@@ -1,0 +1,7 @@
+{
+  "name": "@obh/payments",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reserved workspace package for the OBH payment SDK. No SDK or API is implemented in Step 1."
+}

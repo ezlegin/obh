@@ -5,6 +5,7 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
+    "dev:web": "pnpm --filter web dev --port 3100",
     "lint": "turbo lint",
     "format": "turbo format",
     "typecheck": "turbo typecheck"
@@ -19,6 +20,6 @@
   },
   "packageManager": "pnpm@11.25.0",
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=22.13.0"
   }
 }
