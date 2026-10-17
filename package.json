@@ -8,7 +8,12 @@
     "dev:web": "pnpm --filter web dev --port 3100",
     "lint": "turbo lint",
     "format": "turbo format",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "db:generate": "pnpm --filter web db:generate",
+    "db:validate": "pnpm --filter web db:validate",
+    "db:migrate": "pnpm --filter web db:migrate",
+    "db:deploy": "pnpm --filter web db:deploy",
+    "db:studio": "pnpm --filter web db:studio"
   },
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",

@@ -10,9 +10,9 @@ and the reusable payment SDK.
 - pnpm workspace + Turborepo
 - Next.js 16 App Router, React 19, strict TypeScript
 - Tailwind CSS v4 and shadcn/ui primitives
-- Inter, dark mode only
-- PostgreSQL, Prisma, and Auth.js are planned for later authorized steps; they
-  are not installed or configured yet
+- Inter via `next/font/google`, dark mode only
+- PostgreSQL with Prisma ORM 7.10.1 and the `@prisma/adapter-pg` driver adapter
+- Auth.js v5 is planned for Step 3 and is not configured yet
 
 ## Workspace
 
@@ -47,21 +47,52 @@ with unrelated projects.
 Other useful commands:
 
 ```bash
-pnpm dev          # Turborepo dev task for all configured apps
-pnpm build        # production build through Turborepo
-pnpm lint         # ESLint for every workspace package
-pnpm typecheck    # strict TypeScript checks
+pnpm dev           # Turborepo dev task for all configured apps
+pnpm build         # Prisma generate + production build
+pnpm lint          # ESLint for every workspace package
+pnpm typecheck     # strict TypeScript checks
+pnpm db:validate   # validate the Prisma schema
+pnpm db:generate   # generate the Prisma 7 client
+pnpm db:migrate    # create/apply a development migration
+pnpm db:deploy     # apply committed migrations (deployment)
+pnpm db:studio     # open Prisma Studio
 ```
 
-No environment variables are required for the Step 1 public website.
+The public site does not require a database connection. Database commands need
+`DATABASE_URL`. To configure a local database:
+
+```bash
+copy apps\web\.env.example apps\web\.env
+```
+
+Then replace the placeholder credentials in `apps/web/.env` with a dedicated
+local PostgreSQL database and least-privileged user. Never commit `.env`.
 
 Inter is loaded through `next/font/google`. A production build therefore
 requires network access to Google Fonts; the font is not vendored in this
 repository.
 
+## Database foundation
+
+The Prisma 7 schema and initial migration are implemented under
+[`apps/web/prisma`](apps/web/prisma). Architecture decisions, monetary rules,
+entity relationships, deletion behavior, and unresolved business rules are
+documented in [`apps/web/prisma/README.md`](apps/web/prisma/README.md).
+
+Database access is server-only. The single Prisma Client entry point is
+[`apps/web/lib/db/client.ts`](apps/web/lib/db/client.ts), and the server layer
+convention is described in [`apps/web/server/README.md`](apps/web/server/README.md).
+Shared packages must remain independent of application database internals.
+
+The initial migration was validated against a disposable PostgreSQL 18
+instance. No persistent OBH database was provisioned with user credentials.
+
 ## Project status
 
-Completed: Step 1 — project foundation and public visual direction.
+Completed:
+
+- Step 1 — project foundation and public visual direction
+- Step 2 — database and application architecture foundation
 
 Applied decisions:
 
@@ -71,6 +102,8 @@ Applied decisions:
 - original OBH SVG wordmark used in the navbar, footer, and system map
 - standalone documentation app boundary reserved in `apps/docs` (not built)
 - provisional `@obh/payments` package boundary reserved (not implemented)
+- Prisma 7 server-only database boundary with an initial financial schema and
+  one validated initial migration
 
 Awaiting confirmation before later steps:
 
@@ -78,9 +111,11 @@ Awaiting confirmation before later steps:
 - direct OBH contact channel (no email address or phone number was supplied)
 - live status of the six external service destinations
 - when the standalone documentation application should be implemented
+- profit distribution rules, revenue recognition policy, reporting time zone,
+  and the other database rules listed in `apps/web/prisma/README.md`
 
-Admin, authentication, database, payment API/SDK, accounting, shareholder, and
-reporting functionality remain intentionally unimplemented.
+Admin, authentication, payment API/SDK, accounting calculations, shareholder
+workflows, and reporting remain intentionally unimplemented.
 
 ## Public routes
 
@@ -89,9 +124,6 @@ reporting functionality remain intentionally unimplemented.
 - `/contact-us` — service-based contact directory
 - `/terms` — website terms
 - `/docs` — not implemented; reserved for the separate documentation app
-
-Admin, authentication, database, payment, accounting, shareholder, reporting,
-and SDK functionality are intentionally out of scope for Step 1.
 
 ## Adding shadcn/ui components
 

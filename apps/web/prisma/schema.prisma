@@ -1,0 +1,630 @@
+// OBH database foundation.
+//
+// This schema intentionally models financial facts without implementing
+// business calculations. See prisma/README.md for the accounting boundaries and
+// the rules that still require confirmation before Step 7/8 logic is added.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccountKind {
+  PROVIDER
+  BUSINESS
+}
+
+enum ProviderEnvironment {
+  TEST
+  LIVE
+}
+
+enum PaymentDirection {
+  INCOMING
+  OUTGOING
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentEventSource {
+  SYSTEM
+  SERVICE
+  PROVIDER
+  MANAGER
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+}
+
+enum TransferKind {
+  INTERNAL
+  SETTLEMENT
+  WITHDRAWAL
+}
+
+enum TransferStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum FeeKind {
+  GATEWAY_FEE
+  COMMISSION
+}
+
+enum FeeStatus {
+  PENDING
+  SETTLED
+  VOIDED
+}
+
+enum ExpenseStatus {
+  PENDING
+  PAID
+  VOIDED
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  EXHAUSTED
+}
+
+enum ProfitPeriodStatus {
+  DRAFT
+  APPROVED
+  CLOSED
+  VOIDED
+}
+
+enum ProfitDistributionStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  VOIDED
+}
+
+enum PayoutStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+/// The authenticated manager account. Authentication is implemented in Step 3;
+/// this model only reserves the durable identity and audit relationship.
+model User {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  email        String    @unique @db.VarChar(320)
+  name         String    @db.VarChar(160)
+  passwordHash String?   @db.VarChar(255)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime? @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
+
+  auditLogs            AuditLog[]
+  approvedProfitPeriod ProfitPeriod[] @relation("ProfitPeriodApprovedBy")
+}
+
+/// A product or service that can originate payments through OBH.
+model ConnectedService {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  slug              String   @unique @db.VarChar(80)
+  name              String   @db.VarChar(160)
+  domain            String   @unique @db.VarChar(255)
+  description       String?  @db.Text
+  allowedReturnUrls String[] @default([])
+  webhookUrl        String?  @db.Text
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
+  credentials       ServiceCredential[]
+  payments          Payment[]
+  webhookDeliveries WebhookDelivery[]
+
+  @@index([isActive])
+}
+
+/// Service API credentials. Only a non-secret key identifier and a one-way
+/// secret hash are stored; the raw credential is shown once when issued.
+model ServiceCredential {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  serviceId  String    @db.Uuid
+  keyId      String    @unique @db.VarChar(64)
+  secretHash String    @db.VarChar(255)
+  label      String    @db.VarChar(120)
+  lastUsedAt DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  service ConnectedService @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([serviceId, revokedAt])
+}
+
+/// A payment provider integration. Provider credentials are intentionally not
+/// stored here; they remain server-side environment/secret-manager values.
+model PaymentProvider {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  code        String   @unique @db.VarChar(80)
+  name        String   @db.VarChar(160)
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  accounts FinancialAccount[]
+  payments Payment[]
+
+  @@index([isActive])
+}
+
+/// A real account at a provider or a business-owned account (bank, cash,
+/// wallet, etc.). This is not the same thing as a provider or a connected
+/// service. `providerId` is expected for PROVIDER accounts and absent for
+/// BUSINESS accounts; that rule is enforced by server validation in a later
+/// step rather than inferred here.
+model FinancialAccount {
+  id                String               @id @default(uuid(7)) @db.Uuid
+  name              String               @db.VarChar(160)
+  kind              AccountKind
+  providerId        String?              @db.Uuid
+  environment       ProviderEnvironment?
+  externalReference String?              @db.VarChar(191)
+  institution       String?              @db.VarChar(160)
+  maskedIdentifier  String?              @db.VarChar(80)
+  currency          String               @default("IRR") @db.VarChar(3)
+  openingBalance    Decimal              @default(0) @db.Decimal(24, 2)
+  openingBalanceAt  DateTime?            @db.Timestamptz(3)
+  isActive          Boolean              @default(true)
+  notes             String?              @db.Text
+  createdAt         DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime             @updatedAt @db.Timestamptz(3)
+
+  provider             PaymentProvider?        @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  payments             Payment[]               @relation("PaymentProviderAccount")
+  fees                 ProviderFee[]
+  transfersFrom        Transfer[]              @relation("TransferFromAccount")
+  transfersTo          Transfer[]              @relation("TransferToAccount")
+  reconciliations      AccountReconciliation[]
+  expenses             Expense[]
+  income               Income[]
+  capitalContributions CapitalContribution[]
+  shareholderPayouts   ShareholderPayout[]
+
+  @@index([kind, isActive])
+  @@index([providerId])
+}
+
+/// A manual reconciliation snapshot. Balances are otherwise calculated from
+/// recorded movements; this table is what lets the UI distinguish an actual
+/// reconciled balance from a calculated one.
+model AccountReconciliation {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  accountId         String   @db.Uuid
+  asOf              DateTime @db.Timestamptz(3)
+  actualBalance     Decimal  @db.Decimal(24, 2)
+  calculatedBalance Decimal  @db.Decimal(24, 2)
+  difference        Decimal  @db.Decimal(24, 2)
+  note              String?  @db.Text
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+
+  account FinancialAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([accountId, asOf])
+}
+
+model PaymentMethod {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  code        String   @unique @db.VarChar(80)
+  name        String   @db.VarChar(160)
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  payments Payment[]
+
+  @@index([isActive])
+}
+
+/// Authoritative OBH payment record. Provider callbacks and browser redirects
+/// may update this only after server-side verification in a later step.
+model Payment {
+  id                String           @id @default(uuid(7)) @db.Uuid
+  reference         String           @unique @db.VarChar(48)
+  serviceId         String?          @db.Uuid
+  externalOrderId   String?          @db.VarChar(191)
+  idempotencyKey    String?          @db.VarChar(191)
+  amount            Decimal          @db.Decimal(24, 2)
+  currency          String           @default("IRR") @db.VarChar(3)
+  direction         PaymentDirection @default(INCOMING)
+  status            PaymentStatus    @default(PENDING)
+  description       String           @db.Text
+  metadata          Json?
+  providerId        String?          @db.Uuid
+  providerAccountId String?          @db.Uuid
+  providerReference String?          @db.VarChar(191)
+  providerSessionId String?          @db.VarChar(191)
+  checkoutUrl       String?          @db.Text
+  paymentMethodId   String?          @db.Uuid
+  completedAt       DateTime?        @db.Timestamptz(3)
+  verifiedAt        DateTime?        @db.Timestamptz(3)
+  failedAt          DateTime?        @db.Timestamptz(3)
+  cancelledAt       DateTime?        @db.Timestamptz(3)
+  createdAt         DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime         @updatedAt @db.Timestamptz(3)
+
+  service           ConnectedService?     @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  provider          PaymentProvider?      @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  providerAccount   FinancialAccount?     @relation("PaymentProviderAccount", fields: [providerAccountId], references: [id], onDelete: Restrict)
+  paymentMethod     PaymentMethod?        @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  events            PaymentEvent[]
+  verifications     PaymentVerification[]
+  fees              ProviderFee[]
+  webhookDeliveries WebhookDelivery[]
+
+  @@unique([serviceId, externalOrderId])
+  @@unique([serviceId, idempotencyKey])
+  @@index([status, createdAt])
+  @@index([serviceId, createdAt])
+  @@index([providerAccountId, createdAt])
+  @@index([providerReference])
+}
+
+/// Append-only lifecycle history for a payment. `type` is a controlled string
+/// so new event names can be introduced without a destructive enum migration.
+model PaymentEvent {
+  id             String             @id @default(uuid(7)) @db.Uuid
+  paymentId      String             @db.Uuid
+  type           String             @db.VarChar(80)
+  source         PaymentEventSource
+  previousStatus PaymentStatus?
+  newStatus      PaymentStatus?
+  message        String?            @db.Text
+  metadata       Json?
+  createdAt      DateTime           @default(now()) @db.Timestamptz(3)
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId, createdAt])
+  @@index([type, createdAt])
+}
+
+/// Each row is one server-side verification attempt. A redirect is never
+/// verification; only a verified row may support an authoritative status.
+model PaymentVerification {
+  id                String             @id @default(uuid(7)) @db.Uuid
+  paymentId         String             @db.Uuid
+  status            VerificationStatus
+  method            String             @db.VarChar(80)
+  providerReference String?            @db.VarChar(191)
+  verifiedAt        DateTime?          @db.Timestamptz(3)
+  failureReason     String?            @db.Text
+  metadata          Json?
+  createdAt         DateTime           @default(now()) @db.Timestamptz(3)
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId, createdAt])
+  @@index([status, createdAt])
+}
+
+/// Fees charged by a provider. Fees are recorded separately from the gross
+/// payment amount so reports do not conflate them.
+model ProviderFee {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  providerAccountId String    @db.Uuid
+  paymentId         String?   @db.Uuid
+  kind              FeeKind
+  status            FeeStatus @default(PENDING)
+  amount            Decimal   @db.Decimal(24, 2)
+  currency          String    @default("IRR") @db.VarChar(3)
+  chargedAt         DateTime  @db.Timestamptz(3)
+  reference         String?   @db.VarChar(191)
+  note              String?   @db.Text
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @db.Timestamptz(3)
+
+  providerAccount FinancialAccount @relation(fields: [providerAccountId], references: [id], onDelete: Restrict)
+  payment         Payment?         @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([providerAccountId, chargedAt])
+  @@index([paymentId])
+  @@index([status, chargedAt])
+}
+
+/// A movement between two financial accounts. Settlements and withdrawals use
+/// the same transfer record with an explicit kind.
+model Transfer {
+  id                String         @id @default(uuid(7)) @db.Uuid
+  reference         String         @unique @db.VarChar(48)
+  fromAccountId     String         @db.Uuid
+  toAccountId       String         @db.Uuid
+  amount            Decimal        @db.Decimal(24, 2)
+  currency          String         @default("IRR") @db.VarChar(3)
+  kind              TransferKind
+  status            TransferStatus @default(PENDING)
+  occurredAt        DateTime       @db.Timestamptz(3)
+  externalReference String?        @db.VarChar(191)
+  note              String?        @db.Text
+  createdAt         DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime       @updatedAt @db.Timestamptz(3)
+
+  fromAccount FinancialAccount @relation("TransferFromAccount", fields: [fromAccountId], references: [id], onDelete: Restrict)
+  toAccount   FinancialAccount @relation("TransferToAccount", fields: [toAccountId], references: [id], onDelete: Restrict)
+
+  @@index([fromAccountId, occurredAt])
+  @@index([toAccountId, occurredAt])
+  @@index([status, occurredAt])
+}
+
+/// Reliable service notification queue. Delivery attempts are recorded here so
+/// retries and duplicate callbacks are observable in Step 6.
+model WebhookDelivery {
+  id            String                @id @default(uuid(7)) @db.Uuid
+  serviceId     String                @db.Uuid
+  paymentId     String                @db.Uuid
+  eventType     String                @db.VarChar(80)
+  endpoint      String                @db.Text
+  status        WebhookDeliveryStatus @default(PENDING)
+  attempts      Int                   @default(0)
+  payload       Json
+  lastAttemptAt DateTime?             @db.Timestamptz(3)
+  nextAttemptAt DateTime?             @db.Timestamptz(3)
+  deliveredAt   DateTime?             @db.Timestamptz(3)
+  lastError     String?               @db.Text
+  createdAt     DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime              @updatedAt @db.Timestamptz(3)
+
+  service ConnectedService @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  payment Payment          @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentId, eventType])
+  @@index([status, nextAttemptAt])
+  @@index([serviceId, createdAt])
+}
+
+model ExpenseCategory {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  name        String   @unique @db.VarChar(120)
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  expenses Expense[]
+
+  @@index([isActive, sortOrder])
+}
+
+/// Operating costs are accounting records, not simply cash withdrawals. The
+/// source account is optional until an expense is marked paid.
+model Expense {
+  id                String        @id @default(uuid(7)) @db.Uuid
+  categoryId        String        @db.Uuid
+  accountId         String?       @db.Uuid
+  amount            Decimal       @db.Decimal(24, 2)
+  currency          String        @default("IRR") @db.VarChar(3)
+  spentOn           DateTime      @db.Date
+  description       String        @db.Text
+  notes             String?       @db.Text
+  status            ExpenseStatus @default(PENDING)
+  paidAt            DateTime?     @db.Timestamptz(3)
+  externalReference String?       @db.VarChar(191)
+  createdAt         DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime      @updatedAt @db.Timestamptz(3)
+
+  category  ExpenseCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  account   FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  documents ExpenseDocument[]
+
+  @@index([spentOn])
+  @@index([categoryId, spentOn])
+  @@index([accountId, spentOn])
+  @@index([status])
+}
+
+/// Metadata for a private supporting document. The file itself belongs in
+/// protected object storage; no binary financial document is stored in Postgres.
+model ExpenseDocument {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  expenseId      String   @db.Uuid
+  fileName       String   @db.VarChar(255)
+  storageKey     String   @unique @db.VarChar(512)
+  mimeType       String   @db.VarChar(160)
+  byteSize       Int
+  checksumSha256 String?  @db.VarChar(64)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+
+  @@index([expenseId])
+}
+
+model Income {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  accountId         String?  @db.Uuid
+  amount            Decimal  @db.Decimal(24, 2)
+  currency          String   @default("IRR") @db.VarChar(3)
+  receivedOn        DateTime @db.Date
+  description       String   @db.Text
+  source            String?  @db.VarChar(160)
+  externalReference String?  @db.VarChar(191)
+  notes             String?  @db.Text
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
+  account FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([receivedOn])
+  @@index([accountId, receivedOn])
+}
+
+model Shareholder {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String   @db.VarChar(160)
+  email     String?  @db.VarChar(320)
+  phone     String?  @db.VarChar(40)
+  notes     String?  @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  ownershipRecords     OwnershipRecord[]
+  capitalContributions CapitalContribution[]
+  distributions        ProfitDistribution[]
+
+  @@index([isActive])
+}
+
+/// Historical ownership. Overlapping active periods are prevented by service
+/// validation, not by a database exclusion constraint in this foundation.
+model OwnershipRecord {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  shareholderId String    @db.Uuid
+  percentage    Decimal   @db.Decimal(7, 4)
+  effectiveFrom DateTime  @db.Date
+  effectiveTo   DateTime? @db.Date
+  note          String?   @db.Text
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+
+  shareholder Shareholder @relation(fields: [shareholderId], references: [id], onDelete: Restrict)
+
+  @@index([shareholderId, effectiveFrom])
+  @@index([effectiveFrom, effectiveTo])
+}
+
+/// Capital paid into the corporation by a shareholder. This is equity, never
+/// revenue, and is deliberately separate from Income and ProfitDistribution.
+model CapitalContribution {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  shareholderId     String   @db.Uuid
+  accountId         String?  @db.Uuid
+  amount            Decimal  @db.Decimal(24, 2)
+  currency          String   @default("IRR") @db.VarChar(3)
+  contributedOn     DateTime @db.Date
+  description       String   @db.Text
+  externalReference String?  @db.VarChar(191)
+  note              String?  @db.Text
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
+  shareholder Shareholder       @relation(fields: [shareholderId], references: [id], onDelete: Restrict)
+  account     FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([shareholderId, contributedOn])
+  @@index([accountId, contributedOn])
+}
+
+/// A frozen profit-calculation snapshot. Monetary totals remain null until a
+/// calculation is intentionally recorded. Distribution rules are not assumed.
+model ProfitPeriod {
+  id                  String             @id @default(uuid(7)) @db.Uuid
+  startsOn            DateTime           @db.Date
+  endsOn              DateTime           @db.Date
+  currency            String             @default("IRR") @db.VarChar(3)
+  status              ProfitPeriodStatus @default(DRAFT)
+  totalRevenue        Decimal?           @db.Decimal(24, 2)
+  totalExpenses       Decimal?           @db.Decimal(24, 2)
+  netProfit           Decimal?           @db.Decimal(24, 2)
+  distributableAmount Decimal?           @db.Decimal(24, 2)
+  calculatedAt        DateTime?          @db.Timestamptz(3)
+  approvedAt          DateTime?          @db.Timestamptz(3)
+  approvedById        String?            @db.Uuid
+  notes               String?            @db.Text
+  createdAt           DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime           @updatedAt @db.Timestamptz(3)
+
+  approvedBy    User?                @relation("ProfitPeriodApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  distributions ProfitDistribution[]
+
+  @@unique([startsOn, endsOn])
+  @@index([status, endsOn])
+}
+
+/// A single shareholder's allocation for a period. The percentage is snapshotted
+/// so later ownership changes cannot rewrite history.
+model ProfitDistribution {
+  id                 String                   @id @default(uuid(7)) @db.Uuid
+  profitPeriodId     String                   @db.Uuid
+  shareholderId      String                   @db.Uuid
+  percentageSnapshot Decimal                  @db.Decimal(7, 4)
+  allocatedAmount    Decimal                  @db.Decimal(24, 2)
+  currency           String                   @default("IRR") @db.VarChar(3)
+  status             ProfitDistributionStatus @default(PENDING)
+  approvedAt         DateTime?                @db.Timestamptz(3)
+  notes              String?                  @db.Text
+  createdAt          DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                 @updatedAt @db.Timestamptz(3)
+
+  profitPeriod ProfitPeriod        @relation(fields: [profitPeriodId], references: [id], onDelete: Restrict)
+  shareholder  Shareholder         @relation(fields: [shareholderId], references: [id], onDelete: Restrict)
+  payouts      ShareholderPayout[]
+
+  @@unique([profitPeriodId, shareholderId])
+  @@index([shareholderId, createdAt])
+  @@index([status])
+}
+
+/// Payments against a distribution. Multiple rows support partial payment.
+model ShareholderPayout {
+  id                   String       @id @default(uuid(7)) @db.Uuid
+  profitDistributionId String       @db.Uuid
+  accountId            String?      @db.Uuid
+  amount               Decimal      @db.Decimal(24, 2)
+  currency             String       @default("IRR") @db.VarChar(3)
+  status               PayoutStatus @default(PENDING)
+  paidAt               DateTime?    @db.Timestamptz(3)
+  externalReference    String?      @db.VarChar(191)
+  note                 String?      @db.Text
+  createdAt            DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime     @updatedAt @db.Timestamptz(3)
+
+  profitDistribution ProfitDistribution @relation(fields: [profitDistributionId], references: [id], onDelete: Restrict)
+  account            FinancialAccount?  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([profitDistributionId, createdAt])
+  @@index([accountId, paidAt])
+  @@index([status])
+}
+
+/// Append-only audit trail for financially significant changes.
+model AuditLog {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  actorId    String?  @db.Uuid
+  action     String   @db.VarChar(80)
+  entityType String   @db.VarChar(80)
+  entityId   String   @db.VarChar(80)
+  before     Json?
+  after      Json?
+  metadata   Json?
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+}
