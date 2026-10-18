@@ -11,8 +11,7 @@
     "typecheck": "turbo typecheck",
     "db:generate": "pnpm --filter web db:generate",
     "db:validate": "pnpm --filter web db:validate",
-    "db:migrate": "pnpm --filter web db:migrate",
-    "db:deploy": "pnpm --filter web db:deploy",
+    "db:push": "pnpm --filter web db:push",
     "db:studio": "pnpm --filter web db:studio",
     "auth:create-manager": "pnpm --filter web auth:create-manager"
   },

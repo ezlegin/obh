@@ -27,14 +27,14 @@ Generate a secret with:
 node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
-The local `.env.local` contains a generated development secret and is ignored
-by Git. It does not contain database credentials. For deployment, set both
-variables through the hosting environment.
+The local `.env.local` contains local development secrets and database settings;
+it is ignored by Git. For deployment, set both variables through the hosting
+environment.
 
 ## Create a manager
 
 There is no public registration or password-reset flow. Managers are provisioned
-only through the server-side CLI after migrations have been applied:
+only through the server-side CLI after the schema has been pushed:
 
 ```bash
 pnpm auth:create-manager

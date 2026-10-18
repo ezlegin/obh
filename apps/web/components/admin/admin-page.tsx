@@ -3,6 +3,8 @@ import type { ReactNode } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
 
+import { AdminEmptyState } from "@/components/admin/empty-state"
+
 type AdminPageHeaderProps = {
   eyebrow: string
   title: string
@@ -45,21 +47,15 @@ function AdminModulePlaceholder({
 }: AdminModulePlaceholderProps) {
   return (
     <div className="mt-8 overflow-hidden rounded-2xl border border-border bg-card/40">
-      <div className="flex min-h-[22rem] flex-col items-center justify-center px-6 py-16 text-center">
-        <span className="flex size-12 items-center justify-center rounded-full border border-border bg-white/[0.03] text-muted-foreground">
-          <Icon aria-hidden="true" className="size-5" />
-        </span>
-        <Badge variant="outline" className="mt-6">
-          Protected module
-        </Badge>
-        <h2 className="mt-4 text-xl font-medium tracking-[-0.02em]">
-          This section is ready.
-        </h2>
-        <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
-          {description} No records are displayed until the {title.toLowerCase()}{" "}
-          module is implemented.
-        </p>
+      <div className="flex justify-center border-b border-border py-4">
+        <Badge variant="outline">Protected module</Badge>
       </div>
+      <AdminEmptyState
+        icon={Icon}
+        title="This section is ready."
+        description={`${description} No records are displayed until the ${title.toLowerCase()} module is implemented.`}
+        className="min-h-[18rem]"
+      />
     </div>
   )
 }

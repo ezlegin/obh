@@ -106,21 +106,23 @@ the PostgreSQL driver adapter, and is reused across development hot reloads.
 Query and transaction code belongs under `server/`. Shared packages, including
 `@obh/payments`, must not import this database module or generated Prisma code.
 
-## Migration workflow
+## Schema workflow
+
+This project uses `prisma db push` rather than a migration history.
 
 From the repository root:
 
 ```bash
 pnpm db:validate
 pnpm db:generate
-pnpm db:migrate
-pnpm db:deploy
+pnpm db:push
 ```
 
-`DATABASE_URL` is configured in `apps/web/.env` for local development. The
-initial migration is checked into `prisma/migrations`. `prisma generate` does not
-need a live database, so the public site can still build before credentials are
-provided.
+`DATABASE_URL` is configured in `apps/web/.env` for local development.
+`prisma generate` does not need a live database, so the public site can still
+build before credentials are provided. Because `db push` applies schema changes
+directly, take a backup before using it against a database containing real
+financial records.
 
 ## Rules that are NOT implemented yet
 

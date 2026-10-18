@@ -53,8 +53,7 @@ pnpm lint          # ESLint for every workspace package
 pnpm typecheck     # strict TypeScript checks
 pnpm db:validate   # validate the Prisma schema
 pnpm db:generate   # generate the Prisma 7 client
-pnpm db:migrate    # create/apply a development migration
-pnpm db:deploy     # apply committed migrations (deployment)
+pnpm db:push       # push the schema directly to the database
 pnpm db:studio     # open Prisma Studio
 pnpm auth:create-manager # provision a manager (no public registration)
 ```
@@ -67,7 +66,7 @@ copy apps\web\.env.example apps\web\.env
 ```
 
 Then replace the placeholder PostgreSQL credentials and `AUTH_SECRET` in
-`apps/web/.env`, apply migrations with `pnpm db:migrate`, and create the manager:
+`apps/web/.env`, push the schema with `pnpm db:push`, and create the manager:
 
 ```bash
 pnpm auth:create-manager
@@ -86,18 +85,19 @@ repository.
 
 ## Database foundation
 
-The Prisma 7 schema and initial migration are implemented under
-[`apps/web/prisma`](apps/web/prisma). Architecture decisions, monetary rules,
-entity relationships, deletion behavior, and unresolved business rules are
-documented in [`apps/web/prisma/README.md`](apps/web/prisma/README.md).
+The Prisma 7 schema is implemented under [`apps/web/prisma`](apps/web/prisma).
+Architecture decisions, monetary rules, entity relationships, deletion behavior,
+and unresolved business rules are documented in
+[`apps/web/prisma/README.md`](apps/web/prisma/README.md). The schema is applied
+with `prisma db push` rather than a migration history.
 
 Database access is server-only. The single Prisma Client entry point is
 [`apps/web/lib/db/client.ts`](apps/web/lib/db/client.ts), and the server layer
 convention is described in [`apps/web/server/README.md`](apps/web/server/README.md).
 Shared packages must remain independent of application database internals.
 
-The initial migration was validated against a disposable PostgreSQL 18
-instance. No persistent OBH database was provisioned with user credentials.
+The schema was validated against a disposable PostgreSQL 18 instance. No
+persistent production database was provisioned with user credentials.
 
 ## Authentication and admin
 
@@ -110,6 +110,13 @@ Auth.js v5 protects the entire `/admin` area. The implementation includes:
 - a database-backed `requireAdmin()` guard for every admin page
 - responsive admin navigation and sign-out
 - `noindex` admin metadata and no login links on the public website
+- a reusable admin component set for summaries, tables, filters, dialogs,
+  forms, charts, loading states, and empty states
+
+The dashboard at `/admin` currently uses clearly labeled development data. No
+figure there is read from or written to the database, and the interface states
+this prominently. Real data will replace it when the relevant modules are
+implemented.
 
 No registration, password reset, MFA, or login rate limiting is implemented yet.
 See [`apps/web/AUTH.md`](apps/web/AUTH.md).
@@ -121,6 +128,7 @@ Completed:
 - Step 1 — project foundation and public visual direction
 - Step 2 — database and application architecture foundation
 - Step 3 — authentication, login, protected admin layout, and route scaffolds
+- Step 4 — interactive dashboard and shared admin components
 
 Applied decisions:
 
@@ -130,10 +138,14 @@ Applied decisions:
 - original OBH SVG wordmark used in the navbar, footer, and system map
 - standalone documentation app boundary reserved in `apps/docs` (not built)
 - provisional `@obh/payments` package boundary reserved (not implemented)
-- Prisma 7 server-only database boundary with an initial financial schema and
-  one validated initial migration
+- Prisma 7 server-only database boundary with an initial financial schema
+  applied through `prisma db push`
 - Auth.js v5 JWT sessions, manager provisioning CLI, server-side admin guard,
   and responsive protected admin navigation
+- reusable summary cards, data table, filter form, dialogs, chart, loading
+  skeleton, and empty states in the protected admin area
+- a dashboard clearly labeled as development data, with no sample figure
+  presented as an actual financial record
 
 Awaiting confirmation before later steps:
 
@@ -161,7 +173,7 @@ Public:
 
 Protected:
 
-- `/admin` — admin foundation overview
+- `/admin` — development-data financial dashboard
 - `/admin/payments`, `/admin/gateways`, `/admin/services`
 - `/admin/expenses`, `/admin/income`, `/admin/reports`
 - `/admin/shareholders`, `/admin/distributions`
