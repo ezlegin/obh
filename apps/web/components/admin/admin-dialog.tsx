@@ -14,6 +14,8 @@ type AdminDialogProps = {
   className?: string
 }
 
+let openDialogCount = 0
+
 function AdminDialog({
   open,
   onOpenChange,
@@ -33,20 +35,30 @@ function AdminDialog({
       return
     }
 
-    if (open) {
-      if (!dialog.open) {
-        dialog.showModal()
-      }
-      document.body.style.overflow = "hidden"
-    } else {
+    if (!open) {
       if (dialog.open) {
         dialog.close()
       }
-      document.body.style.overflow = ""
+      return
     }
 
+    if (!dialog.open) {
+      dialog.showModal()
+    }
+
+    openDialogCount += 1
+    document.body.style.overflow = "hidden"
+
     return () => {
-      document.body.style.overflow = ""
+      openDialogCount = Math.max(0, openDialogCount - 1)
+
+      if (openDialogCount === 0) {
+        document.body.style.overflow = ""
+      }
+
+      if (dialog.open) {
+        dialog.close()
+      }
     }
   }, [open])
 

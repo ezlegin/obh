@@ -112,7 +112,13 @@ Do not log `secretKey`, webhook signing secrets, or raw provider credentials.
 The SDK does not verify inbound webhooks. Connected services must verify the
 `OBH-Signature` HMAC-SHA256 header with their own per-service webhook signing
 secret over `<timestamp>.<raw body>`, reject stale timestamps, and deduplicate by
-`OBH-Event-Id`. See [`../../apps/web/PAYMENT_API.md`](../../apps/web/PAYMENT_API.md).
+`OBH-Event-Id`. See the repository's `apps/web/PAYMENT_API.md` contract.
+
+## Releasing
+
+See the repository's `RELEASING.md` file. The package is prepared but has not
+been published. Do not publish without explicit approval and npm organization
+access.
 
 ## Development
 

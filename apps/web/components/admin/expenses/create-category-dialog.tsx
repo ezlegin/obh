@@ -115,6 +115,7 @@ function CreateCategoryDialog({
         <label className="flex items-start gap-3 rounded-xl border border-border p-4">
           <input
             type="checkbox"
+            aria-label="Require a supporting document"
             className="mt-0.5 size-4 accent-white"
             {...register("requiresDocument")}
           />

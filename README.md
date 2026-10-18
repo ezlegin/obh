@@ -193,6 +193,66 @@ Implemented in Step 7:
 Supporting documents currently use private local storage. Production must move
 them to protected object storage. No real money moves through these workflows.
 
+## Equity and profit distribution
+
+The approved monthly profit rules, ownership snapshots, loss carryforward,
+approval model, and full-payout policy are documented in
+[`apps/web/EQUITY.md`](apps/web/EQUITY.md).
+
+Implemented in Step 8:
+
+- shareholder profiles and historical effective-date ownership records
+- overlap protection and period-end 100.0000% ownership validation
+- monthly cash-basis profit calculation using LIVE payments, manual income, paid
+  expenses, settled LIVE provider fees, reserve, and tax
+- loss carryforward and whole-IRR allocation with retained rounding residual
+- period-level manager approval and frozen snapshots
+- full payout per shareholder against a business payment source
+- automatic period close after all positive allocations are paid
+- audit history for ownership, calculation, approval, and payouts
+
+TEST payments are excluded from profit. No payments, transfers, or bank
+operations are executed by the distribution workflow.
+
+## Reports and reconciliation
+
+Reporting definitions, consistency checks, exports, and reconciliation math are
+documented in [`apps/web/REPORTS.md`](apps/web/REPORTS.md).
+
+Implemented in Step 9:
+
+- date-filtered cash-basis financial reports
+- revenue by service, expenses by category, and income by source
+- approved distributable profit and payout summaries
+- manager-only CSV exports for summary, LIVE payments, expenses, and
+  distributions, with formula-injection protection
+- provider fee tracking, settlement transfers, calculated provider balances, and
+  reconciliation against actual statement balances
+- consistency checks across payments, income, expenses, documents, profit
+  periods, distributions, payouts, and provider reconciliations
+- TEST payments excluded from financial totals and surfaced as a review item
+
+## Production readiness
+
+Deployment, environment, backup, worker scheduling, document storage, security,
+and SDK release procedures are documented in
+[`DEPLOYMENT.md`](DEPLOYMENT.md) and
+[`packages/payments/RELEASING.md`](packages/payments/RELEASING.md).
+
+Step 10 verified:
+
+- production build and all workspace tests
+- route-by-route desktop and mobile rendering with no horizontal overflow
+- one `h1` and one main landmark per admin route
+- accessible names for buttons and form controls
+- no duplicate DOM IDs in the audited routes
+- security headers and error boundaries
+- no client-exposed secrets or unsafe HTML injection
+- CSV formula-injection protection
+- SDK tarball contents and release/versioning documentation
+
+No deployment, npm publication, or production payment operation was performed.
+
 ## Project status
 
 Completed:
@@ -204,6 +264,9 @@ Completed:
 - Step 5 — payment platform, provider boundary, services, and gateway foundation
 - Step 6 — versioned payment API, signed notifications, and `@obh/payments` SDK
 - Step 7 — income, expenses, categories, payment sources, recurring rules, and documents
+- Step 8 — shareholders, ownership history, monthly distributions, and payouts
+- Step 9 — financial reports, CSV exports, reconciliation, and consistency checks
+- Step 10 — final review, hardening, tests, and deployment documentation
 
 Applied decisions:
 
@@ -228,25 +291,31 @@ Applied decisions:
   development checkout, signed webhooks, retry worker, and SDK integration tests
 - business payment sources, expense categories, income and expense ledgers,
   private document attachments, and approval-gated recurring expense rules
+- historical ownership, monthly profit snapshots, loss carryforward,
+  single-manager approval, and full shareholder payouts
+- date-filtered cash-basis reports, CSV exports, provider settlements, gateway
+  reconciliation, and cross-ledger consistency checks
+- production security headers, error boundaries, responsive audit, and deployment
+  and SDK release documentation
 
 Awaiting confirmation before later steps:
 
-- review of Step 7 recurring-expense and document-requirement semantics
+- review and approval of Steps 8–10
 - review and approval of Step 6 before npm publication
 - authorized test against a real payment provider before any live integration
   claim
-- production object-storage provider for expense documents
+- production object-storage provider and malware-scanning decision for documents
+- formal tax/withholding and external reporting policy
 - direct OBH contact channel (no email address or phone number was supplied)
 - live status of the six external service destinations
 - when the standalone documentation application should be implemented
-- profit distribution rules, revenue recognition policy, reporting timezone,
-  and the other database rules listed in `apps/web/prisma/README.md`
+- remaining production controls such as MFA, login/API rate limiting, and
+  distributed webhook worker scheduling
 
-Formal accounting reports, revenue recognition calculations, shareholder
-workflows, and profit distribution remain intentionally unimplemented. The
-dashboard is still development data. Login/API rate limiting, webhook worker
-scheduling, recurring-expense scheduling, document scanning, and production
-hardening are also deferred.
+Formal tax/withholding calculations and externally audited reporting remain
+outside this implementation. The dashboard is still development data. Login/API
+rate limiting, MFA, webhook worker scheduling, automated statement import, and
+document scanning are production gaps documented in `DEPLOYMENT.md`.
 
 ## Routes
 
@@ -271,11 +340,13 @@ Protected:
 - `/admin/payments` — TEST payment console and lifecycle
 - `/admin/gateways` — development provider and TEST account setup
 - `/admin/services` — connected-service registry and credentials
+- `/admin/reconciliation` — provider fees, settlements, balances, and reconciliation
 - `/admin/accounts` — business payment sources
 - `/admin/expenses` — expenses, categories, documents, and recurring rules
 - `/admin/income` — additional income records
-- `/admin/reports` — placeholder until the reporting step
-- `/admin/shareholders`, `/admin/distributions`
+- `/admin/reports` — filtered financial reports, checks, and CSV exports
+- `/admin/shareholders` — profiles and ownership history
+- `/admin/distributions` — monthly profit periods, approvals, and payouts
 - `/admin/settings`
 
 All `/admin` routes require a valid manager session and an active database user.

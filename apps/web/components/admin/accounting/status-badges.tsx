@@ -39,3 +39,37 @@ function RecurringStatusBadge({
 }
 
 export { ExpenseStatusBadge, RecurringStatusBadge }
+
+const profitPeriodConfig = {
+  DRAFT: { label: "Draft · approval required", variant: "warning" as const },
+  APPROVED: { label: "Approved", variant: "info" as const },
+  CLOSED: { label: "Closed", variant: "success" as const },
+  VOIDED: { label: "Voided", variant: "muted" as const },
+}
+
+function ProfitPeriodStatusBadge({
+  status,
+}: {
+  status: "DRAFT" | "APPROVED" | "CLOSED" | "VOIDED"
+}) {
+  const config = profitPeriodConfig[status]
+  return <Badge variant={config.variant}>{config.label}</Badge>
+}
+
+const distributionConfig = {
+  PENDING: { label: "Awaiting payout", variant: "warning" as const },
+  PARTIALLY_PAID: { label: "Partially paid", variant: "info" as const },
+  PAID: { label: "Paid", variant: "success" as const },
+  VOIDED: { label: "Voided", variant: "muted" as const },
+}
+
+function ProfitDistributionStatusBadge({
+  status,
+}: {
+  status: "PENDING" | "PARTIALLY_PAID" | "PAID" | "VOIDED"
+}) {
+  const config = distributionConfig[status]
+  return <Badge variant={config.variant}>{config.label}</Badge>
+}
+
+export { ProfitDistributionStatusBadge, ProfitPeriodStatusBadge }

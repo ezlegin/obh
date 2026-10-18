@@ -31,6 +31,10 @@ The local `.env.local` contains local development secrets and database settings;
 it is ignored by Git. For deployment, set both variables through the hosting
 environment.
 
+`AUTH_SECRET` is also used to derive the encryption key for per-service webhook
+signing secrets. Rotating it without rotating those service webhook secrets makes
+the existing encrypted secrets unreadable. See `PAYMENT_API.md`.
+
 ## Create a manager
 
 There is no public registration or password-reset flow. Managers are provisioned
@@ -52,6 +56,25 @@ pnpm auth:create-manager
 
 Passwords must be 12–72 characters. The CLI refuses to overwrite an existing
 email and never prints the password or hash.
+
+To set or reset the password of an existing manager from `ADMIN_EMAIL` and
+`ADMIN_PASSWORD`, use the idempotent reset command:
+
+```bash
+ADMIN_EMAIL="manager@example.com" ADMIN_PASSWORD="..." pnpm auth:reset-manager
+```
+
+It creates the manager if missing, otherwise replaces the password and reactivates
+the account. It prints only whether the password verifies, never the password or
+hash.
+
+If `DATABASE_URL` points to a database that has not been created yet, create it
+first:
+
+```bash
+pnpm db:ensure
+pnpm db:push
+```
 
 ## Protection model
 

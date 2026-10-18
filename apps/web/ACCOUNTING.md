@@ -1,7 +1,8 @@
 # OBH accounting: income, expenses, and documents
 
-Status: Step 7 implements the operating accounting records. Shareholder equity,
-profit distribution, and formal reports remain later work.
+Status: Step 7 implements the operating accounting records. Equity and profit
+distribution are documented in [`EQUITY.md`](EQUITY.md); reporting and
+reconciliation are documented in [`REPORTS.md`](REPORTS.md).
 
 ## Record boundaries
 

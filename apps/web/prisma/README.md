@@ -89,6 +89,20 @@ explicit.
   storage in development, never in PostgreSQL.
 - `Income` remains separate from `Payment` and `CapitalContribution`.
 
+## Profit periods and distributions
+
+- `ProfitPeriod` is one calendar month with frozen revenue, expenses, fees,
+  reserve, tax, net profit, loss carryforward, distributable amount, ownership
+  total, and retained residual.
+- Only approved/closed periods contribute to distributable totals.
+- `ProfitDistribution.percentageSnapshot` freezes period-end ownership.
+- `ShareholderPayout` has a unique `profitDistributionId`; Step 9 policy is one
+  full payout per shareholder allocation.
+- `ProfitPeriod.status = CLOSED` means all positive allocations were paid, or the
+  period had no distributable profit.
+- Approved periods are immutable snapshots; late entries do not rewrite them.
+- TEST payments are excluded from revenue and profit.
+
 ## Financial rules encoded as structure
 
 - All monetary fields use PostgreSQL `NUMERIC(24, 2)` through Prisma `Decimal`.

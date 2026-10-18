@@ -1,20 +1,42 @@
 import type { Metadata } from "next"
-import { PieChart } from "lucide-react"
 
-import { AdminModuleView } from "@/components/admin/admin-module-view"
+import { Badge } from "@workspace/ui/components/badge"
+
+import { AdminPageHeader } from "@/components/admin/admin-page"
+import { DistributionsWorkspace } from "@/components/admin/distributions/distributions-workspace"
+import {
+  getDistributionsWorkspace,
+  getShareholderWorkspace,
+} from "@/server/equity/queries"
 
 export const metadata: Metadata = {
   title: "Distributions",
 }
 
-export default function AdminDistributionsPage() {
+export default async function AdminDistributionsPage() {
+  const [data, shareholders] = await Promise.all([
+    getDistributionsWorkspace(),
+    getShareholderWorkspace(),
+  ])
+
   return (
-    <AdminModuleView
-      eyebrow="Admin / Equity"
-      title="Distributions"
-      description="Profit periods, calculated allocations, manager approval, and shareholder payouts with historical snapshots."
-      emptyDescription="Profit calculations, approvals, and payout records will appear here after the distribution rules are confirmed."
-      icon={PieChart}
-    />
+    <>
+      <AdminPageHeader
+        eyebrow="Admin / Equity"
+        title="Distributions"
+        description="Monthly profit calculations, period-end ownership snapshots, manager approval, and full shareholder payouts with an immutable history."
+        actions={
+          <Badge variant="outline">
+            {data.periods.length}{" "}
+            {data.periods.length === 1 ? "period" : "periods"}
+          </Badge>
+        }
+      />
+      <DistributionsWorkspace
+        data={data}
+        currentOwnershipTotal={shareholders.currentTotal}
+        shareholderCount={shareholders.shareholders.length}
+      />
+    </>
   )
 }

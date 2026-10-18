@@ -629,12 +629,22 @@ model ProfitPeriod {
   status              ProfitPeriodStatus @default(DRAFT)
   totalRevenue        Decimal?           @db.Decimal(24, 2)
   totalExpenses       Decimal?           @db.Decimal(24, 2)
+  providerFees        Decimal?           @db.Decimal(24, 2)
+  reserveAmount       Decimal?           @db.Decimal(24, 2)
+  taxAmount           Decimal?           @db.Decimal(24, 2)
   netProfit           Decimal?           @db.Decimal(24, 2)
+  lossBalanceBefore   Decimal?           @db.Decimal(24, 2)
+  lossApplied         Decimal?           @db.Decimal(24, 2)
+  lossBalanceAfter    Decimal?           @db.Decimal(24, 2)
   distributableAmount Decimal?           @db.Decimal(24, 2)
+  unallocatedResidual Decimal?           @db.Decimal(24, 2)
+  ownershipTotal      Decimal?           @db.Decimal(7, 4)
   calculatedAt        DateTime?          @db.Timestamptz(3)
   approvedAt          DateTime?          @db.Timestamptz(3)
   approvedById        String?            @db.Uuid
+  closedAt            DateTime?          @db.Timestamptz(3)
   notes               String?            @db.Text
+  adjustmentNote      String?            @db.Text
   createdAt           DateTime           @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime           @updatedAt @db.Timestamptz(3)
 
@@ -686,6 +696,7 @@ model ShareholderPayout {
   profitDistribution ProfitDistribution @relation(fields: [profitDistributionId], references: [id], onDelete: Restrict)
   account            FinancialAccount?  @relation(fields: [accountId], references: [id], onDelete: Restrict)
 
+  @@unique([profitDistributionId])
   @@index([profitDistributionId, createdAt])
   @@index([accountId, paidAt])
   @@index([status])

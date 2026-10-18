@@ -63,6 +63,14 @@ export function formatAccountingDate(value: string) {
   }).format(new Date(`${value}T00:00:00.000Z`))
 }
 
+export function formatAccountingMonth(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}-01T00:00:00.000Z`))
+}
+
 export function formatFileSize(bytes: number) {
   if (bytes < 1024) {
     return `${bytes} B`

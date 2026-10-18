@@ -12,19 +12,20 @@ proxy.ts                Optimistic JWT redirect for /admin/:path*
 lib/auth/               Session guards, password hashing, redirect sanitization
 lib/db/                 Prisma Client entry point
 server/
-  accounting/            Income, expenses, categories, recurring rules, documents
-  api/                   Service auth, request parsing, API errors
-  app-url.ts             Public checkout origin resolution
-  errors.ts              Expected domain errors
-  gateways/              Provider-account management foundation
-  payments/              Payment lifecycle, API service, queries, adapters, webhooks
-    providers/           Server-side provider adapter boundary
-  services/              Connected-service registry and credential issuance
-app/admin/accounts/      Business payment sources
-app/admin/expenses/      Expenses, recurring rules, documents
-app/admin/income/        Additional income
-app/api/v1/              Versioned service API route handlers
-app/pay/dev/             Local development checkout page and completion route
+  accounting/           Income, expenses, categories, recurring rules, documents
+  api/                  Service auth, request parsing, API errors
+  app-url.ts            Public checkout origin resolution
+  equity/               Shareholders, ownership, profit periods, payouts
+  errors.ts             Expected domain errors
+  gateways/             Provider-account management foundation
+  payments/             Payment lifecycle, API service, queries, adapters, webhooks
+    providers/          Server-side provider adapter boundary
+  reconciliation/       Provider fees, settlements, balances, reconciliation
+  reports/              Financial queries, CSV exports, consistency checks
+  services/             Connected-service registry and credential issuance
+app/admin/*/            Guarded admin route handlers and server actions
+app/api/v1/             Versioned service API route handlers
+app/pay/dev/            Local development checkout page and completion route
 ```
 
 Rules:
@@ -42,11 +43,13 @@ Rules:
   `lib/generated/prisma`.
 - Multi-record financial changes use Prisma transactions in the service layer.
 - All external input is validated on the server before it reaches a service.
-- Use `Prisma.Decimal` for monetary values. Never use floating point for money.
-- Provider credentials, service secret material, webhook signing secrets, and
-  trusted payment verification stay server-side. Provider adapters never expose
-  secret values.
+- Use `Prisma.Decimal` for monetary and percentage values. Never use floating
+  point for financial calculations.
+- Provider credentials, service secret material, webhook signing secrets,
+  expense-document binaries, and trusted payment verification stay server-side.
 - Development-provider results are simulated and only valid for TEST payments.
   The development checkout is not proof of a real payment.
+- Reports distinguish TEST from LIVE. TEST payments are excluded from financial
+  totals and profit.
 - `@workspace/ui` and `@obh/payments` remain independent of the application
   database.
