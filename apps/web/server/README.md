@@ -12,15 +12,19 @@ proxy.ts                Optimistic JWT redirect for /admin/:path*
 lib/auth/               Session guards, password hashing, redirect sanitization
 lib/db/                 Prisma Client entry point
 server/
-  api/                  Service auth, request parsing, API errors
-  app-url.ts            Public checkout origin resolution
-  errors.ts             Expected domain errors
-  gateways/             Provider-account management foundation
-  payments/             Payment lifecycle, API service, queries, adapters, webhooks
-    providers/          Server-side provider adapter boundary
-  services/             Connected-service registry and credential issuance
-app/api/v1/             Versioned service API route handlers
-app/pay/dev/            Local development checkout page and completion route
+  accounting/            Income, expenses, categories, recurring rules, documents
+  api/                   Service auth, request parsing, API errors
+  app-url.ts             Public checkout origin resolution
+  errors.ts              Expected domain errors
+  gateways/              Provider-account management foundation
+  payments/              Payment lifecycle, API service, queries, adapters, webhooks
+    providers/           Server-side provider adapter boundary
+  services/              Connected-service registry and credential issuance
+app/admin/accounts/      Business payment sources
+app/admin/expenses/      Expenses, recurring rules, documents
+app/admin/income/        Additional income
+app/api/v1/              Versioned service API route handlers
+app/pay/dev/             Local development checkout page and completion route
 ```
 
 Rules:

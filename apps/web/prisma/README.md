@@ -1,8 +1,8 @@
-# OBH database architecture — Step 2 foundation
+# OBH database architecture
 
-This document records the database decisions implemented in the initial Prisma
-schema. The schema creates durable structures for later modules, but does not
-implement calculations, provider integration, or authorization.
+This document records the database decisions implemented in the Prisma schema
+through Step 7. The schema creates durable financial structures; reporting and
+profit calculations remain later work.
 
 Prisma: `7.10.1` with the `prisma-client` generator and `@prisma/adapter-pg`.
 PostgreSQL is the only supported database.
@@ -34,6 +34,13 @@ ConnectedService 1 ─── * ServiceCredential
 ConnectedService 1 ─── * Payment
 ConnectedService 1 ─── * PaymentIdempotencyRecord
 Payment          1 ─── * PaymentIdempotencyRecord
+
+ExpenseCategory  1 ─── * Expense
+ExpenseCategory  1 ─── * RecurringExpense
+FinancialAccount 1 ─── * Expense
+FinancialAccount 1 ─── * Income
+Expense          1 ─── * ExpenseDocument
+RecurringExpense 1 ─── * Expense
 PaymentProvider  1 ─── * FinancialAccount (kind = PROVIDER)
 PaymentProvider  1 ─── * Payment
 FinancialAccount 1 ─── * Payment (provider account)
@@ -69,6 +76,18 @@ environment; raw credentials are shown once at issuance and never stored.
 `ConnectedService.webhookSecretEncrypted` stores an AES-256-GCM encrypted
 per-service webhook signing secret; the raw value is shown once and rotation is
 explicit.
+
+## Accounting records
+
+- `ExpenseCategory.requiresDocument` makes the supporting-document rule
+  configurable per category.
+- `Expense.recurringExpenseId` links a generated occurrence to its approved rule.
+  The unique `(recurringExpenseId, spentOn)` pair prevents duplicate occurrences.
+- `RecurringExpense` starts as `DRAFT` and can only generate expenses after an
+  explicit approval records `approvedAt` and `approvedById`.
+- `ExpenseDocument` stores metadata only. File binaries live in private local
+  storage in development, never in PostgreSQL.
+- `Income` remains separate from `Payment` and `CapitalContribution`.
 
 ## Financial rules encoded as structure
 

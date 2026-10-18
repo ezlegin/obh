@@ -1,0 +1,239 @@
+"use client"
+
+import {
+  CircleDollarSign,
+  Landmark,
+  Plus,
+  Search,
+  WalletCards,
+} from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useMemo, useState } from "react"
+
+import { Button } from "@workspace/ui/components/button"
+import { Input } from "@workspace/ui/components/input"
+
+import { AccountingStat } from "@/components/admin/accounting/accounting-stat"
+import { DataTable, type DataTableColumn } from "@/components/admin/data-table"
+import { AdminEmptyState } from "@/components/admin/empty-state"
+import { CreateIncomeDialog } from "@/components/admin/income/create-income-dialog"
+import type { AdminIncome, IncomeWorkspace } from "@/server/accounting/queries"
+import { formatAccountingDate, formatIrrDecimal } from "@/lib/admin/format"
+
+function IncomeWorkspace({ data }: { data: IncomeWorkspace }) {
+  const router = useRouter()
+  const [createOpen, setCreateOpen] = useState(false)
+  const [search, setSearch] = useState("")
+
+  const filteredIncomes = useMemo(() => {
+    const query = search.trim().toLowerCase()
+
+    if (!query) {
+      return data.incomes
+    }
+
+    return data.incomes.filter((income) =>
+      [
+        income.description,
+        income.source,
+        income.accountName,
+        income.externalReference,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    )
+  }, [data.incomes, search])
+
+  const columns: DataTableColumn<AdminIncome>[] = [
+    {
+      id: "income",
+      header: "Income",
+      sortValue: (income) => income.description,
+      cell: (income) => (
+        <div>
+          <p className="text-xs font-medium">{income.description}</p>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            {income.source ?? "No source label"}
+          </p>
+          {income.externalReference ? (
+            <p className="mt-1 font-mono text-[9px] text-muted-foreground/50">
+              {income.externalReference}
+            </p>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      id: "date",
+      header: "Received",
+      sortValue: (income) => income.receivedOn,
+      cell: (income) => (
+        <span className="font-mono text-[10px] text-muted-foreground">
+          {formatAccountingDate(income.receivedOn)}
+        </span>
+      ),
+    },
+    {
+      id: "account",
+      header: "Payment source",
+      cell: (income) => (
+        <span className="text-[11px] text-muted-foreground">
+          {income.accountName ?? "Not assigned"}
+        </span>
+      ),
+    },
+    {
+      id: "amount",
+      header: "Amount",
+      align: "right",
+      sortValue: (income) => Number(income.amount),
+      cell: (income) => (
+        <span className="text-xs font-medium tabular-nums">
+          {formatIrrDecimal(income.amount)}
+        </span>
+      ),
+    },
+  ]
+
+  return (
+    <>
+      <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <AccountingStat
+          label="Received this month"
+          value={formatIrrDecimal(data.summary.receivedThisMonth)}
+          hint="Additional income with a received date in the current month."
+          icon={CircleDollarSign}
+        />
+        <AccountingStat
+          label="Received all time"
+          value={formatIrrDecimal(data.summary.receivedAllTime)}
+          hint="All recorded additional income, excluding payment transactions."
+          icon={WalletCards}
+        />
+        <AccountingStat
+          label="Income records"
+          value={String(data.summary.incomeCount)}
+          hint="Every manual income record in the ledger."
+          icon={Landmark}
+        />
+        <AccountingStat
+          label="This month"
+          value={String(data.summary.thisMonthCount)}
+          hint="Number of income records received this month."
+          icon={CircleDollarSign}
+        />
+      </div>
+
+      {data.accounts.length === 0 ? (
+        <p className="mt-4 text-[11px] leading-5 text-muted-foreground">
+          No business payment source exists yet. Income can be recorded, but it
+          cannot be linked to an account until one is added.{" "}
+          <Link
+            href="/admin/accounts"
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            Manage payment sources
+          </Link>
+          .
+        </p>
+      ) : null}
+
+      <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card/40">
+        <div className="flex flex-col justify-between gap-4 border-b border-border p-5 sm:flex-row sm:items-center">
+          <div>
+            <p className="font-mono text-[9px] tracking-[0.12em] text-muted-foreground/60 uppercase">
+              Additional income
+            </p>
+            <p className="mt-2 text-sm font-medium">
+              {data.incomes.length}{" "}
+              {data.incomes.length === 1 ? "record" : "records"}
+            </p>
+          </div>
+          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus aria-hidden="true" className="size-3.5" />
+            Record income
+          </Button>
+        </div>
+
+        <div className="border-b border-border p-4">
+          <div className="relative w-full sm:max-w-xs">
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-3.5 size-3.5 -translate-y-1/2 text-muted-foreground/60"
+            />
+            <Input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search income"
+              aria-label="Search income"
+              className="h-10 pl-9 text-xs"
+            />
+          </div>
+        </div>
+
+        <DataTable
+          rows={filteredIncomes}
+          columns={columns}
+          getRowId={(income) => income.id}
+          caption="Additional income records"
+          defaultSort={{ columnId: "date", direction: "desc" }}
+          minWidthClassName="min-w-[46rem]"
+          emptyState={
+            <AdminEmptyState
+              icon={CircleDollarSign}
+              title={
+                data.incomes.length === 0
+                  ? "No income records yet"
+                  : "No income matches your search"
+              }
+              description={
+                data.incomes.length === 0
+                  ? "Record additional business income here. Incoming payment transactions and shareholder capital remain separate."
+                  : "Clear the search to see all income records."
+              }
+              action={
+                data.incomes.length === 0 ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    <Plus aria-hidden="true" className="size-3.5" />
+                    Record first income
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSearch("")}
+                  >
+                    Clear search
+                  </Button>
+                )
+              }
+            />
+          }
+        />
+      </div>
+
+      <p className="mt-4 text-[10px] leading-5 text-muted-foreground/55">
+        Income is a separate accounting record. It does not create a payment
+        transaction, alter gateway balances, or represent shareholder capital.
+      </p>
+
+      <CreateIncomeDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        accounts={data.accounts}
+        onCreated={() => router.refresh()}
+      />
+    </>
+  )
+}
+
+export { IncomeWorkspace }

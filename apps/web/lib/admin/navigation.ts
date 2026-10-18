@@ -10,6 +10,7 @@ import {
   Receipt,
   Settings,
   Users,
+  WalletCards,
 } from "lucide-react"
 
 export type AdminNavItem = {
@@ -75,6 +76,12 @@ export const adminNavigation: AdminNavGroup[] = [
         href: "/admin/income",
         description: "Additional business income records.",
         icon: CircleDollarSign,
+      },
+      {
+        label: "Payment sources",
+        href: "/admin/accounts",
+        description: "Business accounts used for income and expenses.",
+        icon: WalletCards,
       },
       {
         label: "Reports",

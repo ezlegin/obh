@@ -79,6 +79,20 @@ enum ExpenseStatus {
   VOIDED
 }
 
+enum RecurringExpenseStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum RecurringFrequency {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
 enum WebhookDeliveryStatus {
   PENDING
   DELIVERED
@@ -119,8 +133,9 @@ model User {
   createdAt    DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
 
-  auditLogs            AuditLog[]
-  approvedProfitPeriod ProfitPeriod[] @relation("ProfitPeriodApprovedBy")
+  auditLogs                 AuditLog[]
+  approvedProfitPeriod      ProfitPeriod[]     @relation("ProfitPeriodApprovedBy")
+  approvedRecurringExpenses RecurringExpense[] @relation("RecurringExpenseApprovedBy")
 }
 
 /// A product or service that can originate payments through OBH.
@@ -215,6 +230,7 @@ model FinancialAccount {
   income               Income[]
   capitalContributions CapitalContribution[]
   shareholderPayouts   ShareholderPayout[]
+  recurringExpenses    RecurringExpense[]
 
   @@index([kind, isActive])
   @@index([providerId])
@@ -433,15 +449,17 @@ model WebhookDelivery {
 }
 
 model ExpenseCategory {
-  id          String   @id @default(uuid(7)) @db.Uuid
-  name        String   @unique @db.VarChar(120)
-  description String?  @db.Text
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  id               String   @id @default(uuid(7)) @db.Uuid
+  name             String   @unique @db.VarChar(120)
+  description      String?  @db.Text
+  requiresDocument Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
 
-  expenses Expense[]
+  expenses          Expense[]
+  recurringExpenses RecurringExpense[]
 
   @@index([isActive, sortOrder])
 }
@@ -449,28 +467,32 @@ model ExpenseCategory {
 /// Operating costs are accounting records, not simply cash withdrawals. The
 /// source account is optional until an expense is marked paid.
 model Expense {
-  id                String        @id @default(uuid(7)) @db.Uuid
-  categoryId        String        @db.Uuid
-  accountId         String?       @db.Uuid
-  amount            Decimal       @db.Decimal(24, 2)
-  currency          String        @default("IRR") @db.VarChar(3)
-  spentOn           DateTime      @db.Date
-  description       String        @db.Text
-  notes             String?       @db.Text
-  status            ExpenseStatus @default(PENDING)
-  paidAt            DateTime?     @db.Timestamptz(3)
-  externalReference String?       @db.VarChar(191)
-  createdAt         DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime      @updatedAt @db.Timestamptz(3)
+  id                 String        @id @default(uuid(7)) @db.Uuid
+  categoryId         String        @db.Uuid
+  accountId          String?       @db.Uuid
+  recurringExpenseId String?       @db.Uuid
+  amount             Decimal       @db.Decimal(24, 2)
+  currency           String        @default("IRR") @db.VarChar(3)
+  spentOn            DateTime      @db.Date
+  description        String        @db.Text
+  notes              String?       @db.Text
+  status             ExpenseStatus @default(PENDING)
+  paidAt             DateTime?     @db.Timestamptz(3)
+  externalReference  String?       @db.VarChar(191)
+  createdAt          DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime      @updatedAt @db.Timestamptz(3)
 
-  category  ExpenseCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  account   FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  documents ExpenseDocument[]
+  category         ExpenseCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  account          FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  recurringExpense RecurringExpense? @relation(fields: [recurringExpenseId], references: [id], onDelete: Restrict)
+  documents        ExpenseDocument[]
 
+  @@unique([recurringExpenseId, spentOn])
   @@index([spentOn])
   @@index([categoryId, spentOn])
   @@index([accountId, spentOn])
   @@index([status])
+  @@index([recurringExpenseId])
 }
 
 /// Metadata for a private supporting document. The file itself belongs in
@@ -488,6 +510,37 @@ model ExpenseDocument {
   expense Expense @relation(fields: [expenseId], references: [id], onDelete: Restrict)
 
   @@index([expenseId])
+}
+
+/// A manager-approved template for repeating operating costs. Approval is an
+/// explicit state change; scheduled expenses are generated manually and remain
+/// pending until their supporting requirements are satisfied.
+model RecurringExpense {
+  id            String                 @id @default(uuid(7)) @db.Uuid
+  categoryId    String                 @db.Uuid
+  accountId     String?                @db.Uuid
+  amount        Decimal                @db.Decimal(24, 2)
+  currency      String                 @default("IRR") @db.VarChar(3)
+  description   String                 @db.Text
+  frequency     RecurringFrequency
+  intervalCount Int                    @default(1)
+  startOn       DateTime               @db.Date
+  nextDueOn     DateTime               @db.Date
+  endOn         DateTime?              @db.Date
+  status        RecurringExpenseStatus @default(DRAFT)
+  approvedAt    DateTime?              @db.Timestamptz(3)
+  approvedById  String?                @db.Uuid
+  notes         String?                @db.Text
+  createdAt     DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime               @updatedAt @db.Timestamptz(3)
+
+  category   ExpenseCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  account    FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  approvedBy User?             @relation("RecurringExpenseApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  expenses   Expense[]
+
+  @@index([status, nextDueOn])
+  @@index([categoryId])
 }
 
 model Income {

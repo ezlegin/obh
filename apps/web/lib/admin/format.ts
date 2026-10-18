@@ -49,3 +49,34 @@ export function formatDevelopmentDateTime(value: string) {
     timeZone: "Asia/Tehran",
   }).format(new Date(value))
 }
+
+/**
+ * Accounting dates are date-only values. Format them in UTC so the displayed
+ * calendar date never shifts with the viewer's timezone.
+ */
+export function formatAccountingDate(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00.000Z`))
+}
+
+export function formatFileSize(bytes: number) {
+  if (bytes < 1024) {
+    return `${bytes} B`
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export function todayInputValue() {
+  const now = new Date()
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
+  return local.toISOString().slice(0, 10)
+}

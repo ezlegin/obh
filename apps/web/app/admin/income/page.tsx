@@ -1,20 +1,32 @@
 import type { Metadata } from "next"
-import { CircleDollarSign } from "lucide-react"
 
-import { AdminModuleView } from "@/components/admin/admin-module-view"
+import { Badge } from "@workspace/ui/components/badge"
+
+import { AdminPageHeader } from "@/components/admin/admin-page"
+import { IncomeWorkspace } from "@/components/admin/income/income-workspace"
+import { getIncomeWorkspace } from "@/server/accounting/queries"
 
 export const metadata: Metadata = {
   title: "Income",
 }
 
-export default function AdminIncomePage() {
+export default async function AdminIncomePage() {
+  const data = await getIncomeWorkspace()
+
   return (
-    <AdminModuleView
-      eyebrow="Admin / Accounting"
-      title="Income"
-      description="Additional business income kept separate from incoming payment transactions and shareholder capital."
-      emptyDescription="Additional income records and their source accounts will appear here."
-      icon={CircleDollarSign}
-    />
+    <>
+      <AdminPageHeader
+        eyebrow="Admin / Accounting"
+        title="Income"
+        description="Additional business income kept separate from incoming payment transactions and shareholder capital."
+        actions={
+          <Badge variant="outline">
+            {data.incomes.length}{" "}
+            {data.incomes.length === 1 ? "record" : "records"}
+          </Badge>
+        }
+      />
+      <IncomeWorkspace data={data} />
+    </>
   )
 }

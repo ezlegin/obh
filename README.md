@@ -168,6 +168,31 @@ development adapter is disabled in production builds unless explicitly enabled i
 an approved test environment; see
 [`DEVELOPMENT_PAYMENTS.md`](apps/web/DEVELOPMENT_PAYMENTS.md).
 
+## Accounting and expenses
+
+Accounting boundaries, document rules, and recurring approvals are documented in
+[`apps/web/ACCOUNTING.md`](apps/web/ACCOUNTING.md).
+
+Implemented in Step 7:
+
+- business-owned payment sources for bank, cash, and wallet accounts
+- expense categories with configurable supporting-document requirements
+- income records kept separate from payments and shareholder capital
+- expense records with pending/paid states and payment-source assignment
+- private PDF/image attachments with signature checks, checksums, guarded
+  downloads, and a 10 MB limit
+- server-enforced document requirements before an expense can be marked paid
+- approval-gated recurring expense rules:
+  - draft by default;
+  - explicit manager approval records the approver and time;
+  - pause, resume, and end states;
+  - manual generation of due, pending expenses only;
+  - no automatic charges or payments
+- real accounting summaries and filtered views for expenses and income
+
+Supporting documents currently use private local storage. Production must move
+them to protected object storage. No real money moves through these workflows.
+
 ## Project status
 
 Completed:
@@ -178,6 +203,7 @@ Completed:
 - Step 4 — interactive dashboard and shared admin components
 - Step 5 — payment platform, provider boundary, services, and gateway foundation
 - Step 6 — versioned payment API, signed notifications, and `@obh/payments` SDK
+- Step 7 — income, expenses, categories, payment sources, recurring rules, and documents
 
 Applied decisions:
 
@@ -200,22 +226,27 @@ Applied decisions:
   adapter, and a versioned API contract
 - authenticated service API, idempotent payment initiation, scoped retrieval,
   development checkout, signed webhooks, retry worker, and SDK integration tests
+- business payment sources, expense categories, income and expense ledgers,
+  private document attachments, and approval-gated recurring expense rules
 
 Awaiting confirmation before later steps:
 
+- review of Step 7 recurring-expense and document-requirement semantics
 - review and approval of Step 6 before npm publication
 - authorized test against a real payment provider before any live integration
   claim
+- production object-storage provider for expense documents
 - direct OBH contact channel (no email address or phone number was supplied)
 - live status of the six external service destinations
 - when the standalone documentation application should be implemented
-- profit distribution rules, revenue recognition policy, reporting time zone,
+- profit distribution rules, revenue recognition policy, reporting timezone,
   and the other database rules listed in `apps/web/prisma/README.md`
 
-Business modules, accounting calculations, shareholder workflows, and reporting
-remain intentionally unimplemented. Login/API rate limiting, webhook worker
-scheduling, cancellation/expiry notifications, and production hardening are also
-deferred.
+Formal accounting reports, revenue recognition calculations, shareholder
+workflows, and profit distribution remain intentionally unimplemented. The
+dashboard is still development data. Login/API rate limiting, webhook worker
+scheduling, recurring-expense scheduling, document scanning, and production
+hardening are also deferred.
 
 ## Routes
 
@@ -240,7 +271,10 @@ Protected:
 - `/admin/payments` — TEST payment console and lifecycle
 - `/admin/gateways` — development provider and TEST account setup
 - `/admin/services` — connected-service registry and credentials
-- `/admin/expenses`, `/admin/income`, `/admin/reports`
+- `/admin/accounts` — business payment sources
+- `/admin/expenses` — expenses, categories, documents, and recurring rules
+- `/admin/income` — additional income records
+- `/admin/reports` — placeholder until the reporting step
 - `/admin/shareholders`, `/admin/distributions`
 - `/admin/settings`
 
