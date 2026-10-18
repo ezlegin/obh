@@ -9,24 +9,30 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "lint": "eslint",
-    "format": "prettier --write \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\" \"*.{ts,mjs}\"",
+    "format": "prettier --write \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\" \"scripts/**/*.ts\" \"types/**/*.d.ts\" \"*.{ts,mjs}\"",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "auth:create-manager": "tsx scripts/create-manager.ts"
   },
   "dependencies": {
+    "@hookform/resolvers": "5.9.2",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
     "@workspace/ui": "workspace:*",
+    "bcryptjs": "3.0.3",
     "dotenv": "18.0.8",
     "lucide-react": "^1.58.0",
     "next": "16.4.2",
+    "next-auth": "5.0.0-beta.32",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "server-only": "0.0.1"
+    "react-hook-form": "7.90.0",
+    "server-only": "0.0.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -37,6 +43,7 @@
     "@workspace/typescript-config": "workspace:*",
     "eslint": "^10",
     "prisma": "7.10.1",
+    "tsx": "4.23.15",
     "typescript": "^5"
   }
 }

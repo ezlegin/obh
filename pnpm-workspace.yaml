@@ -9,3 +9,6 @@ allowBuilds:
   msw: false
   '@prisma/engines': true
   prisma: true
+
+minimumReleaseAgeExclude:
+  - '@hookform/resolvers@5.9.2'

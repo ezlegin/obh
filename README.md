@@ -12,7 +12,7 @@ and the reusable payment SDK.
 - Tailwind CSS v4 and shadcn/ui primitives
 - Inter via `next/font/google`, dark mode only
 - PostgreSQL with Prisma ORM 7.10.1 and the `@prisma/adapter-pg` driver adapter
-- Auth.js v5 is planned for Step 3 and is not configured yet
+- Auth.js v5 with email/password credentials, bcrypt, and JWT sessions
 
 ## Workspace
 
@@ -56,17 +56,29 @@ pnpm db:generate   # generate the Prisma 7 client
 pnpm db:migrate    # create/apply a development migration
 pnpm db:deploy     # apply committed migrations (deployment)
 pnpm db:studio     # open Prisma Studio
+pnpm auth:create-manager # provision a manager (no public registration)
 ```
 
-The public site does not require a database connection. Database commands need
-`DATABASE_URL`. To configure a local database:
+The public site does not require a database connection. Authentication and all
+admin routes do. To configure a local environment:
 
 ```bash
 copy apps\web\.env.example apps\web\.env
 ```
 
-Then replace the placeholder credentials in `apps/web/.env` with a dedicated
-local PostgreSQL database and least-privileged user. Never commit `.env`.
+Then replace the placeholder PostgreSQL credentials and `AUTH_SECRET` in
+`apps/web/.env`, apply migrations with `pnpm db:migrate`, and create the manager:
+
+```bash
+pnpm auth:create-manager
+```
+
+The manager is prompted for a password and confirmation. Never commit `.env`
+or `.env.local`. See [`apps/web/AUTH.md`](apps/web/AUTH.md) for the full
+authentication and security notes.
+
+After sign-in at [http://localhost:3100/login](http://localhost:3100/login), the
+protected console is available at `/admin`.
 
 Inter is loaded through `next/font/google`. A production build therefore
 requires network access to Google Fonts; the font is not vendored in this
@@ -87,12 +99,28 @@ Shared packages must remain independent of application database internals.
 The initial migration was validated against a disposable PostgreSQL 18
 instance. No persistent OBH database was provisioned with user credentials.
 
+## Authentication and admin
+
+Auth.js v5 protects the entire `/admin` area. The implementation includes:
+
+- `/login` with email/password validation and accessible error states
+- bcrypt password hashing and generic invalid-credential errors
+- a standalone manager-provisioning CLI
+- an optimistic Next.js 16 proxy redirect that preserves safe callback URLs
+- a database-backed `requireAdmin()` guard for every admin page
+- responsive admin navigation and sign-out
+- `noindex` admin metadata and no login links on the public website
+
+No registration, password reset, MFA, or login rate limiting is implemented yet.
+See [`apps/web/AUTH.md`](apps/web/AUTH.md).
+
 ## Project status
 
 Completed:
 
 - Step 1 — project foundation and public visual direction
 - Step 2 — database and application architecture foundation
+- Step 3 — authentication, login, protected admin layout, and route scaffolds
 
 Applied decisions:
 
@@ -104,6 +132,8 @@ Applied decisions:
 - provisional `@obh/payments` package boundary reserved (not implemented)
 - Prisma 7 server-only database boundary with an initial financial schema and
   one validated initial migration
+- Auth.js v5 JWT sessions, manager provisioning CLI, server-side admin guard,
+  and responsive protected admin navigation
 
 Awaiting confirmation before later steps:
 
@@ -114,16 +144,30 @@ Awaiting confirmation before later steps:
 - profit distribution rules, revenue recognition policy, reporting time zone,
   and the other database rules listed in `apps/web/prisma/README.md`
 
-Admin, authentication, payment API/SDK, accounting calculations, shareholder
-workflows, and reporting remain intentionally unimplemented.
+Business modules, payment API/SDK, accounting calculations, shareholder
+workflows, and reporting remain intentionally unimplemented. Login rate
+limiting is also deferred to production hardening.
 
-## Public routes
+## Routes
+
+Public:
 
 - `/` — corporation introduction and service ecosystem
 - `/about-us` — corporate overview
 - `/contact-us` — service-based contact directory
 - `/terms` — website terms
+- `/login` — manager sign-in (not linked from the public website)
 - `/docs` — not implemented; reserved for the separate documentation app
+
+Protected:
+
+- `/admin` — admin foundation overview
+- `/admin/payments`, `/admin/gateways`, `/admin/services`
+- `/admin/expenses`, `/admin/income`, `/admin/reports`
+- `/admin/shareholders`, `/admin/distributions`
+- `/admin/settings`
+
+All `/admin` routes require a valid manager session and an active database user.
 
 ## Adding shadcn/ui components
 
