@@ -7,6 +7,7 @@ import {
   createConnectedServiceSchema,
   issueServiceCredentialSchema,
   revokeServiceCredentialSchema,
+  rotateWebhookSecretSchema,
   toggleConnectedServiceSchema,
 } from "@/lib/validation/payment-platform"
 import { DomainError } from "@/server/errors"
@@ -14,6 +15,7 @@ import {
   createConnectedService,
   issueServiceCredential,
   revokeServiceCredential,
+  rotateWebhookSecret,
   setConnectedServiceActive,
 } from "@/server/services/connected-service"
 
@@ -28,6 +30,8 @@ export type ServiceActionResult = {
     environment: "TEST" | "LIVE"
     createdAt: string
   }
+  webhookSecret?: string
+  webhookSecretCreatedAt?: string
 }
 
 function actionError(error: unknown): ServiceActionResult {
@@ -137,6 +141,30 @@ export async function revokeServiceCredentialAction(
     await revokeServiceCredential(admin.id, parsed.data.credentialId)
     revalidatePath("/admin/services")
     return { ok: true }
+  } catch (error) {
+    return actionError(error)
+  }
+}
+
+export async function rotateWebhookSecretAction(
+  input: unknown
+): Promise<ServiceActionResult> {
+  const admin = await requireAdmin()
+  const parsed = rotateWebhookSecretSchema.safeParse(input)
+
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid service." }
+  }
+
+  try {
+    const result = await rotateWebhookSecret(admin.id, parsed.data.serviceId)
+    revalidatePath("/admin/services")
+
+    return {
+      ok: true,
+      webhookSecret: result.secret,
+      webhookSecretCreatedAt: result.createdAt,
+    }
   } catch (error) {
     return actionError(error)
   }

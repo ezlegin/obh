@@ -3,7 +3,7 @@ import test from "node:test"
 
 import { developmentPaymentAdapter } from "../server/payments/providers/development"
 
-test("development adapter creates a TEST-only session without a redirect", async () => {
+test("development adapter creates a TEST-only session with a local checkout", async () => {
   const session = await developmentPaymentAdapter.createCheckoutSession({
     paymentReference: "OBH-TESTREF",
     serviceSlug: "test-service",
@@ -16,7 +16,7 @@ test("development adapter creates a TEST-only session without a redirect", async
 
   assert.match(session.providerSessionId, /^dev_sess_/)
   assert.match(session.providerReference, /^dev_ref_/)
-  assert.equal(session.checkoutUrl, null)
+  assert.match(session.checkoutUrl ?? "", /^\/pay\/dev\/dev_sess_/)
   assert.equal(session.expiresAt.getTime() > Date.now(), true)
   assert.deepEqual(developmentPaymentAdapter.supportedEnvironments, ["TEST"])
 })

@@ -1,4 +1,8 @@
-import { developmentPaymentAdapter } from "./development"
+import {
+  DEVELOPMENT_PROVIDER_CODE,
+  developmentPaymentAdapter,
+  isDevelopmentProviderEnabled,
+} from "./development"
 import type { PaymentProviderAdapter, ProviderEnvironmentValue } from "./types"
 
 const adapters = new Map<string, PaymentProviderAdapter>([
@@ -8,6 +12,12 @@ const adapters = new Map<string, PaymentProviderAdapter>([
 export function getPaymentProviderAdapter(
   code: string
 ): PaymentProviderAdapter {
+  if (code === DEVELOPMENT_PROVIDER_CODE && !isDevelopmentProviderEnabled()) {
+    throw new Error(
+      "The development provider is disabled in production. Set OBH_ENABLE_DEVELOPMENT_PROVIDER=true only in an approved test environment."
+    )
+  }
+
   const adapter = adapters.get(code)
 
   if (!adapter) {
@@ -29,3 +39,4 @@ export function providerSupportsEnvironment(
 }
 
 export { DEVELOPMENT_PROVIDER_CODE } from "./development"
+export { isDevelopmentProviderEnabled } from "./development"

@@ -11,6 +11,13 @@ import {
 
 export const DEVELOPMENT_PROVIDER_CODE = "development"
 
+export function isDevelopmentProviderEnabled() {
+  return (
+    process.env.NODE_ENV !== "production" ||
+    process.env.OBH_ENABLE_DEVELOPMENT_PROVIDER === "true"
+  )
+}
+
 /**
  * A local-only adapter used to exercise the payment lifecycle without real
  * provider credentials. It NEVER contacts a payment network and every result is
@@ -36,7 +43,7 @@ export const developmentPaymentAdapter: PaymentProviderAdapter = {
     return {
       providerSessionId,
       providerReference,
-      checkoutUrl: null,
+      checkoutUrl: `/pay/dev/${providerSessionId}`,
       expiresAt: new Date(Date.now() + 15 * 60 * 1000),
     }
   },

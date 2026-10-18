@@ -81,6 +81,10 @@ export const revokeServiceCredentialSchema = z.object({
   credentialId: z.string().uuid(),
 })
 
+export const rotateWebhookSecretSchema = z.object({
+  serviceId: z.string().uuid(),
+})
+
 export const createProviderAccountSchema = z.object({
   providerId: z.string().uuid(),
   name: z

@@ -10,6 +10,7 @@ import {
   Loader2,
   Plus,
   Power,
+  Webhook,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -25,7 +26,12 @@ import {
 } from "@/components/admin/services/issue-credential-dialog"
 import { RegisterServiceDialog } from "@/components/admin/services/register-service-dialog"
 import {
+  WebhookSecretDialog,
+  type IssuedWebhookSecret,
+} from "@/components/admin/services/webhook-secret-dialog"
+import {
   revokeServiceCredentialAction,
+  rotateWebhookSecretAction,
   toggleConnectedServiceAction,
 } from "@/app/admin/services/actions"
 import type { AdminConnectedService } from "@/server/payments/queries"
@@ -42,6 +48,8 @@ function ServicesManager({ services }: ServicesManagerProps) {
     useState<AdminConnectedService | null>(null)
   const [issuedCredential, setIssuedCredential] =
     useState<IssuedCredential | null>(null)
+  const [issuedWebhookSecret, setIssuedWebhookSecret] =
+    useState<IssuedWebhookSecret | null>(null)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -86,6 +94,35 @@ function ServicesManager({ services }: ServicesManagerProps) {
     if (!result.ok) {
       setError(result.error ?? "The credential could not be revoked.")
     } else {
+      refresh()
+    }
+
+    setPendingKey(null)
+  }
+
+  const rotateWebhook = async (service: AdminConnectedService) => {
+    if (
+      service.webhookSecretConfigured &&
+      !window.confirm(
+        `Rotate the webhook signing secret for ${service.name}? Existing verification will fail until the service is updated.`
+      )
+    ) {
+      return
+    }
+
+    setPendingKey(`webhook:${service.id}`)
+    setError(null)
+
+    const result = await rotateWebhookSecretAction({ serviceId: service.id })
+
+    if (!result.ok || !result.webhookSecret) {
+      setError(result.error ?? "The webhook secret could not be created.")
+    } else {
+      setIssuedWebhookSecret({
+        secret: result.webhookSecret,
+        serviceName: service.name,
+        createdAt: result.webhookSecretCreatedAt ?? new Date().toISOString(),
+      })
       refresh()
     }
 
@@ -323,6 +360,59 @@ function ServicesManager({ services }: ServicesManagerProps) {
                     </div>
                   )}
 
+                  {service.webhookUrl ? (
+                    <div className="mt-4 flex flex-col justify-between gap-3 rounded-xl border border-border bg-white/[0.02] p-4 sm:flex-row sm:items-center">
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-2 text-xs font-medium">
+                          <Webhook aria-hidden="true" className="size-3.5" />
+                          Webhook notifications
+                          <Badge
+                            variant={
+                              service.webhookSecretConfigured
+                                ? "success"
+                                : "warning"
+                            }
+                          >
+                            {service.webhookSecretConfigured
+                              ? "Signed"
+                              : "Not configured"}
+                          </Badge>
+                        </p>
+                        <p className="mt-1 max-w-xl truncate font-mono text-[9px] text-muted-foreground/60">
+                          {service.webhookUrl}
+                        </p>
+                        {service.webhookSecretCreatedAt ? (
+                          <p className="mt-1 text-[9px] text-muted-foreground/45">
+                            Last rotated{" "}
+                            {formatDevelopmentDate(
+                              service.webhookSecretCreatedAt
+                            )}
+                          </p>
+                        ) : null}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => rotateWebhook(service)}
+                        disabled={pendingKey === `webhook:${service.id}`}
+                        className="shrink-0"
+                      >
+                        {pendingKey === `webhook:${service.id}` ? (
+                          <Loader2
+                            aria-hidden="true"
+                            className="size-3.5 animate-spin"
+                          />
+                        ) : (
+                          <Webhook aria-hidden="true" className="size-3.5" />
+                        )}
+                        {service.webhookSecretConfigured
+                          ? "Rotate signing secret"
+                          : "Generate signing secret"}
+                      </Button>
+                    </div>
+                  ) : null}
+
                   {service.allowedReturnUrls.length > 0 ? (
                     <details className="mt-4 rounded-xl border border-border">
                       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-[11px] text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none">
@@ -374,6 +464,10 @@ function ServicesManager({ services }: ServicesManagerProps) {
       <CredentialSecretDialog
         credential={issuedCredential}
         onClose={() => setIssuedCredential(null)}
+      />
+      <WebhookSecretDialog
+        data={issuedWebhookSecret}
+        onClose={() => setIssuedWebhookSecret(null)}
       />
     </>
   )

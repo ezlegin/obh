@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto"
 
 import { Prisma, type Payment } from "@/lib/generated/prisma/client"
 import { getDb } from "@/lib/db/client"
+import { getAppBaseUrl } from "@/server/app-url"
 import type {
   CreateDevelopmentPaymentInputForm,
   SimulateDevelopmentResultInput,
@@ -18,6 +19,7 @@ import {
   DEVELOPMENT_PROVIDER_CODE,
   getPaymentProviderAdapter,
 } from "@/server/payments/providers/registry"
+import { queuePaymentWebhook } from "@/server/payments/webhook-service"
 
 export type CreateDevelopmentPaymentInput = {
   actorId: string
@@ -213,12 +215,16 @@ export async function createDevelopmentPayment(
     })
 
     const updated = await db.$transaction(async (tx) => {
+      const checkoutUrl = session.checkoutUrl
+        ? new URL(session.checkoutUrl, getAppBaseUrl()).toString()
+        : null
+
       const result = await tx.payment.update({
         where: { id: payment.id },
         data: {
           providerSessionId: session.providerSessionId,
           providerReference: session.providerReference,
-          checkoutUrl: session.checkoutUrl,
+          checkoutUrl,
         },
       })
 
@@ -265,6 +271,13 @@ export async function createDevelopmentPayment(
           metadata: { simulated: true },
         },
       })
+    })
+
+    await queuePaymentWebhook(payment.id).catch((error) => {
+      console.error(
+        "Webhook notification could not be delivered.",
+        error instanceof Error ? error.name : "Unknown error"
+      )
     })
 
     throw new DomainError(
@@ -412,6 +425,13 @@ export async function simulateDevelopmentPaymentResult(
         provider: { select: { name: true } },
       },
     })
+  })
+
+  await queuePaymentWebhook(updated.id).catch((error) => {
+    console.error(
+      "Webhook notification could not be delivered.",
+      error instanceof Error ? error.name : "Unknown error"
+    )
   })
 
   return updated

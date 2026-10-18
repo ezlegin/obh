@@ -1,7 +1,36 @@
 {
   "name": "@obh/payments",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Server-side TypeScript SDK for the versioned OBH payment API.",
+  "license": "UNLICENSED",
   "type": "module",
-  "description": "Reserved workspace package for the OBH payment SDK. No SDK or API is implemented in Step 1."
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"*.json\" \"README.md\"",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/client.test.ts",
+    "prepublishOnly": "pnpm build"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "4.23.15",
+    "typescript": "^5"
+  }
 }

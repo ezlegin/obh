@@ -8,6 +8,10 @@ import type {
 } from "@/lib/validation/payment-platform"
 import { DomainError } from "@/server/errors"
 import { generateServiceCredential } from "@/server/payments/service-credentials"
+import {
+  encryptWebhookSecret,
+  generateWebhookSecret,
+} from "@/server/payments/webhook-secret"
 
 export async function createConnectedService(
   actorId: string,
@@ -207,4 +211,63 @@ export async function revokeServiceCredential(
 
     return updated
   })
+}
+
+export async function rotateWebhookSecret(actorId: string, serviceId: string) {
+  const db = getDb()
+
+  const service = await db.connectedService.findUnique({
+    where: { id: serviceId },
+    select: {
+      id: true,
+      name: true,
+      webhookUrl: true,
+      webhookSecretCreatedAt: true,
+    },
+  })
+
+  if (!service) {
+    throw new DomainError("SERVICE_NOT_FOUND", "Service was not found.")
+  }
+
+  if (!service.webhookUrl) {
+    throw new DomainError(
+      "WEBHOOK_NOT_CONFIGURED",
+      "Add a webhook URL before creating a signing secret."
+    )
+  }
+
+  const secret = generateWebhookSecret()
+  const createdAt = new Date()
+
+  await db.$transaction(async (tx) => {
+    await tx.connectedService.update({
+      where: { id: service.id },
+      data: {
+        webhookSecretEncrypted: encryptWebhookSecret(secret),
+        webhookSecretCreatedAt: createdAt,
+      },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "connected_service.webhook_secret_rotated",
+        entityType: "ConnectedService",
+        entityId: service.id,
+        before: {
+          configured: Boolean(service.webhookSecretCreatedAt),
+        },
+        after: {
+          configured: true,
+          rotatedAt: createdAt.toISOString(),
+        },
+      },
+    })
+  })
+
+  return {
+    secret,
+    createdAt: createdAt.toISOString(),
+  }
 }

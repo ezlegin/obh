@@ -51,7 +51,9 @@ pnpm dev           # Turborepo dev task for all configured apps
 pnpm build         # Prisma generate + production build
 pnpm lint          # ESLint for every workspace package
 pnpm typecheck     # strict TypeScript checks
-pnpm test          # payment lifecycle, adapter, credential tests
+pnpm test          # payment/API/SDK unit tests
+pnpm test:integration # local API + SDK integration test (requires local server)
+pnpm webhooks:process # process due webhook retries
 pnpm db:validate   # validate the Prisma schema
 pnpm db:generate   # generate the Prisma 7 client
 pnpm db:push       # push the schema directly to the database
@@ -122,11 +124,12 @@ implemented.
 No registration, password reset, MFA, or login rate limiting is implemented yet.
 See [`apps/web/AUTH.md`](apps/web/AUTH.md).
 
-## Payment platform foundation
+## Payment platform and SDK
 
-The service-facing HTTP API and npm SDK are not implemented yet. Their reviewed
-contract is documented in
-[`apps/web/PAYMENT_API.md`](apps/web/PAYMENT_API.md).
+The versioned API contract and security model are documented in
+[`apps/web/PAYMENT_API.md`](apps/web/PAYMENT_API.md). The server-side SDK is
+[`@obh/payments`](packages/payments), version `0.1.0`, prepared for review but
+**not published**.
 
 Implemented in Step 5:
 
@@ -143,9 +146,27 @@ Implemented in Step 5:
 - duplicate external-order prevention
 - unit tests for lifecycle transitions, credential hashing, and adapter behavior
 
-All admin payment records currently created through the UI are marked `TEST`.
-No real provider is contacted and no value moves. The API/SDK and webhook delivery
-are intentionally deferred to Step 6.
+Implemented in Step 6:
+
+- `POST /api/v1/payments` and `GET /api/v1/payments/{reference}`
+- Bearer service authentication, revocation, last-used tracking, and service
+  isolation
+- idempotency keys and canonical request fingerprints
+- provider checkout URL generation and a local development checkout
+- server-side development verification producing completed/failed records
+- signed `payment.completed` / `payment.failed` webhooks with retries
+- encrypted per-service webhook signing secrets and rotation in admin
+- `@obh/payments` with typed errors, timeouts, idempotency support, and a
+  server-only guard
+- local API/SDK integration tests covering cross-service isolation, idempotency,
+  signed webhooks, retry delivery, and revoked credentials
+
+Every payment created in this environment is TEST and uses the development
+adapter. No real payment provider has been contacted, no real money has moved,
+and the SDK has not been published or tested against a live provider. The
+development adapter is disabled in production builds unless explicitly enabled in
+an approved test environment; see
+[`DEVELOPMENT_PAYMENTS.md`](apps/web/DEVELOPMENT_PAYMENTS.md).
 
 ## Project status
 
@@ -156,6 +177,7 @@ Completed:
 - Step 3 — authentication, login, protected admin layout, and route scaffolds
 - Step 4 — interactive dashboard and shared admin components
 - Step 5 — payment platform, provider boundary, services, and gateway foundation
+- Step 6 — versioned payment API, signed notifications, and `@obh/payments` SDK
 
 Applied decisions:
 
@@ -164,7 +186,8 @@ Applied decisions:
 - dark-only design system with Inter and fully rounded controls
 - original OBH SVG wordmark used in the navbar, footer, and system map
 - standalone documentation app boundary reserved in `apps/docs` (not built)
-- provisional `@obh/payments` package boundary reserved (not implemented)
+- publishable `@obh/payments` 0.1.0 package boundary, built and pack-checked but
+  not published
 - Prisma 7 server-only database boundary with an initial financial schema
   applied through `prisma db push`
 - Auth.js v5 JWT sessions, manager provisioning CLI, server-side admin guard,
@@ -174,12 +197,15 @@ Applied decisions:
 - a dashboard clearly labeled as development data, with no sample figure
   presented as an actual financial record
 - TEST/LIVE separation on credentials and payments, a development provider
-  adapter, and a versioned API contract documented before SDK work
+  adapter, and a versioned API contract
+- authenticated service API, idempotent payment initiation, scoped retrieval,
+  development checkout, signed webhooks, retry worker, and SDK integration tests
 
 Awaiting confirmation before later steps:
 
-- approval of the v1 payment API contract in `apps/web/PAYMENT_API.md`
-- final `@obh/payments` package name and SDK architecture
+- review and approval of Step 6 before npm publication
+- authorized test against a real payment provider before any live integration
+  claim
 - direct OBH contact channel (no email address or phone number was supplied)
 - live status of the six external service destinations
 - when the standalone documentation application should be implemented
@@ -187,9 +213,9 @@ Awaiting confirmation before later steps:
   and the other database rules listed in `apps/web/prisma/README.md`
 
 Business modules, accounting calculations, shareholder workflows, and reporting
-remain intentionally unimplemented. The service API, npm SDK, webhook signing,
-and delivery worker are deferred to Step 6. Login rate limiting is also deferred
-to production hardening.
+remain intentionally unimplemented. Login/API rate limiting, webhook worker
+scheduling, cancellation/expiry notifications, and production hardening are also
+deferred.
 
 ## Routes
 
@@ -200,7 +226,13 @@ Public:
 - `/contact-us` — service-based contact directory
 - `/terms` — website terms
 - `/login` — manager sign-in (not linked from the public website)
+- `/pay/dev/<session>` — noindex development checkout (TEST only)
 - `/docs` — not implemented; reserved for the separate documentation app
+
+API:
+
+- `POST /api/v1/payments` — service-authenticated payment initiation
+- `GET /api/v1/payments/{reference}` — service-scoped payment retrieval
 
 Protected:
 

@@ -1,12 +1,12 @@
 # OBH Payment API contract — v1
 
-Status: **contract defined in Step 5; HTTP endpoints are implemented in Step 6.**
-The admin payment console, connected-service registry, gateway foundation, and
-development adapter are implemented now. The service-facing API and SDK are not
-yet available.
+Status: **implemented in Step 6 for TEST credentials and the development
+adapter.** The `@obh/payments` SDK at version `0.1.0` is prepared but not
+published. No real provider or live payment has been tested. LIVE credentials are
+not issued.
 
-This document defines the interface the `@obh/payments` SDK will call. It must be
-kept in sync with the implementation and the SDK version.
+This document defines the service-facing API and the behavior implemented by the
+`@obh/payments` package. Breaking changes require a new version.
 
 ## 1. Versioning and transport
 
@@ -128,6 +128,9 @@ Rules:
 - `Idempotency-Key` is required and scoped to the authenticated service. Reusing
   a key with the same request returns the original payment. Reusing it with a
   different request returns `409 IDEMPOTENCY_CONFLICT`.
+- Every accepted key is recorded in a service-scoped idempotency ledger, including
+  a key that replays an existing external order. A consumed key cannot later be
+  reused for a different financial request.
 - Reusing an `externalOrderId` for an existing order returns the existing
   payment if the financial request matches; otherwise it returns
   `409 ORDER_CONFLICT`.
@@ -156,9 +159,12 @@ Success `201 Created`:
 
 - First successful creation: `201`.
 - Idempotent replay: `200`, with header `Idempotent-Replayed: true`.
-- `checkoutUrl` is `null` for adapters that do not use a redirect (including the
-  current admin-only development path). The SDK must represent this explicitly
-  rather than inventing a URL.
+- `checkoutUrl` is `null` for adapters that do not use a redirect. The current
+  development adapter returns an absolute local checkout URL at
+  `/pay/dev/<session>`.
+- The development checkout is a simulation UI. Its POST result is processed by
+  the server before redirecting, but connected services must still call
+  `GET /api/v1/payments/{reference}` and must not treat the redirect as proof.
 
 ## 5. Retrieve a payment
 
@@ -209,9 +215,11 @@ Core codes:
 | 409 | `IDEMPOTENCY_CONFLICT` | Same key used for a different request |
 | 409 | `ORDER_CONFLICT` | External order already used with conflicting details |
 | 409 | `PAYMENT_STATE_CONFLICT` | Invalid lifecycle operation |
+| 413 | `PAYLOAD_TOO_LARGE` | Request body exceeds the size limit |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | Request body is not JSON |
 | 422 | `RETURN_URL_NOT_ALLOWED` | Return URL is not in the exact allowlist |
 | 422 | `RETURN_URL_REQUIRED` | No return URL provided or configured |
-| 429 | `RATE_LIMITED` | Per-service rate limit exceeded |
+| 429 | `RATE_LIMITED` | Reserved for per-service rate limiting (not enforced yet) |
 | 502 | `PROVIDER_ERROR` | Provider transport or response failure |
 | 503 | `PROVIDER_UNAVAILABLE` | No active provider account/adapter |
 
@@ -219,13 +227,14 @@ Provider errors are sanitized before reaching the connected service.
 
 ## 7. Webhooks
 
-Planned for Step 6 alongside the API. They are not active yet.
+Implemented for TEST payments when a service has both a webhook URL and a signing
+secret.
 
 - Destination: the service's configured `webhookUrl`.
 - Method: `POST` with JSON.
-- Events: `payment.completed`, `payment.failed`,
-  `payment.cancelled`, `payment.expired`.
-- Each event has a stable event ID and includes the OBH payment object.
+- Events: `payment.completed` and `payment.failed`. Cancellation and expiry
+  events remain reserved for a later lifecycle implementation.
+- Each event has a stable `evt_...` ID and includes the OBH payment object.
 - Signature headers:
 
 ```http
@@ -235,17 +244,32 @@ OBH-Signature: t=1760000000,v1=<hex hmac>
 ```
 
 - HMAC-SHA256 is calculated over `<timestamp>.<raw request body>` with a
-  per-service webhook secret. The webhook secret is separate from the API
-  credential and will be managed server-side with rotation support.
+  per-service webhook secret created or rotated in OBH Admin. It is separate from
+  the API credential.
+- The signing secret is encrypted at rest with a key derived from `AUTH_SECRET`
+  using AES-256-GCM. Rotating `AUTH_SECRET` without rotating service webhook
+  secrets will make existing secrets unreadable.
 - A `2xx` response acknowledges delivery. Other responses and timeouts are
-  retried with exponential backoff and jitter.
-- Receivers must deduplicate by `OBH-Event-Id`.
-- Older timestamps are rejected after a small tolerance window.
-- Delivered events are attempts only: services should still retrieve the
-  authoritative payment when reconciling.
+  retried with exponential backoff and jitter. The delivery row stores attempts,
+  next attempt time, and a sanitized error.
+- The first attempt is made immediately after the terminal payment update. A
+  scheduled worker retries due deliveries:
 
-The current schema records `WebhookDelivery` rows and retry fields; the delivery
-worker and signing secret management are not implemented yet.
+```bash
+pnpm --filter web webhooks:process
+```
+
+- Receivers must deduplicate by `OBH-Event-Id`.
+- Older timestamps should be rejected by receivers after a small tolerance
+  window.
+- Delivered events are notifications: services should still retrieve the
+  authoritative payment when reconciling.
+- The worker is not yet scheduled automatically in this local environment.
+  Production deployment must run it on a schedule.
+
+The current schema records `WebhookDelivery` rows and retry fields. Delivery to
+external endpoints has been tested only against a local receiver; real network,
+TLS, and provider environments remain unverified.
 
 ## 8. Security model
 
@@ -291,30 +315,80 @@ type PaymentProviderAdapter = {
 - No provider SDK is imported by browser code or by `@obh/payments`.
 - Provider calls are not trusted merely because a request/redirect arrived.
 - The development adapter is local-only, supports TEST only, never contacts a
-  network, and explicitly marks its results as simulated.
+  network, and explicitly marks its results as simulated. It is disabled in
+  production builds unless `OBH_ENABLE_DEVELOPMENT_PROVIDER=true` is set in an
+  approved test environment. See
+  [`DEVELOPMENT_PAYMENTS.md`](DEVELOPMENT_PAYMENTS.md).
 - A live adapter must be implemented and tested in an authorized environment
   before live credentials are issued.
 
-## 10. Step 5 implementation status
+## 10. Implementation status
 
-Implemented now:
+Implemented:
 
-- Connected-service registration with exact return URL allowlist and default
-  return URL.
-- One-time TEST credential issuance and revocation.
-- Development gateway and TEST provider-account setup.
-- Admin TEST payment creation through the development adapter.
-- Payment lifecycle transitions, payment events, verification records, audit
-  logs, and duplicate-protection constraints.
-- Unit tests for lifecycle, credential hashing, and the development adapter.
+- `POST /api/v1/payments` and `GET /api/v1/payments/{reference}`.
+- Service Bearer authentication with hashed credentials, revocation, last-used
+  timestamps, active-service checks, and TEST-only access.
+- Exact return URL allowlists and service defaults.
+- Per-service idempotency with request fingerprint conflict detection.
+- External order duplicate detection.
+- Provider checkout URL generation through the development adapter.
+- Development checkout at `/pay/dev/<session>` with server-side verification.
+- Scoped payment retrieval and cross-service 404 isolation.
+- Payment lifecycle events, verification records, and audit logs.
+- Signed webhook notifications, retry scheduling, delivery history, and worker.
+- `@obh/payments` 0.1.0: typed client, idempotency support, timeouts, typed
+  errors, and server-only guard.
+- Unit tests and a local API/SDK integration test covering isolation,
+  idempotency, checkout completion, webhook signature verification, retry
+  delivery, and revoked credentials.
 
-Not implemented yet:
+Not implemented or not verified:
 
-- HTTP `/api/v1` endpoints.
-- `@obh/payments` SDK.
-- Public service authentication middleware.
-- Webhook signing and delivery worker.
-- Real provider adapters.
-- Login/API rate limiting and production deployment hardening.
+- LIVE credentials, live adapter, and real provider testing.
+- Rate limiting and abuse controls.
+- Automatic scheduling of the webhook retry worker.
+- Cancellation and expiry notification events.
+- Webhook secret recovery after loss; rotate the secret instead.
+- npm publication. The package is prepared for review only.
+- The standalone documentation application.
 
-The SDK will not be built until these contract details are approved.
+The SDK must not be described as production-ready or integrated with a real
+payment provider until an authorized environment test is completed.
+
+## 11. SDK
+
+Package: `@obh/payments` version `0.1.0` at
+[`packages/payments`](../../packages/payments).
+
+```ts
+import { OBHPayments } from "@obh/payments"
+
+const obh = new OBHPayments({
+  secretKey: process.env.OBH_SERVICE_KEY!,
+  baseUrl: "https://pay.obh.example",
+})
+
+const payment = await obh.startPayment({
+  externalOrderId: "IG-8821",
+  amount: "245000000",
+  description: "Annual design workspace",
+  returnUrl: "https://igraphical.ir/payments/return",
+  idempotencyKey: "order-IG-8821-attempt-1",
+})
+
+const status = await obh.getPayment(payment.reference)
+```
+
+- The SDK is ESM, server-only, Node.js 20+, and depends on no database or
+  provider package.
+- `startPayment` sends the idempotency header and generates a key when the caller
+  does not supply one.
+- `getPayment` retrieves only the authenticated service's payment.
+- Errors are `OBHPaymentsError` with `code`, `status`, `requestId`, `details`,
+  and `retryable`.
+- The SDK has not been published. It has been tested against the local API and
+  development adapter, not a real provider.
+
+See the package [README](../../packages/payments/README.md) for full usage and
+security notes.

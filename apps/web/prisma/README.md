@@ -32,6 +32,8 @@ A ledger can be introduced later if required, but it is not being assumed now.
 ```text
 ConnectedService 1 ─── * ServiceCredential
 ConnectedService 1 ─── * Payment
+ConnectedService 1 ─── * PaymentIdempotencyRecord
+Payment          1 ─── * PaymentIdempotencyRecord
 PaymentProvider  1 ─── * FinancialAccount (kind = PROVIDER)
 PaymentProvider  1 ─── * Payment
 FinancialAccount 1 ─── * Payment (provider account)
@@ -57,10 +59,16 @@ of these are interchangeable.
 
 `ConnectedService.allowedReturnUrls` is an exact allowlist and
 `defaultReturnUrl` is used when a payment request omits its return URL.
+`Payment.returnUrl` preserves the validated destination for the provider flow.
+`Payment.requestFingerprint` is a canonical hash used to detect idempotency-key
+and external-order conflicts.
 `Payment.environment` and `ServiceCredential.environment` separate TEST from
 LIVE. The current development adapter can only write TEST payments.
 `ServiceCredential` stores a public `keyId`, a one-way secret hash, and its
 environment; raw credentials are shown once at issuance and never stored.
+`ConnectedService.webhookSecretEncrypted` stores an AES-256-GCM encrypted
+per-service webhook signing secret; the raw value is shown once and rotation is
+explicit.
 
 ## Financial rules encoded as structure
 
@@ -86,6 +94,11 @@ environment; raw credentials are shown once at issuance and never stored.
 
 - `Payment` has a unique `(serviceId, externalOrderId)` pair when both are set.
 - `Payment` has a unique `(serviceId, idempotencyKey)` pair when both are set.
+- `PaymentIdempotencyRecord` is a service-scoped ledger of every consumed API
+  idempotency key. It allows multiple keys to map to one replayed payment while
+  preventing any consumed key from being reused for a different request.
+- `Payment.requestFingerprint` makes reuse of either identifier with different
+  financial details an explicit conflict rather than a silent replay.
 - `ProviderReference` is indexed for provider reconciliation.
 - `ProfitDistribution` has a unique `(profitPeriodId, shareholderId)` pair.
 - `WebhookDelivery` has a unique `(paymentId, eventType)` pair.

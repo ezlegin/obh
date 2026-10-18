@@ -125,21 +125,24 @@ model User {
 
 /// A product or service that can originate payments through OBH.
 model ConnectedService {
-  id                String   @id @default(uuid(7)) @db.Uuid
-  slug              String   @unique @db.VarChar(80)
-  name              String   @db.VarChar(160)
-  domain            String   @unique @db.VarChar(255)
-  description       String?  @db.Text
-  allowedReturnUrls String[] @default([])
-  defaultReturnUrl  String?  @db.Text
-  webhookUrl        String?  @db.Text
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+  id                     String    @id @default(uuid(7)) @db.Uuid
+  slug                   String    @unique @db.VarChar(80)
+  name                   String    @db.VarChar(160)
+  domain                 String    @unique @db.VarChar(255)
+  description            String?   @db.Text
+  allowedReturnUrls      String[]  @default([])
+  defaultReturnUrl       String?   @db.Text
+  webhookUrl             String?   @db.Text
+  webhookSecretEncrypted String?   @db.Text
+  webhookSecretCreatedAt DateTime? @db.Timestamptz(3)
+  isActive               Boolean   @default(true)
+  createdAt              DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime  @updatedAt @db.Timestamptz(3)
 
-  credentials       ServiceCredential[]
-  payments          Payment[]
-  webhookDeliveries WebhookDelivery[]
+  credentials        ServiceCredential[]
+  payments           Payment[]
+  idempotencyRecords PaymentIdempotencyRecord[]
+  webhookDeliveries  WebhookDelivery[]
 
   @@index([isActive])
 }
@@ -252,39 +255,42 @@ model PaymentMethod {
 /// Authoritative OBH payment record. Provider callbacks and browser redirects
 /// may update this only after server-side verification in a later step.
 model Payment {
-  id                String              @id @default(uuid(7)) @db.Uuid
-  reference         String              @unique @db.VarChar(48)
-  serviceId         String?             @db.Uuid
-  externalOrderId   String?             @db.VarChar(191)
-  idempotencyKey    String?             @db.VarChar(191)
-  amount            Decimal             @db.Decimal(24, 2)
-  currency          String              @default("IRR") @db.VarChar(3)
-  direction         PaymentDirection    @default(INCOMING)
-  environment       ProviderEnvironment @default(TEST)
-  status            PaymentStatus       @default(PENDING)
-  description       String              @db.Text
-  metadata          Json?
-  providerId        String?             @db.Uuid
-  providerAccountId String?             @db.Uuid
-  providerReference String?             @db.VarChar(191)
-  providerSessionId String?             @db.VarChar(191)
-  checkoutUrl       String?             @db.Text
-  paymentMethodId   String?             @db.Uuid
-  completedAt       DateTime?           @db.Timestamptz(3)
-  verifiedAt        DateTime?           @db.Timestamptz(3)
-  failedAt          DateTime?           @db.Timestamptz(3)
-  cancelledAt       DateTime?           @db.Timestamptz(3)
-  createdAt         DateTime            @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime            @updatedAt @db.Timestamptz(3)
+  id                 String              @id @default(uuid(7)) @db.Uuid
+  reference          String              @unique @db.VarChar(48)
+  serviceId          String?             @db.Uuid
+  externalOrderId    String?             @db.VarChar(191)
+  idempotencyKey     String?             @db.VarChar(191)
+  amount             Decimal             @db.Decimal(24, 2)
+  currency           String              @default("IRR") @db.VarChar(3)
+  direction          PaymentDirection    @default(INCOMING)
+  environment        ProviderEnvironment @default(TEST)
+  status             PaymentStatus       @default(PENDING)
+  description        String              @db.Text
+  metadata           Json?
+  providerId         String?             @db.Uuid
+  providerAccountId  String?             @db.Uuid
+  providerReference  String?             @db.VarChar(191)
+  providerSessionId  String?             @db.VarChar(191)
+  checkoutUrl        String?             @db.Text
+  returnUrl          String?             @db.Text
+  requestFingerprint String?             @db.VarChar(64)
+  paymentMethodId    String?             @db.Uuid
+  completedAt        DateTime?           @db.Timestamptz(3)
+  verifiedAt         DateTime?           @db.Timestamptz(3)
+  failedAt           DateTime?           @db.Timestamptz(3)
+  cancelledAt        DateTime?           @db.Timestamptz(3)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
 
-  service           ConnectedService?     @relation(fields: [serviceId], references: [id], onDelete: Restrict)
-  provider          PaymentProvider?      @relation(fields: [providerId], references: [id], onDelete: Restrict)
-  providerAccount   FinancialAccount?     @relation("PaymentProviderAccount", fields: [providerAccountId], references: [id], onDelete: Restrict)
-  paymentMethod     PaymentMethod?        @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
-  events            PaymentEvent[]
-  verifications     PaymentVerification[]
-  fees              ProviderFee[]
-  webhookDeliveries WebhookDelivery[]
+  service            ConnectedService?          @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  provider           PaymentProvider?           @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  providerAccount    FinancialAccount?          @relation("PaymentProviderAccount", fields: [providerAccountId], references: [id], onDelete: Restrict)
+  paymentMethod      PaymentMethod?             @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  events             PaymentEvent[]
+  verifications      PaymentVerification[]
+  fees               ProviderFee[]
+  webhookDeliveries  WebhookDelivery[]
+  idempotencyRecords PaymentIdempotencyRecord[]
 
   @@unique([serviceId, externalOrderId])
   @@unique([serviceId, idempotencyKey])
@@ -293,6 +299,24 @@ model Payment {
   @@index([serviceId, createdAt])
   @@index([providerAccountId, createdAt])
   @@index([providerReference])
+}
+
+/// Every consumed service idempotency key, including keys that replay an
+/// existing external order. This prevents a key from being reused for a
+/// different request after an order-based replay.
+model PaymentIdempotencyRecord {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  serviceId          String   @db.Uuid
+  key                String   @db.VarChar(191)
+  paymentId          String   @db.Uuid
+  requestFingerprint String   @db.VarChar(64)
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+
+  service ConnectedService @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  payment Payment          @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([serviceId, key])
+  @@index([paymentId])
 }
 
 /// Append-only lifecycle history for a payment. `type` is a controlled string

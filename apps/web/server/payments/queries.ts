@@ -21,6 +21,8 @@ export type AdminConnectedService = {
   allowedReturnUrls: string[]
   defaultReturnUrl: string | null
   webhookUrl: string | null
+  webhookSecretConfigured: boolean
+  webhookSecretCreatedAt: string | null
   isActive: boolean
   paymentCount: number
   credentials: AdminServiceCredential[]
@@ -108,6 +110,9 @@ export async function getConnectedServicesForAdmin(): Promise<
     allowedReturnUrls: service.allowedReturnUrls,
     defaultReturnUrl: service.defaultReturnUrl,
     webhookUrl: service.webhookUrl,
+    webhookSecretConfigured: Boolean(service.webhookSecretEncrypted),
+    webhookSecretCreatedAt:
+      service.webhookSecretCreatedAt?.toISOString() ?? null,
     isActive: service.isActive,
     paymentCount: service._count.payments,
     createdAt: service.createdAt.toISOString(),
