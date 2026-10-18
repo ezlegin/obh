@@ -55,6 +55,13 @@ ProfitDistribution 1 ─ * ShareholderPayout
 provider is `PaymentProvider`; a connected service is `ConnectedService`. None
 of these are interchangeable.
 
+`ConnectedService.allowedReturnUrls` is an exact allowlist and
+`defaultReturnUrl` is used when a payment request omits its return URL.
+`Payment.environment` and `ServiceCredential.environment` separate TEST from
+LIVE. The current development adapter can only write TEST payments.
+`ServiceCredential` stores a public `keyId`, a one-way secret hash, and its
+environment; raw credentials are shown once at issuance and never stored.
+
 ## Financial rules encoded as structure
 
 - All monetary fields use PostgreSQL `NUMERIC(24, 2)` through Prisma `Decimal`.
@@ -86,8 +93,10 @@ of these are interchangeable.
   sources have their own references but no global uniqueness assumption is made
   beyond the fields declared in the schema.
 
-The external-order uniqueness semantics still need confirmation: a failed
-payment may or may not be reusable for a retry of the same external order.
+The external-order uniqueness semantics are defined in the v1 API contract:
+API creation must resolve idempotent retries, and conflicting reuse of an
+external order is rejected. The Step 5 admin test path rejects any reuse of an
+external order for the same service.
 
 ## Credentials and sensitive data
 

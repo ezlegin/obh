@@ -1,20 +1,27 @@
 import type { Metadata } from "next"
-import { Boxes } from "lucide-react"
 
-import { AdminModuleView } from "@/components/admin/admin-module-view"
+import { Badge } from "@workspace/ui/components/badge"
+
+import { AdminPageHeader } from "@/components/admin/admin-page"
+import { ServicesManager } from "@/components/admin/services/services-manager"
+import { getConnectedServicesForAdmin } from "@/server/payments/queries"
 
 export const metadata: Metadata = {
   title: "Connected services",
 }
 
-export default function AdminServicesPage() {
+export default async function AdminServicesPage() {
+  const services = await getConnectedServicesForAdmin()
+
   return (
-    <AdminModuleView
-      eyebrow="Admin / Operations"
-      title="Connected services"
-      description="The services that use OBH payment infrastructure, their approved return URLs, and securely managed credentials."
-      emptyDescription="Registered services and credential lifecycle will appear here."
-      icon={Boxes}
-    />
+    <>
+      <AdminPageHeader
+        eyebrow="Admin / Operations"
+        title="Connected services"
+        description="Register the services that use OBH payment infrastructure, manage their return URL allowlists, and issue TEST credentials. Raw secrets are never stored."
+        actions={<Badge variant="outline">{services.length} registered</Badge>}
+      />
+      <ServicesManager services={services} />
+    </>
   )
 }

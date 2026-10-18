@@ -9,6 +9,7 @@
     "lint": "turbo lint",
     "format": "turbo format",
     "typecheck": "turbo typecheck",
+    "test": "turbo test",
     "db:generate": "pnpm --filter web db:generate",
     "db:validate": "pnpm --filter web db:validate",
     "db:push": "pnpm --filter web db:push",

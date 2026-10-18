@@ -1,20 +1,32 @@
 import type { Metadata } from "next"
-import { Landmark } from "lucide-react"
 
-import { AdminModuleView } from "@/components/admin/admin-module-view"
+import { Badge } from "@workspace/ui/components/badge"
+
+import { AdminPageHeader } from "@/components/admin/admin-page"
+import { GatewayManager } from "@/components/admin/gateways/gateway-manager"
+import { getPaymentProvidersForAdmin } from "@/server/payments/queries"
 
 export const metadata: Metadata = {
   title: "Gateways",
 }
 
-export default function AdminGatewaysPage() {
+export default async function AdminGatewaysPage() {
+  const providers = await getPaymentProvidersForAdmin()
+
   return (
-    <AdminModuleView
-      eyebrow="Admin / Operations"
-      title="Gateways"
-      description="Payment providers, provider accounts, fees, settlements, transfers, and manual balance reconciliation."
-      emptyDescription="Provider accounts and reconciliation records will appear here."
-      icon={Landmark}
-    />
+    <>
+      <AdminPageHeader
+        eyebrow="Admin / Operations"
+        title="Gateways"
+        description="Provider and provider-account configuration for the OBH payment layer. Only the local development adapter is available at this stage."
+        actions={
+          <Badge variant="outline">
+            {providers.length}{" "}
+            {providers.length === 1 ? "provider" : "providers"}
+          </Badge>
+        }
+      />
+      <GatewayManager providers={providers} />
+    </>
   )
 }

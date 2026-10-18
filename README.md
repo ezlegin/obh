@@ -51,6 +51,7 @@ pnpm dev           # Turborepo dev task for all configured apps
 pnpm build         # Prisma generate + production build
 pnpm lint          # ESLint for every workspace package
 pnpm typecheck     # strict TypeScript checks
+pnpm test          # payment lifecycle, adapter, credential tests
 pnpm db:validate   # validate the Prisma schema
 pnpm db:generate   # generate the Prisma 7 client
 pnpm db:push       # push the schema directly to the database
@@ -121,6 +122,31 @@ implemented.
 No registration, password reset, MFA, or login rate limiting is implemented yet.
 See [`apps/web/AUTH.md`](apps/web/AUTH.md).
 
+## Payment platform foundation
+
+The service-facing HTTP API and npm SDK are not implemented yet. Their reviewed
+contract is documented in
+[`apps/web/PAYMENT_API.md`](apps/web/PAYMENT_API.md).
+
+Implemented in Step 5:
+
+- connected-service registration with exact return URL allowlists and a default
+  return URL
+- one-time TEST credential issuance and revocation, with only hashed secrets
+  stored
+- a server-side provider adapter boundary
+- an explicit local-only development adapter that supports TEST only
+- development provider and TEST provider-account setup
+- payment creation, provider session creation, lifecycle transitions, payment
+  events, verification attempts, and audit records
+- an admin TEST payment console that exercises success and failure paths
+- duplicate external-order prevention
+- unit tests for lifecycle transitions, credential hashing, and adapter behavior
+
+All admin payment records currently created through the UI are marked `TEST`.
+No real provider is contacted and no value moves. The API/SDK and webhook delivery
+are intentionally deferred to Step 6.
+
 ## Project status
 
 Completed:
@@ -129,6 +155,7 @@ Completed:
 - Step 2 — database and application architecture foundation
 - Step 3 — authentication, login, protected admin layout, and route scaffolds
 - Step 4 — interactive dashboard and shared admin components
+- Step 5 — payment platform, provider boundary, services, and gateway foundation
 
 Applied decisions:
 
@@ -146,19 +173,23 @@ Applied decisions:
   skeleton, and empty states in the protected admin area
 - a dashboard clearly labeled as development data, with no sample figure
   presented as an actual financial record
+- TEST/LIVE separation on credentials and payments, a development provider
+  adapter, and a versioned API contract documented before SDK work
 
 Awaiting confirmation before later steps:
 
-- final `@obh/payments` package name and API architecture
+- approval of the v1 payment API contract in `apps/web/PAYMENT_API.md`
+- final `@obh/payments` package name and SDK architecture
 - direct OBH contact channel (no email address or phone number was supplied)
 - live status of the six external service destinations
 - when the standalone documentation application should be implemented
 - profit distribution rules, revenue recognition policy, reporting time zone,
   and the other database rules listed in `apps/web/prisma/README.md`
 
-Business modules, payment API/SDK, accounting calculations, shareholder
-workflows, and reporting remain intentionally unimplemented. Login rate
-limiting is also deferred to production hardening.
+Business modules, accounting calculations, shareholder workflows, and reporting
+remain intentionally unimplemented. The service API, npm SDK, webhook signing,
+and delivery worker are deferred to Step 6. Login rate limiting is also deferred
+to production hardening.
 
 ## Routes
 
@@ -174,7 +205,9 @@ Public:
 Protected:
 
 - `/admin` — development-data financial dashboard
-- `/admin/payments`, `/admin/gateways`, `/admin/services`
+- `/admin/payments` — TEST payment console and lifecycle
+- `/admin/gateways` — development provider and TEST account setup
+- `/admin/services` — connected-service registry and credentials
 - `/admin/expenses`, `/admin/income`, `/admin/reports`
 - `/admin/shareholders`, `/admin/distributions`
 - `/admin/settings`

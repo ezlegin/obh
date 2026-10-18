@@ -11,6 +11,21 @@ export function formatIrr(value: number) {
   return `${irrFormatter.format(value)} IRR`
 }
 
+/**
+ * Formats a Prisma Decimal serialized as a string without converting it to a
+ * JavaScript floating-point number.
+ */
+export function formatIrrDecimal(value: string) {
+  const negative = value.startsWith("-")
+  const normalized = negative ? value.slice(1) : value
+  const [integerPart = "0", fractionPart = ""] = normalized.split(".")
+  const grouped = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  const fraction = fractionPart.replace(/0+$/, "")
+  const formatted = fraction ? `${grouped}.${fraction}` : grouped
+
+  return `${negative ? "-" : ""}${formatted} IRR`
+}
+
 export function formatCompactIrr(value: number) {
   return compactFormatter.format(value)
 }
