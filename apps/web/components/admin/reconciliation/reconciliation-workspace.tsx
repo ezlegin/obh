@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Landmark,
   Loader2,
+  Pencil,
   Receipt,
   Scale,
   Trash2,
@@ -45,8 +46,16 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
     useState<ProviderAccountBalanceView | null>(null)
   const [reconciliationTarget, setReconciliationTarget] =
     useState<ProviderAccountBalanceView | null>(null)
+  const [editingFee, setEditingFee] = useState<ProviderFeeView | null>(null)
+  const [editingSettlement, setEditingSettlement] =
+    useState<SettlementView | null>(null)
+  const [editingReconciliation, setEditingReconciliation] =
+    useState<ReconciliationView | null>(null)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const accountById = (accountId: string) =>
+    data.accounts.find((account) => account.id === accountId) ?? null
 
   const refresh = () => router.refresh()
 
@@ -154,21 +163,32 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
       header: "",
       align: "right",
       cell: (fee) => (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          aria-label="Remove provider fee"
-          onClick={() => removeFee(fee)}
-          disabled={pendingKey === `fee:${fee.id}`}
-          className="text-danger hover:bg-danger/10 hover:text-danger"
-        >
-          {pendingKey === `fee:${fee.id}` ? (
-            <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
-          ) : (
-            <Trash2 aria-hidden="true" className="size-3.5" />
-          )}
-        </Button>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Edit provider fee"
+            onClick={() => setEditingFee(fee)}
+          >
+            <Pencil aria-hidden="true" className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Remove provider fee"
+            onClick={() => removeFee(fee)}
+            disabled={pendingKey === `fee:${fee.id}`}
+            className="text-danger hover:bg-danger/10 hover:text-danger"
+          >
+            {pendingKey === `fee:${fee.id}` ? (
+              <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+            ) : (
+              <Trash2 aria-hidden="true" className="size-3.5" />
+            )}
+          </Button>
+        </div>
       ),
     },
   ]
@@ -225,21 +245,32 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
       header: "",
       align: "right",
       cell: (settlement) => (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          aria-label={`Remove settlement ${settlement.reference}`}
-          onClick={() => removeSettlement(settlement)}
-          disabled={pendingKey === `settlement:${settlement.id}`}
-          className="text-danger hover:bg-danger/10 hover:text-danger"
-        >
-          {pendingKey === `settlement:${settlement.id}` ? (
-            <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
-          ) : (
-            <Trash2 aria-hidden="true" className="size-3.5" />
-          )}
-        </Button>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Edit settlement ${settlement.reference}`}
+            onClick={() => setEditingSettlement(settlement)}
+          >
+            <Pencil aria-hidden="true" className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Remove settlement ${settlement.reference}`}
+            onClick={() => removeSettlement(settlement)}
+            disabled={pendingKey === `settlement:${settlement.id}`}
+            className="text-danger hover:bg-danger/10 hover:text-danger"
+          >
+            {pendingKey === `settlement:${settlement.id}` ? (
+              <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+            ) : (
+              <Trash2 aria-hidden="true" className="size-3.5" />
+            )}
+          </Button>
+        </div>
       ),
     },
   ]
@@ -303,21 +334,32 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
       header: "",
       align: "right",
       cell: (reconciliation) => (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          aria-label="Remove reconciliation"
-          onClick={() => removeReconciliation(reconciliation)}
-          disabled={pendingKey === `reconciliation:${reconciliation.id}`}
-          className="text-danger hover:bg-danger/10 hover:text-danger"
-        >
-          {pendingKey === `reconciliation:${reconciliation.id}` ? (
-            <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
-          ) : (
-            <Trash2 aria-hidden="true" className="size-3.5" />
-          )}
-        </Button>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Edit reconciliation"
+            onClick={() => setEditingReconciliation(reconciliation)}
+          >
+            <Pencil aria-hidden="true" className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Remove reconciliation"
+            onClick={() => removeReconciliation(reconciliation)}
+            disabled={pendingKey === `reconciliation:${reconciliation.id}`}
+            className="text-danger hover:bg-danger/10 hover:text-danger"
+          >
+            {pendingKey === `reconciliation:${reconciliation.id}` ? (
+              <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+            ) : (
+              <Trash2 aria-hidden="true" className="size-3.5" />
+            )}
+          </Button>
+        </div>
       ),
     },
   ]
@@ -611,32 +653,48 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
       </section>
 
       <RecordFeeDialog
-        account={feeTarget}
-        open={Boolean(feeTarget)}
+        account={
+          editingFee ? accountById(editingFee.providerAccountId) : feeTarget
+        }
+        fee={editingFee}
+        open={Boolean(feeTarget || editingFee)}
         onOpenChange={(open) => {
           if (!open) {
             setFeeTarget(null)
+            setEditingFee(null)
           }
         }}
         onCreated={refresh}
       />
       <RecordSettlementDialog
-        account={settlementTarget}
+        account={
+          editingSettlement
+            ? accountById(editingSettlement.fromAccountId)
+            : settlementTarget
+        }
         businessAccounts={data.businessAccounts}
-        open={Boolean(settlementTarget)}
+        settlement={editingSettlement}
+        open={Boolean(settlementTarget || editingSettlement)}
         onOpenChange={(open) => {
           if (!open) {
             setSettlementTarget(null)
+            setEditingSettlement(null)
           }
         }}
         onCreated={refresh}
       />
       <RecordReconciliationDialog
-        account={reconciliationTarget}
-        open={Boolean(reconciliationTarget)}
+        account={
+          editingReconciliation
+            ? accountById(editingReconciliation.accountId)
+            : reconciliationTarget
+        }
+        reconciliation={editingReconciliation}
+        open={Boolean(reconciliationTarget || editingReconciliation)}
         onOpenChange={(open) => {
           if (!open) {
             setReconciliationTarget(null)
+            setEditingReconciliation(null)
           }
         }}
         onCreated={refresh}

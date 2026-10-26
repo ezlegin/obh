@@ -14,27 +14,59 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { AmountInput } from "@/components/admin/amount-input"
 import { createIncomeAction } from "@/app/admin/income/actions"
+import { updateIncomeAction } from "@/app/admin/income/edit-actions"
+import type { AdminIncome } from "@/server/accounting/queries"
 import {
   createIncomeSchema,
   type CreateIncomeInput,
 } from "@/lib/validation/accounting"
 import { todayInputValue } from "@/lib/admin/format"
 
+function getIncomeDefaults(
+  income: AdminIncome | null | undefined,
+  firstAccount: { id: string } | undefined
+): CreateIncomeInput {
+  if (income) {
+    return {
+      accountId: income.accountId ?? "",
+      amount: income.amount.replace(/\.00$/, ""),
+      receivedOn: income.receivedOn,
+      description: income.description,
+      source: income.source ?? "",
+      externalReference: income.externalReference ?? "",
+      notes: income.notes ?? "",
+    }
+  }
+
+  return {
+    accountId: firstAccount?.id ?? "",
+    amount: "",
+    receivedOn: todayInputValue(),
+    description: "",
+    source: "",
+    externalReference: "",
+    notes: "",
+  }
+}
+
 function CreateIncomeDialog({
   open,
   onOpenChange,
   accounts,
+  income,
   onCreated,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   accounts: Array<{ id: string; name: string }>
+  income?: AdminIncome | null
   onCreated: () => void
 }) {
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const firstAccount = accounts[0]
+  const isEditing = Boolean(income)
 
   const {
     register,
@@ -44,36 +76,38 @@ function CreateIncomeDialog({
     formState: { errors },
   } = useForm<CreateIncomeInput>({
     resolver: zodResolver(createIncomeSchema),
-    defaultValues: {
-      accountId: firstAccount?.id ?? "",
-      amount: "",
-      receivedOn: todayInputValue(),
-      description: "",
-      source: "",
-      externalReference: "",
-      notes: "",
-    },
+    defaultValues: getIncomeDefaults(null, firstAccount),
   })
 
   useEffect(() => {
     if (open) {
       setServerError(null)
-      reset({
-        accountId: firstAccount?.id ?? "",
-        amount: "",
-        receivedOn: todayInputValue(),
-        description: "",
-        source: "",
-        externalReference: "",
-        notes: "",
-      })
+      reset(getIncomeDefaults(income, firstAccount))
     }
-  }, [open, firstAccount?.id, reset])
+  }, [open, income, firstAccount?.id, reset])
 
   const onSubmit = (values: CreateIncomeInput) => {
     setServerError(null)
 
     startTransition(async () => {
+      if (income) {
+        const result = await updateIncomeAction({
+          ...values,
+          incomeId: income.id,
+        })
+
+        if (!result.ok) {
+          setServerError(
+            result.error ?? "The income record could not be updated."
+          )
+          return
+        }
+
+        onOpenChange(false)
+        onCreated()
+        return
+      }
+
       const result = await createIncomeAction(values)
 
       if (!result.ok) {
@@ -92,8 +126,12 @@ function CreateIncomeDialog({
     <AdminDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Record additional income"
-      description="Recorded income directly increases the business balance alongside completed gateway payments."
+      title={isEditing ? "Edit income" : "Record additional income"}
+      description={
+        isEditing
+          ? "Update the income record. Changes are recorded in the audit log."
+          : "Recorded income directly increases the business balance alongside completed gateway payments."
+      }
       className="max-w-2xl"
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">

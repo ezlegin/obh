@@ -20,6 +20,7 @@ export type AdminBusinessAccount = {
   calculatedBalance: string
   openingBalanceAt: string | null
   isActive: boolean
+  notes: string | null
   expenseCount: number
   incomeCount: number
   createdAt: string
@@ -150,6 +151,7 @@ function mapBusinessAccount(
       ? formatDateOnly(account.openingBalanceAt)
       : null,
     isActive: account.isActive,
+    notes: account.notes,
     expenseCount: account._count.expenses,
     incomeCount: account._count.income,
     createdAt: account.createdAt.toISOString(),

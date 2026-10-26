@@ -13,7 +13,11 @@ import { Textarea } from "@workspace/ui/components/textarea"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import type { IssuedCredential } from "@/components/admin/services/issue-credential-dialog"
-import { registerConnectedServiceAction } from "@/app/admin/services/actions"
+import {
+  registerConnectedServiceAction,
+  updateConnectedServiceAction,
+} from "@/app/admin/services/actions"
+import type { AdminConnectedService } from "@/server/payments/queries"
 
 const registerServiceSchema = z
   .object({
@@ -100,19 +104,36 @@ const registerServiceSchema = z
 
 type RegisterServiceValues = z.infer<typeof registerServiceSchema>
 
+function getServiceDefaults(
+  service?: AdminConnectedService | null
+): RegisterServiceValues {
+  return {
+    name: service?.name ?? "",
+    slug: service?.slug ?? "",
+    domain: service?.domain ?? "",
+    description: service?.description ?? "",
+    returnUrls: service?.allowedReturnUrls.join("\n") ?? "",
+    defaultReturnUrl: service?.defaultReturnUrl ?? "",
+    webhookUrl: service?.webhookUrl ?? "",
+  }
+}
+
 type RegisterServiceDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  service?: AdminConnectedService | null
   onCreated: (credential?: IssuedCredential) => void
 }
 
 function RegisterServiceDialog({
   open,
   onOpenChange,
+  service,
   onCreated,
 }: RegisterServiceDialogProps) {
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const isEditing = Boolean(service)
 
   const {
     register,
@@ -121,23 +142,15 @@ function RegisterServiceDialog({
     formState: { errors },
   } = useForm<RegisterServiceValues>({
     resolver: zodResolver(registerServiceSchema),
-    defaultValues: {
-      name: "",
-      slug: "",
-      domain: "",
-      description: "",
-      returnUrls: "",
-      defaultReturnUrl: "",
-      webhookUrl: "",
-    },
+    defaultValues: getServiceDefaults(null),
   })
 
   useEffect(() => {
     if (open) {
       setServerError(null)
-      reset()
+      reset(getServiceDefaults(service))
     }
-  }, [open, reset])
+  }, [open, service, reset])
 
   const onSubmit = (values: RegisterServiceValues) => {
     setServerError(null)
@@ -148,7 +161,7 @@ function RegisterServiceDialog({
       .filter(Boolean)
 
     startTransition(async () => {
-      const result = await registerConnectedServiceAction({
+      const payload = {
         name: values.name,
         slug: values.slug,
         domain: values.domain,
@@ -156,10 +169,21 @@ function RegisterServiceDialog({
         allowedReturnUrls,
         defaultReturnUrl: values.defaultReturnUrl,
         webhookUrl: values.webhookUrl,
-      })
+      }
+      const result = service
+        ? await updateConnectedServiceAction({
+            ...payload,
+            serviceId: service.id,
+          })
+        : await registerConnectedServiceAction(payload)
 
       if (!result.ok) {
-        setServerError(result.error ?? "The service could not be generated.")
+        setServerError(
+          result.error ??
+            (isEditing
+              ? "The service could not be updated."
+              : "The service could not be generated.")
+        )
         return
       }
 
@@ -182,8 +206,14 @@ function RegisterServiceDialog({
     <AdminDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Generate a connected service"
-      description="Creates the connected service and automatically generates its single API key. Set OBH_SIMULATOR=true in the service's environment to use the OBH Sadad simulator."
+      title={
+        isEditing ? "Edit connected service" : "Generate a connected service"
+      }
+      description={
+        isEditing
+          ? "Update the service identity, return URL allowlist, and webhook endpoint. Existing API keys and signing secrets are preserved."
+          : "Creates the connected service and automatically generates its single API key. Set OBH_SIMULATOR=true in the service's environment to use the OBH Sadad simulator."
+      }
       className="max-w-2xl"
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
@@ -313,8 +343,10 @@ function RegisterServiceDialog({
             {isPending ? (
               <>
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                Generating…
+                {isEditing ? "Saving…" : "Generating…"}
               </>
+            ) : isEditing ? (
+              "Save changes"
             ) : (
               "Generate service & API key"
             )}

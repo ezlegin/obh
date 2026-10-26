@@ -14,6 +14,8 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { AmountInput } from "@/components/admin/amount-input"
 import { createExpenseAction } from "@/app/admin/expenses/actions"
+import { updateExpenseAction } from "@/app/admin/expenses/edit-actions"
+import type { AdminExpense } from "@/server/accounting/queries"
 import {
   createExpenseSchema,
   type CreateExpenseInput,
@@ -23,23 +25,54 @@ import { todayInputValue } from "@/lib/admin/format"
 type CategoryOption = { id: string; name: string; requiresDocument: boolean }
 type AccountOption = { id: string; name: string }
 
+function getDefaultValues(
+  expense: AdminExpense | null | undefined,
+  firstCategory: CategoryOption | undefined,
+  firstAccount: AccountOption | undefined
+): CreateExpenseInput {
+  if (expense) {
+    return {
+      categoryId: expense.categoryId,
+      accountId: expense.accountId ?? "",
+      amount: expense.amount.replace(/\.00$/, ""),
+      spentOn: expense.spentOn,
+      description: expense.description,
+      notes: expense.notes ?? "",
+      externalReference: expense.externalReference ?? "",
+    }
+  }
+
+  return {
+    categoryId: firstCategory?.id ?? "",
+    accountId: firstAccount?.id ?? "",
+    amount: "",
+    spentOn: todayInputValue(),
+    description: "",
+    notes: "",
+    externalReference: "",
+  }
+}
+
 function CreateExpenseDialog({
   open,
   onOpenChange,
   categories,
   accounts,
+  expense,
   onCreated,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   categories: CategoryOption[]
   accounts: AccountOption[]
+  expense?: AdminExpense | null
   onCreated: (expenseId: string) => void
 }) {
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const firstCategory = categories[0]
   const firstAccount = accounts[0]
+  const isEditing = Boolean(expense)
 
   const {
     register,
@@ -49,36 +82,36 @@ function CreateExpenseDialog({
     formState: { errors },
   } = useForm<CreateExpenseInput>({
     resolver: zodResolver(createExpenseSchema),
-    defaultValues: {
-      categoryId: firstCategory?.id ?? "",
-      accountId: firstAccount?.id ?? "",
-      amount: "",
-      spentOn: todayInputValue(),
-      description: "",
-      notes: "",
-      externalReference: "",
-    },
+    defaultValues: getDefaultValues(null, firstCategory, firstAccount),
   })
 
   useEffect(() => {
     if (open) {
       setServerError(null)
-      reset({
-        categoryId: firstCategory?.id ?? "",
-        accountId: firstAccount?.id ?? "",
-        amount: "",
-        spentOn: todayInputValue(),
-        description: "",
-        notes: "",
-        externalReference: "",
-      })
+      reset(getDefaultValues(expense, firstCategory, firstAccount))
     }
-  }, [open, firstCategory?.id, firstAccount?.id, reset])
+  }, [open, expense, firstCategory?.id, firstAccount?.id, reset])
 
   const onSubmit = (values: CreateExpenseInput) => {
     setServerError(null)
 
     startTransition(async () => {
+      if (expense) {
+        const result = await updateExpenseAction({
+          ...values,
+          expenseId: expense.id,
+        })
+
+        if (!result.ok) {
+          setServerError(result.error ?? "The expense could not be updated.")
+          return
+        }
+
+        onOpenChange(false)
+        onCreated(expense.id)
+        return
+      }
+
       const result = await createExpenseAction(values)
 
       if (!result.ok || !result.expenseId) {
@@ -95,8 +128,12 @@ function CreateExpenseDialog({
     <AdminDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Record an expense"
-      description="Recorded expenses are immediately marked paid and deducted from the business balance."
+      title={isEditing ? "Edit expense" : "Record an expense"}
+      description={
+        isEditing
+          ? "Update the expense details. Changes are recorded in the audit log."
+          : "Recorded expenses are immediately marked paid and deducted from the business balance."
+      }
       className="max-w-2xl"
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
@@ -218,8 +255,10 @@ function CreateExpenseDialog({
             {isPending ? (
               <>
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                Recording…
+                {isEditing ? "Saving…" : "Recording…"}
               </>
+            ) : isEditing ? (
+              "Save changes"
             ) : (
               "Record expense"
             )}

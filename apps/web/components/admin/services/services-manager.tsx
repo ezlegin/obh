@@ -10,6 +10,7 @@ import {
   KeyRound,
   Link2,
   Loader2,
+  Pencil,
   Plus,
   Power,
   RefreshCw,
@@ -46,6 +47,8 @@ type ServicesManagerProps = {
 function ServicesManager({ services }: ServicesManagerProps) {
   const router = useRouter()
   const [registerOpen, setRegisterOpen] = useState(false)
+  const [editingService, setEditingService] =
+    useState<AdminConnectedService | null>(null)
   const [issuedCredential, setIssuedCredential] =
     useState<IssuedCredential | null>(null)
   const [issuedWebhookSecret, setIssuedWebhookSecret] =
@@ -260,6 +263,19 @@ function ServicesManager({ services }: ServicesManagerProps) {
                   </div>
 
                   <div className="flex shrink-0 flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditingService(service)}
+                      disabled={
+                        pendingKey === `delete:${service.id}` ||
+                        pendingKey === `service:${service.id}`
+                      }
+                    >
+                      <Pencil aria-hidden="true" className="size-3.5" />
+                      Edit
+                    </Button>
                     <Button
                       type="button"
                       variant="ghost"
@@ -550,12 +566,20 @@ function ServicesManager({ services }: ServicesManagerProps) {
       )}
 
       <RegisterServiceDialog
-        open={registerOpen}
-        onOpenChange={setRegisterOpen}
+        open={registerOpen || Boolean(editingService)}
+        service={editingService}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRegisterOpen(false)
+            setEditingService(null)
+          }
+        }}
         onCreated={(credential) => {
           if (credential) {
             setIssuedCredential(credential)
           }
+          setRegisterOpen(false)
+          setEditingService(null)
           refresh()
         }}
       />

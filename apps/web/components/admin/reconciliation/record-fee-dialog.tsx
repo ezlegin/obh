@@ -14,26 +14,62 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { AmountInput } from "@/components/admin/amount-input"
 import { recordProviderFeeAction } from "@/app/admin/reconciliation/actions"
-import type { ProviderAccountBalanceView } from "@/server/reconciliation/queries"
+import { updateProviderFeeAction } from "@/app/admin/reconciliation/edit-actions"
+import type {
+  ProviderAccountBalanceView,
+  ProviderFeeView,
+} from "@/server/reconciliation/queries"
 import {
   recordProviderFeeSchema,
   type RecordProviderFeeInput,
 } from "@/lib/validation/reconciliation"
 import { todayInputValue } from "@/lib/admin/format"
 
+function getFeeDefaults(
+  account: ProviderAccountBalanceView | null,
+  fee: ProviderFeeView | null | undefined
+): RecordProviderFeeInput {
+  if (fee) {
+    return {
+      providerAccountId: fee.providerAccountId,
+      paymentId: fee.paymentId ?? "",
+      kind: fee.kind,
+      status: fee.status === "VOIDED" ? "SETTLED" : fee.status,
+      amount: fee.amount.replace(/\.00$/, ""),
+      chargedAt: fee.chargedAt,
+      reference: fee.reference ?? "",
+      note: fee.note ?? "",
+    }
+  }
+
+  return {
+    providerAccountId: account?.id ?? "",
+    paymentId: "",
+    kind: "GATEWAY_FEE",
+    status: "SETTLED",
+    amount: "",
+    chargedAt: todayInputValue(),
+    reference: "",
+    note: "",
+  }
+}
+
 function RecordFeeDialog({
   account,
+  fee,
   open,
   onOpenChange,
   onCreated,
 }: {
   account: ProviderAccountBalanceView | null
+  fee?: ProviderFeeView | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: () => void
 }) {
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const isEditing = Boolean(fee)
 
   const {
     register,
@@ -43,33 +79,15 @@ function RecordFeeDialog({
     formState: { errors },
   } = useForm<RecordProviderFeeInput>({
     resolver: zodResolver(recordProviderFeeSchema),
-    defaultValues: {
-      providerAccountId: account?.id ?? "",
-      paymentId: "",
-      kind: "GATEWAY_FEE",
-      status: "SETTLED",
-      amount: "",
-      chargedAt: todayInputValue(),
-      reference: "",
-      note: "",
-    },
+    defaultValues: getFeeDefaults(account, null),
   })
 
   useEffect(() => {
     if (open && account) {
       setServerError(null)
-      reset({
-        providerAccountId: account.id,
-        paymentId: "",
-        kind: "GATEWAY_FEE",
-        status: "SETTLED",
-        amount: "",
-        chargedAt: todayInputValue(),
-        reference: "",
-        note: "",
-      })
+      reset(getFeeDefaults(account, fee))
     }
-  }, [open, account, reset])
+  }, [open, account, fee, reset])
 
   if (!account) {
     return null
@@ -79,6 +97,24 @@ function RecordFeeDialog({
     setServerError(null)
 
     startTransition(async () => {
+      if (fee) {
+        const result = await updateProviderFeeAction({
+          ...values,
+          feeId: fee.id,
+        })
+
+        if (!result.ok) {
+          setServerError(
+            result.error ?? "The provider fee could not be updated."
+          )
+          return
+        }
+
+        onOpenChange(false)
+        onCreated()
+        return
+      }
+
       const result = await recordProviderFeeAction(values)
 
       if (!result.ok) {
@@ -97,20 +133,36 @@ function RecordFeeDialog({
     <AdminDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={`Record provider fee · ${account.name}`}
-      description="Recorded fees are immediately settled and deducted from the calculated provider balance."
+      title={`${isEditing ? "Edit" : "Record"} provider fee · ${account.name}`}
+      description={
+        isEditing
+          ? "Update the provider fee. Changes are recorded in the audit log."
+          : "Recorded fees are immediately settled and deducted from the calculated provider balance."
+      }
       className="max-w-2xl"
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
         <input type="hidden" {...register("providerAccountId")} />
-        <input type="hidden" {...register("status")} />
+        {isEditing ? null : <input type="hidden" {...register("status")} />}
 
-        <div className="space-y-2">
-          <Label htmlFor="fee-kind">Fee kind</Label>
-          <NativeSelect id="fee-kind" {...register("kind")}>
-            <option value="GATEWAY_FEE">Gateway fee</option>
-            <option value="COMMISSION">Commission</option>
-          </NativeSelect>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="fee-kind">Fee kind</Label>
+            <NativeSelect id="fee-kind" {...register("kind")}>
+              <option value="GATEWAY_FEE">Gateway fee</option>
+              <option value="COMMISSION">Commission</option>
+            </NativeSelect>
+          </div>
+
+          {isEditing ? (
+            <div className="space-y-2">
+              <Label htmlFor="fee-status">Status</Label>
+              <NativeSelect id="fee-status" {...register("status")}>
+                <option value="SETTLED">Settled</option>
+                <option value="PENDING">Pending</option>
+              </NativeSelect>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
@@ -181,8 +233,10 @@ function RecordFeeDialog({
             {isPending ? (
               <>
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                Recording…
+                {isEditing ? "Saving…" : "Recording…"}
               </>
+            ) : isEditing ? (
+              "Save changes"
             ) : (
               "Record fee"
             )}

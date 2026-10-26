@@ -13,26 +13,54 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { AmountInput } from "@/components/admin/amount-input"
 import { recordReconciliationAction } from "@/app/admin/reconciliation/actions"
-import type { ProviderAccountBalanceView } from "@/server/reconciliation/queries"
+import { updateReconciliationAction } from "@/app/admin/reconciliation/edit-actions"
+import type {
+  ProviderAccountBalanceView,
+  ReconciliationView,
+} from "@/server/reconciliation/queries"
 import {
   recordReconciliationSchema,
   type RecordReconciliationInput,
 } from "@/lib/validation/reconciliation"
 import { formatIrrDecimal, todayInputValue } from "@/lib/admin/format"
 
+function getReconciliationDefaults(
+  account: ProviderAccountBalanceView | null,
+  reconciliation: ReconciliationView | null | undefined
+): RecordReconciliationInput {
+  if (reconciliation) {
+    return {
+      accountId: reconciliation.accountId,
+      actualBalance: reconciliation.actualBalance.replace(/\.00$/, ""),
+      asOf: reconciliation.asOf,
+      note: reconciliation.note ?? "",
+    }
+  }
+
+  return {
+    accountId: account?.id ?? "",
+    actualBalance: "",
+    asOf: todayInputValue(),
+    note: "",
+  }
+}
+
 function RecordReconciliationDialog({
   account,
+  reconciliation,
   open,
   onOpenChange,
   onCreated,
 }: {
   account: ProviderAccountBalanceView | null
+  reconciliation?: ReconciliationView | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: () => void
 }) {
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const isEditing = Boolean(reconciliation)
 
   const {
     register,
@@ -42,25 +70,15 @@ function RecordReconciliationDialog({
     formState: { errors },
   } = useForm<RecordReconciliationInput>({
     resolver: zodResolver(recordReconciliationSchema),
-    defaultValues: {
-      accountId: account?.id ?? "",
-      actualBalance: "",
-      asOf: todayInputValue(),
-      note: "",
-    },
+    defaultValues: getReconciliationDefaults(account, null),
   })
 
   useEffect(() => {
     if (open && account) {
       setServerError(null)
-      reset({
-        accountId: account.id,
-        actualBalance: "",
-        asOf: todayInputValue(),
-        note: "",
-      })
+      reset(getReconciliationDefaults(account, reconciliation))
     }
-  }, [open, account, reset])
+  }, [open, account, reconciliation, reset])
 
   if (!account) {
     return null
@@ -70,6 +88,24 @@ function RecordReconciliationDialog({
     setServerError(null)
 
     startTransition(async () => {
+      if (reconciliation) {
+        const result = await updateReconciliationAction({
+          ...values,
+          reconciliationId: reconciliation.id,
+        })
+
+        if (!result.ok) {
+          setServerError(
+            result.error ?? "The reconciliation could not be updated."
+          )
+          return
+        }
+
+        onOpenChange(false)
+        onCreated()
+        return
+      }
+
       const result = await recordReconciliationAction(values)
 
       if (!result.ok) {
@@ -88,8 +124,12 @@ function RecordReconciliationDialog({
     <AdminDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={`Reconcile · ${account.name}`}
-      description="Enter the actual balance from the provider statement. OBH compares it with the calculated balance from recorded payments, settled fees, and completed transfers."
+      title={`${isEditing ? "Edit" : "Reconcile"} · ${account.name}`}
+      description={
+        isEditing
+          ? "Update the actual balance for this reconciliation. The calculated balance and difference are recalculated and the change is audited."
+          : "Enter the actual balance from the provider statement. OBH compares it with the calculated balance from recorded payments, settled fees, and completed transfers."
+      }
     >
       <div className="rounded-xl border border-border bg-white/[0.02] p-4">
         <p className="text-[10px] text-muted-foreground">Calculated balance</p>
@@ -160,8 +200,10 @@ function RecordReconciliationDialog({
             {isPending ? (
               <>
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                Recording…
+                {isEditing ? "Saving…" : "Recording…"}
               </>
+            ) : isEditing ? (
+              "Save changes"
             ) : (
               "Record reconciliation"
             )}

@@ -36,7 +36,9 @@ export type ProviderAccountBalanceView = {
 
 export type ProviderFeeView = {
   id: string
+  providerAccountId: string
   providerAccountName: string
+  paymentId: string | null
   paymentReference: string | null
   kind: "GATEWAY_FEE" | "COMMISSION"
   status: "PENDING" | "SETTLED" | "VOIDED"
@@ -44,22 +46,27 @@ export type ProviderFeeView = {
   currency: string
   chargedAt: string
   reference: string | null
+  note: string | null
 }
 
 export type SettlementView = {
   id: string
   reference: string
+  fromAccountId: string
   fromAccountName: string
+  toAccountId: string
   toAccountName: string
   amount: string
   currency: string
   status: "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED"
   occurredAt: string
   externalReference: string | null
+  note: string | null
 }
 
 export type ReconciliationView = {
   id: string
+  accountId: string
   accountName: string
   asOf: string
   actualBalance: string
@@ -202,7 +209,9 @@ export async function getReconciliationWorkspace(): Promise<ReconciliationWorksp
     businessAccounts,
     fees: feeRows.map((fee) => ({
       id: fee.id,
+      providerAccountId: fee.providerAccountId,
       providerAccountName: fee.providerAccount.name,
+      paymentId: fee.paymentId,
       paymentReference: fee.payment?.reference ?? null,
       kind: fee.kind,
       status: fee.status,
@@ -210,20 +219,25 @@ export async function getReconciliationWorkspace(): Promise<ReconciliationWorksp
       currency: fee.currency,
       chargedAt: fee.chargedAt.toISOString().slice(0, 10),
       reference: fee.reference,
+      note: fee.note,
     })),
     transfers: transferRows.map((transfer) => ({
       id: transfer.id,
       reference: transfer.reference,
+      fromAccountId: transfer.fromAccountId,
       fromAccountName: transfer.fromAccount.name,
+      toAccountId: transfer.toAccountId,
       toAccountName: transfer.toAccount.name,
       amount: transfer.amount.toFixed(2),
       currency: transfer.currency,
       status: transfer.status,
       occurredAt: transfer.occurredAt.toISOString().slice(0, 10),
       externalReference: transfer.externalReference,
+      note: transfer.note,
     })),
     reconciliations: reconciliationRows.map((reconciliation) => ({
       id: reconciliation.id,
+      accountId: reconciliation.accountId,
       accountName: reconciliation.account.name,
       asOf: reconciliation.asOf.toISOString().slice(0, 10),
       actualBalance: reconciliation.actualBalance.toFixed(2),

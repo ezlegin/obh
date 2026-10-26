@@ -154,6 +154,8 @@ export const adminNavigation: AdminNavGroup[] = [
         href: "/admin/settings",
         description: "Business, payment, and security settings.",
         icon: Settings,
+        disabled: true,
+        badge: "Soon",
       },
     ],
   },

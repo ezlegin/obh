@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db/client"
 import type {
   CreateConnectedServiceInput,
   IssueServiceCredentialInput,
+  UpdateConnectedServiceInput,
 } from "@/lib/validation/payment-platform"
 import { DomainError } from "@/server/errors"
 import { generateServiceCredential } from "@/server/payments/service-credentials"
@@ -20,9 +21,7 @@ export async function createConnectedService(
 ) {
   const db = getDb()
   const generated = generateServiceCredential()
-  const secretEncrypted = encryptServiceCredentialSecret(
-    generated.presentedKey
-  )
+  const secretEncrypted = encryptServiceCredentialSecret(generated.presentedKey)
 
   try {
     return await db.$transaction(async (tx) => {
@@ -77,6 +76,78 @@ export async function createConnectedService(
         credential,
         presentedKey: generated.presentedKey,
       }
+    })
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new DomainError(
+        "SERVICE_EXISTS",
+        "A service with that slug or domain already exists."
+      )
+    }
+
+    throw error
+  }
+}
+
+export async function updateConnectedService(
+  actorId: string,
+  values: UpdateConnectedServiceInput
+) {
+  const db = getDb()
+  const service = await db.connectedService.findUnique({
+    where: { id: values.serviceId },
+  })
+
+  if (!service) {
+    throw new DomainError("SERVICE_NOT_FOUND", "Service was not found.")
+  }
+
+  try {
+    return await db.$transaction(async (tx) => {
+      const updated = await tx.connectedService.update({
+        where: { id: service.id },
+        data: {
+          name: values.name,
+          slug: values.slug,
+          domain: values.domain,
+          description: values.description || null,
+          allowedReturnUrls: values.allowedReturnUrls,
+          defaultReturnUrl: values.defaultReturnUrl || null,
+          webhookUrl: values.webhookUrl || null,
+        },
+      })
+
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: "connected_service.updated",
+          entityType: "ConnectedService",
+          entityId: service.id,
+          before: {
+            name: service.name,
+            slug: service.slug,
+            domain: service.domain,
+            description: service.description,
+            allowedReturnUrls: service.allowedReturnUrls,
+            defaultReturnUrl: service.defaultReturnUrl,
+            webhookUrl: service.webhookUrl,
+          },
+          after: {
+            name: updated.name,
+            slug: updated.slug,
+            domain: updated.domain,
+            description: updated.description,
+            allowedReturnUrls: updated.allowedReturnUrls,
+            defaultReturnUrl: updated.defaultReturnUrl,
+            webhookUrl: updated.webhookUrl,
+          },
+        },
+      })
+
+      return updated
     })
   } catch (error) {
     if (

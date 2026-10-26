@@ -62,6 +62,12 @@ export const createConnectedServiceSchema = z
     }
   })
 
+export const updateConnectedServiceSchema = createConnectedServiceSchema.extend(
+  {
+    serviceId: z.string().uuid(),
+  }
+)
+
 export const issueServiceCredentialSchema = z.object({
   serviceId: z.string().uuid(),
   label: z
@@ -91,6 +97,7 @@ export const rotateWebhookSecretSchema = z.object({
 
 export const createDevelopmentPaymentSchema = z.object({
   serviceId: z.string().uuid(),
+  environment: z.enum(["TEST", "LIVE"]).optional(),
   amount: z
     .string()
     .trim()
@@ -117,6 +124,9 @@ export const deletePaymentSchema = z.object({
 
 export type CreateConnectedServiceInput = z.infer<
   typeof createConnectedServiceSchema
+>
+export type UpdateConnectedServiceInput = z.infer<
+  typeof updateConnectedServiceSchema
 >
 export type IssueServiceCredentialInput = z.infer<
   typeof issueServiceCredentialSchema

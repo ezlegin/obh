@@ -14,28 +14,61 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { AmountInput } from "@/components/admin/amount-input"
 import { recordSettlementAction } from "@/app/admin/reconciliation/actions"
-import type { ProviderAccountBalanceView } from "@/server/reconciliation/queries"
+import { updateSettlementAction } from "@/app/admin/reconciliation/edit-actions"
+import type {
+  ProviderAccountBalanceView,
+  SettlementView,
+} from "@/server/reconciliation/queries"
 import {
   recordSettlementSchema,
   type RecordSettlementInput,
 } from "@/lib/validation/reconciliation"
 import { todayInputValue } from "@/lib/admin/format"
 
+function getSettlementDefaults(
+  account: ProviderAccountBalanceView | null,
+  businessAccounts: Array<{ id: string }>,
+  settlement: SettlementView | null | undefined
+): RecordSettlementInput {
+  if (settlement) {
+    return {
+      providerAccountId: settlement.fromAccountId,
+      toAccountId: settlement.toAccountId,
+      amount: settlement.amount.replace(/\.00$/, ""),
+      occurredAt: settlement.occurredAt,
+      externalReference: settlement.externalReference ?? "",
+      note: settlement.note ?? "",
+    }
+  }
+
+  return {
+    providerAccountId: account?.id ?? "",
+    toAccountId: businessAccounts[0]?.id ?? "",
+    amount: "",
+    occurredAt: todayInputValue(),
+    externalReference: "",
+    note: "",
+  }
+}
+
 function RecordSettlementDialog({
   account,
   businessAccounts,
+  settlement,
   open,
   onOpenChange,
   onCreated,
 }: {
   account: ProviderAccountBalanceView | null
   businessAccounts: Array<{ id: string; name: string }>
+  settlement?: SettlementView | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: () => void
 }) {
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const isEditing = Boolean(settlement)
 
   const {
     register,
@@ -45,29 +78,15 @@ function RecordSettlementDialog({
     formState: { errors },
   } = useForm<RecordSettlementInput>({
     resolver: zodResolver(recordSettlementSchema),
-    defaultValues: {
-      providerAccountId: account?.id ?? "",
-      toAccountId: businessAccounts[0]?.id ?? "",
-      amount: "",
-      occurredAt: todayInputValue(),
-      externalReference: "",
-      note: "",
-    },
+    defaultValues: getSettlementDefaults(account, businessAccounts, null),
   })
 
   useEffect(() => {
     if (open && account) {
       setServerError(null)
-      reset({
-        providerAccountId: account.id,
-        toAccountId: businessAccounts[0]?.id ?? "",
-        amount: "",
-        occurredAt: todayInputValue(),
-        externalReference: "",
-        note: "",
-      })
+      reset(getSettlementDefaults(account, businessAccounts, settlement))
     }
-  }, [open, account, businessAccounts, reset])
+  }, [open, account, businessAccounts, settlement, reset])
 
   if (!account) {
     return null
@@ -77,6 +96,22 @@ function RecordSettlementDialog({
     setServerError(null)
 
     startTransition(async () => {
+      if (settlement) {
+        const result = await updateSettlementAction({
+          ...values,
+          transferId: settlement.id,
+        })
+
+        if (!result.ok) {
+          setServerError(result.error ?? "The settlement could not be updated.")
+          return
+        }
+
+        onOpenChange(false)
+        onCreated()
+        return
+      }
+
       const result = await recordSettlementAction(values)
 
       if (!result.ok) {
@@ -93,8 +128,12 @@ function RecordSettlementDialog({
     <AdminDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={`Record settlement · ${account.name}`}
-      description="Records a completed settlement transfer from the provider account to a business payment source. This is an accounting record; no bank transfer is executed."
+      title={`${isEditing ? "Edit" : "Record"} settlement · ${account.name}`}
+      description={
+        isEditing
+          ? "Update the settlement record. Changes are recorded in the audit log."
+          : "Records a completed settlement transfer from the provider account to a business payment source. This is an accounting record; no bank transfer is executed."
+      }
       className="max-w-2xl"
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
@@ -178,8 +217,10 @@ function RecordSettlementDialog({
             {isPending ? (
               <>
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                Recording…
+                {isEditing ? "Saving…" : "Recording…"}
               </>
+            ) : isEditing ? (
+              "Save changes"
             ) : (
               "Record settlement"
             )}

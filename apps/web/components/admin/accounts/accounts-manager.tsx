@@ -4,6 +4,7 @@ import {
   Building2,
   Landmark,
   Loader2,
+  Pencil,
   Plus,
   Power,
   Trash2,
@@ -27,6 +28,8 @@ import { formatAccountingDate, formatIrrDecimal } from "@/lib/admin/format"
 function AccountsManager({ accounts }: { accounts: AdminBusinessAccount[] }) {
   const router = useRouter()
   const [createOpen, setCreateOpen] = useState(false)
+  const [editingAccount, setEditingAccount] =
+    useState<AdminBusinessAccount | null>(null)
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -137,6 +140,15 @@ function AccountsManager({ accounts }: { accounts: AdminBusinessAccount[] }) {
           <Button
             type="button"
             variant="ghost"
+            size="icon-xs"
+            aria-label={`Edit ${account.name}`}
+            onClick={() => setEditingAccount(account)}
+          >
+            <Pencil aria-hidden="true" className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
             size="sm"
             onClick={() => toggleAccount(account)}
             disabled={pendingId === `toggle:${account.id}`}
@@ -240,9 +252,19 @@ function AccountsManager({ accounts }: { accounts: AdminBusinessAccount[] }) {
       </div>
 
       <CreateBusinessAccountDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        onCreated={() => router.refresh()}
+        open={createOpen || Boolean(editingAccount)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateOpen(false)
+            setEditingAccount(null)
+          }
+        }}
+        account={editingAccount}
+        onCreated={() => {
+          setCreateOpen(false)
+          setEditingAccount(null)
+          router.refresh()
+        }}
       />
     </>
   )

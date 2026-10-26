@@ -13,23 +13,52 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { AmountInput } from "@/components/admin/amount-input"
 import { createBusinessAccountAction } from "@/app/admin/accounts/actions"
+import { updateBusinessAccountAction } from "@/app/admin/accounts/edit-actions"
+import type { AdminBusinessAccount } from "@/server/accounting/queries"
 import {
   createBusinessAccountSchema,
   type CreateBusinessAccountInput,
 } from "@/lib/validation/accounting"
 import { todayInputValue } from "@/lib/admin/format"
 
+function getAccountDefaults(
+  account: AdminBusinessAccount | null | undefined
+): CreateBusinessAccountInput {
+  if (account) {
+    return {
+      name: account.name,
+      institution: account.institution ?? "",
+      maskedIdentifier: account.maskedIdentifier ?? "",
+      openingBalance: account.openingBalance.replace(/\.00$/, ""),
+      openingBalanceAt: account.openingBalanceAt ?? "",
+      notes: account.notes ?? "",
+    }
+  }
+
+  return {
+    name: "",
+    institution: "",
+    maskedIdentifier: "",
+    openingBalance: "0",
+    openingBalanceAt: todayInputValue(),
+    notes: "",
+  }
+}
+
 function CreateBusinessAccountDialog({
   open,
   onOpenChange,
+  account,
   onCreated,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  account?: AdminBusinessAccount | null
   onCreated: () => void
 }) {
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const isEditing = Boolean(account)
 
   const {
     register,
@@ -39,34 +68,38 @@ function CreateBusinessAccountDialog({
     formState: { errors },
   } = useForm<CreateBusinessAccountInput>({
     resolver: zodResolver(createBusinessAccountSchema),
-    defaultValues: {
-      name: "",
-      institution: "",
-      maskedIdentifier: "",
-      openingBalance: "0",
-      openingBalanceAt: todayInputValue(),
-      notes: "",
-    },
+    defaultValues: getAccountDefaults(null),
   })
 
   useEffect(() => {
     if (open) {
       setServerError(null)
-      reset({
-        name: "",
-        institution: "",
-        maskedIdentifier: "",
-        openingBalance: "0",
-        openingBalanceAt: todayInputValue(),
-        notes: "",
-      })
+      reset(getAccountDefaults(account))
     }
-  }, [open, reset])
+  }, [open, account, reset])
 
   const onSubmit = (values: CreateBusinessAccountInput) => {
     setServerError(null)
 
     startTransition(async () => {
+      if (account) {
+        const result = await updateBusinessAccountAction({
+          ...values,
+          accountId: account.id,
+        })
+
+        if (!result.ok) {
+          setServerError(
+            result.error ?? "The payment source could not be updated."
+          )
+          return
+        }
+
+        onOpenChange(false)
+        onCreated()
+        return
+      }
+
       const result = await createBusinessAccountAction(values)
 
       if (!result.ok) {
@@ -85,8 +118,14 @@ function CreateBusinessAccountDialog({
     <AdminDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Add a business payment source"
-      description="Business-owned accounts are used for income and expense records. They are separate from gateway provider accounts."
+      title={
+        isEditing ? "Edit payment source" : "Add a business payment source"
+      }
+      description={
+        isEditing
+          ? "Update the payment source. Opening balance changes are recorded in the audit log."
+          : "Business-owned accounts are used for income and expense records. They are separate from gateway provider accounts."
+      }
       className="max-w-2xl"
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
@@ -179,8 +218,10 @@ function CreateBusinessAccountDialog({
             {isPending ? (
               <>
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                Creating…
+                {isEditing ? "Saving…" : "Creating…"}
               </>
+            ) : isEditing ? (
+              "Save changes"
             ) : (
               "Add payment source"
             )}
