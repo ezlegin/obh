@@ -137,7 +137,7 @@ function CreateRecurringDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="recurring-amount">Amount (IRR)</Label>
+            <Label htmlFor="recurring-amount">Amount (R)</Label>
             <Input
               id="recurring-amount"
               inputMode="decimal"

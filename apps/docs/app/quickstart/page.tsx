@@ -62,8 +62,8 @@ export default function QuickstartPage() {
             <span className="text-foreground">A service credential</span>
           </td>
           <td>
-            A key shaped like <code>svc_test_&lt;id&gt;.&lt;secret&gt;</code>,
-            issued in OBH Admin. The secret is shown once.
+            A key shaped like <code>svc_&lt;id&gt;.&lt;secret&gt;</code>,
+            generated automatically when your service is created in OBH Admin.
           </td>
         </tr>
         <tr>
@@ -126,8 +126,9 @@ pnpm --filter web add @obh/payments@workspace:*
         filename=".env.local"
         language="bash"
         code={`# Server-only. Do not prefix with NEXT_PUBLIC_.
-OBH_SERVICE_KEY="svc_test_2f4a9c.example-secret-value"
-OBH_API_URL="http://localhost:3100"`}
+OBH_SERVICE_KEY="svc_2f4a9c18e0d14b2a.example-secret-value"
+# Optional: set to "true" in local/test environments to use the OBH Sadad simulator
+OBH_SIMULATOR="true"`}
       />
 
       <CodeBlock
@@ -135,10 +136,9 @@ OBH_API_URL="http://localhost:3100"`}
         language="ts"
         code={`import { OBHPayments } from "@obh/payments"
 
-// One client per credential and origin, created once per process.
+// Requests automatically target https://obhco.ir/api/v1
 export const obh = new OBHPayments({
   secretKey: process.env.OBH_SERVICE_KEY!,
-  baseUrl: process.env.OBH_API_URL!,
   timeoutMs: 15_000,
 })`}
       />
@@ -164,13 +164,9 @@ export const obh = new OBHPayments({
         code={`import { OBHPayments } from "@obh/payments"
 
 const obh = new OBHPayments({
-  secretKey: "svc_test_2f4a9c.example-secret-value",
-  baseUrl: "http://localhost:3100", // becomes http://localhost:3100/api/v1
+  secretKey: "svc_2f4a9c18e0d14b2a.example-secret-value",
 })
-
-// Other valid base URLs:
-// baseUrl: "https://pay.obh.example"
-// baseUrl: "https://pay.obh.example/api/v1"  // not suffixed twice`}
+// Uses https://obhco.ir/api/v1 by default and reads process.env.OBH_SIMULATOR`}
       />
 
       <p>

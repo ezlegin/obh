@@ -1,4 +1,10 @@
-export type TransactionStatusFilter = "all" | "completed" | "pending" | "failed"
+export type TransactionStatusFilter =
+  | "all"
+  | "completed"
+  | "pending"
+  | "failed"
+  | "cancelled"
+  | "expired"
 
 export type DashboardFilters = {
   status: TransactionStatusFilter

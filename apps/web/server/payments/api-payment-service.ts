@@ -16,6 +16,7 @@ import {
 } from "@/server/payments/lifecycle"
 import {
   getPaymentProviderAdapter,
+  getSadadConfigStatus,
   SADAD_PROVIDER_CODE,
 } from "@/server/payments/providers/registry"
 import { describeSadadCode } from "@/server/payments/providers/sadad"
@@ -250,6 +251,15 @@ export async function createApiPayment(
   }
 
   const amount = new Prisma.Decimal(input.amount)
+  const environment: "TEST" | "LIVE" = input.simulator ? "TEST" : "LIVE"
+
+  if (environment === "LIVE" && !getSadadConfigStatus().liveConfigured) {
+    throw new ApiError(
+      503,
+      "LIVE_NOT_AVAILABLE",
+      "LIVE Sadad gateway credentials are not configured on the server."
+    )
+  }
 
   const returnUrl = resolveReturnUrl(auth.service, input.returnUrl)
   const fingerprint = createPaymentRequestFingerprint({
@@ -299,7 +309,7 @@ export async function createApiPayment(
   }
 
   const { provider, account: providerAccount } =
-    await getSadadAccountForEnvironment(auth.environment)
+    await getSadadAccountForEnvironment(environment)
 
   const reference = createPaymentReference()
   let payment: Payment
@@ -315,7 +325,7 @@ export async function createApiPayment(
           amount,
           currency: "IRR",
           direction: "INCOMING",
-          environment: auth.environment,
+          environment,
           status: "PENDING",
           description: input.description,
           metadata: input.metadata as Prisma.InputJsonValue | undefined,
@@ -358,7 +368,7 @@ export async function createApiPayment(
             reference: created.reference,
             gatewayOrderId: String(created.gatewayOrderId),
             serviceId: auth.service.id,
-            environment: auth.environment,
+            environment,
             amount: amount.toFixed(0),
             status: "PENDING",
           },
@@ -431,7 +441,7 @@ export async function createApiPayment(
       description: payment.description,
       returnUrl,
       callbackUrl: getSadadCallbackUrl(appOrigin),
-      environment: auth.environment,
+      environment,
       metadata: input.metadata ?? {},
     })
 
@@ -473,11 +483,17 @@ export async function createApiPayment(
     const now = new Date()
 
     await db.$transaction(async (tx) => {
+      await tx.paymentIdempotencyRecord.deleteMany({
+        where: { paymentId: payment.id },
+      })
+
       await tx.payment.updateMany({
         where: { id: payment.id, status: "PENDING" },
         data: {
           status: "FAILED",
           failedAt: now,
+          idempotencyKey: null,
+          externalOrderId: null,
           gatewayResultText:
             error instanceof Error
               ? error.message

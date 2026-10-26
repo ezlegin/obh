@@ -35,27 +35,7 @@ function GatewayManager({ gateway }: GatewayManagerProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="mt-8 rounded-2xl border border-border bg-card/40 p-4 sm:p-5">
-        <div className="flex items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-info/20 bg-info/10 text-info">
-            <ShieldCheck aria-hidden="true" className="size-4" />
-          </span>
-          <div>
-            <p className="text-xs font-medium">
-              Single gateway architecture · Server-side credentials only
-            </p>
-            <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-              OBH routes all connected service payments exclusively through{" "}
-              <span className="text-foreground">{gateway.name}</span>. Gateway
-              records cannot be added, edited, or deleted from the admin panel,
-              and <code className="font-mono">SADAD_TERMINAL_KEY</code> never
-              leaves server environment configuration.
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <div className="mt-8 space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-border bg-card/40 p-5">
           <p className="font-mono text-[9px] tracking-[0.14em] text-muted-foreground/60 uppercase">
@@ -138,7 +118,7 @@ function GatewayManager({ gateway }: GatewayManagerProps) {
                 )
               </span>
               <span className="font-mono">
-                {gateway.config.merchantIdMasked ?? "Not set"}
+                {gateway.config.merchantId ?? "Not set"}
               </span>
             </div>
 
@@ -148,7 +128,7 @@ function GatewayManager({ gateway }: GatewayManagerProps) {
                 )
               </span>
               <span className="font-mono">
-                {gateway.config.terminalIdMasked ?? "Not set"}
+                {gateway.config.terminalId ?? "Not set"}
               </span>
             </div>
 
@@ -157,28 +137,30 @@ function GatewayManager({ gateway }: GatewayManagerProps) {
                 3DES TerminalKey (
                 <code className="font-mono">SADAD_TERMINAL_KEY</code>)
               </span>
-              <Badge
-                variant={
-                  gateway.config.terminalKeyConfigured ? "success" : "muted"
-                }
-              >
-                <Lock aria-hidden="true" className="mr-1 size-3" />
-                {gateway.config.terminalKeyConfigured
-                  ? "Valid Base64 key"
-                  : "Not configured"}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {gateway.config.terminalKeyPrefix ? (
+                  <span className="font-mono text-foreground">
+                    {gateway.config.terminalKeyPrefix}
+                  </span>
+                ) : null}
+                <Badge
+                  variant={
+                    gateway.config.terminalKeyConfigured ? "success" : "muted"
+                  }
+                >
+                  <Lock aria-hidden="true" className="mr-1 size-3" />
+                  {gateway.config.terminalKeyConfigured
+                    ? "Valid Base64 key"
+                    : "Not configured"}
+                </Badge>
+              </div>
             </div>
 
             <div className="flex items-center justify-between px-5 py-3.5">
               <span className="text-muted-foreground">
-                Local TEST simulator (
-                <code className="font-mono">OBH_SADAD_SIMULATOR</code>)
+                Service simulator (<code className="font-mono">OBH_SIMULATOR</code>)
               </span>
-              <Badge
-                variant={gateway.config.simulatorEnabled ? "warning" : "muted"}
-              >
-                {gateway.config.simulatorEnabled ? "Enabled" : "Disabled"}
-              </Badge>
+              <Badge variant="outline">Controlled per service</Badge>
             </div>
           </div>
         </div>
@@ -296,7 +278,7 @@ function GatewayManager({ gateway }: GatewayManagerProps) {
                   <Badge variant="success">Auto-provisioned</Badge>
                 </div>
                 <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
-                  {account.currency} · {account.paymentCount} payments
+                  R · {account.paymentCount} payments
                 </p>
                 <p className="mt-1 text-[9px] text-muted-foreground/45">
                   Created {formatDevelopmentDate(account.createdAt)}

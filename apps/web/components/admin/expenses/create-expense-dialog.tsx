@@ -120,7 +120,7 @@ function CreateExpenseDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="expense-amount">Amount (IRR)</Label>
+            <Label htmlFor="expense-amount">Amount (R)</Label>
             <Input
               id="expense-amount"
               inputMode="decimal"

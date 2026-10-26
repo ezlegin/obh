@@ -27,6 +27,7 @@ function AdminDialog({
   const titleId = useId()
   const descriptionId = useId()
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const programmaticCloseRef = useRef(false)
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -37,12 +38,14 @@ function AdminDialog({
 
     if (!open) {
       if (dialog.open) {
+        programmaticCloseRef.current = true
         dialog.close()
       }
       return
     }
 
     if (!dialog.open) {
+      programmaticCloseRef.current = false
       dialog.showModal()
     }
 
@@ -57,6 +60,7 @@ function AdminDialog({
       }
 
       if (dialog.open) {
+        programmaticCloseRef.current = true
         dialog.close()
       }
     }
@@ -67,7 +71,16 @@ function AdminDialog({
       ref={dialogRef}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
-      onClose={() => onOpenChange(false)}
+      onClose={() => {
+        if (programmaticCloseRef.current) {
+          programmaticCloseRef.current = false
+          return
+        }
+
+        if (!dialogRef.current?.open) {
+          onOpenChange(false)
+        }
+      }}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onOpenChange(false)

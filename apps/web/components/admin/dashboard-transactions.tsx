@@ -17,21 +17,25 @@ import {
   defaultDashboardFilters,
   type DashboardFilters,
 } from "@/lib/admin/dashboard-filters"
-import type { DevelopmentTransaction } from "@/lib/admin/development-data"
 import { formatDevelopmentDate, formatIrr } from "@/lib/admin/format"
+import type { DashboardTransaction } from "@/server/dashboard/queries"
 
 type DashboardTransactionsProps = {
-  transactions: readonly DevelopmentTransaction[]
+  transactions: readonly DashboardTransaction[]
+  serviceNames: readonly string[]
 }
 
-function DashboardTransactions({ transactions }: DashboardTransactionsProps) {
+function DashboardTransactions({
+  transactions,
+  serviceNames,
+}: DashboardTransactionsProps) {
   const [filters, setFilters] = useState<DashboardFilters>(
     defaultDashboardFilters
   )
   const [search, setSearch] = useState("")
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] =
-    useState<DevelopmentTransaction | null>(null)
+    useState<DashboardTransaction | null>(null)
 
   const activeFilterCount = countActiveDashboardFilters(filters)
 
@@ -82,7 +86,7 @@ function DashboardTransactions({ transactions }: DashboardTransactionsProps) {
     setSearch("")
   }
 
-  const columns: DataTableColumn<DevelopmentTransaction>[] = [
+  const columns: DataTableColumn<DashboardTransaction>[] = [
     {
       id: "reference",
       header: "Reference",
@@ -146,7 +150,7 @@ function DashboardTransactions({ transactions }: DashboardTransactionsProps) {
           type="button"
           variant="ghost"
           size="icon-sm"
-          aria-label={`View sample payment ${transaction.reference}`}
+          aria-label={`View payment ${transaction.reference}`}
           onClick={() => setSelectedTransaction(transaction)}
         >
           <Eye aria-hidden="true" className="size-3.5" />
@@ -170,7 +174,7 @@ function DashboardTransactions({ transactions }: DashboardTransactionsProps) {
               Recent payments
             </h2>
           </div>
-          <Badge variant="outline">Sample data</Badge>
+          <Badge variant="outline">{transactions.length} recorded</Badge>
         </div>
 
         <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -183,15 +187,15 @@ function DashboardTransactions({ transactions }: DashboardTransactionsProps) {
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search sample transactions"
-              aria-label="Search sample transactions"
+              placeholder="Search reference, order ID, or service"
+              aria-label="Search transactions"
               className="h-10 pl-9 text-xs"
             />
           </div>
 
           <div className="flex items-center justify-between gap-3 sm:justify-end">
             <span className="font-mono text-[9px] tracking-[0.08em] text-muted-foreground/55 uppercase">
-              {filteredTransactions.length} of {transactions.length} sample
+              {filteredTransactions.length} of {transactions.length} payments
             </span>
             <Button
               type="button"
@@ -218,23 +222,33 @@ function DashboardTransactions({ transactions }: DashboardTransactionsProps) {
           rows={filteredTransactions}
           columns={columns}
           getRowId={(transaction) => transaction.id}
-          caption="Sample payments from the development dashboard preview"
+          caption="Recent payments recorded in the OBH database"
           defaultSort={{ columnId: "date", direction: "desc" }}
           minWidthClassName="min-w-[36rem] sm:min-w-[44rem]"
           emptyState={
             <AdminEmptyState
               icon={SearchX}
-              title="No sample transactions match"
-              description="Adjust the search term or filters. This table contains demonstration data only."
+              title={
+                transactions.length === 0
+                  ? "No payments recorded yet"
+                  : "No payments match your filters"
+              }
+              description={
+                transactions.length === 0
+                  ? "Payments created via the SDK or admin console will appear here immediately."
+                  : "Adjust the search term or filters to view matching payments."
+              }
               action={
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={clearAllFilters}
-                >
-                  Clear search and filters
-                </Button>
+                transactions.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={clearAllFilters}
+                  >
+                    Clear search and filters
+                  </Button>
+                ) : undefined
               }
             />
           }
@@ -245,6 +259,7 @@ function DashboardTransactions({ transactions }: DashboardTransactionsProps) {
         open={isFilterOpen}
         onOpenChange={setIsFilterOpen}
         initialFilters={filters}
+        serviceNames={serviceNames}
         onApply={setFilters}
       />
       <TransactionDetailDialog

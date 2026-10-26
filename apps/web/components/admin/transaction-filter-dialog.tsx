@@ -16,11 +16,17 @@ import {
   defaultDashboardFilters,
   type DashboardFilters,
 } from "@/lib/admin/dashboard-filters"
-import { services } from "@/lib/site"
 
 const filterSchema = z
   .object({
-    status: z.enum(["all", "completed", "pending", "failed"]),
+    status: z.enum([
+      "all",
+      "completed",
+      "pending",
+      "failed",
+      "cancelled",
+      "expired",
+    ]),
     service: z.string().min(1),
     from: z.string(),
     to: z.string(),
@@ -36,6 +42,7 @@ type TransactionFilterDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialFilters: DashboardFilters
+  serviceNames: readonly string[]
   onApply: (filters: DashboardFilters) => void
 }
 
@@ -43,6 +50,7 @@ function TransactionFilterDialog({
   open,
   onOpenChange,
   initialFilters,
+  serviceNames,
   onApply,
 }: TransactionFilterDialogProps) {
   const {
@@ -76,8 +84,8 @@ function TransactionFilterDialog({
     <AdminDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Filter dashboard"
-      description="Filter the sample transactions by status, connected service, or date. These controls do not query the database."
+      title="Filter transactions"
+      description="Filter recent payments by status, connected service, or date."
     >
       <form onSubmit={handleSubmit(applyFilters)} noValidate>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -89,6 +97,8 @@ function TransactionFilterDialog({
                 <option value="completed">Completed</option>
                 <option value="pending">Pending</option>
                 <option value="failed">Failed</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="expired">Expired</option>
               </NativeSelect>
               <ChevronDown
                 aria-hidden="true"
@@ -102,9 +112,9 @@ function TransactionFilterDialog({
             <div className="relative">
               <NativeSelect id="filter-service" {...register("service")}>
                 <option value="all">All services</option>
-                {services.map((service) => (
-                  <option key={service.href} value={service.name}>
-                    {service.name}
+                {serviceNames.map((serviceName) => (
+                  <option key={serviceName} value={serviceName}>
+                    {serviceName}
                   </option>
                 ))}
               </NativeSelect>

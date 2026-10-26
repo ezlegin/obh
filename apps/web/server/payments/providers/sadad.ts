@@ -247,15 +247,7 @@ export function createSadadVerifySignData(
 }
 
 export function isSadadSimulatorEnabled(): boolean {
-  if (process.env.OBH_SADAD_SIMULATOR === "false") {
-    return false
-  }
-
-  return (
-    process.env.NODE_ENV !== "production" ||
-    process.env.OBH_SADAD_SIMULATOR === "true" ||
-    process.env.OBH_ENABLE_DEVELOPMENT_PROVIDER === "true"
-  )
+  return true
 }
 
 export type SadadConfigStatus = {
@@ -266,8 +258,11 @@ export type SadadConfigStatus = {
   purchaseEndpoint: string
   verifyEndpoint: string
   liveConfigured: boolean
+  merchantId: string | null
+  terminalId: string | null
   merchantIdMasked: string | null
   terminalIdMasked: string | null
+  terminalKeyPrefix: string | null
   terminalKeyConfigured: boolean
   simulatorEnabled: boolean
 }
@@ -309,8 +304,11 @@ export function getSadadConfigStatus(): SadadConfigStatus {
     purchaseEndpoint: `${baseUrl}/Purchase`,
     verifyEndpoint: `${baseUrl}/api/v0/Advice/Verify`,
     liveConfigured: Boolean(merchantId && terminalId && keyValid),
+    merchantId: merchantId || null,
+    terminalId: terminalId || null,
     merchantIdMasked: maskIdentifier(merchantId),
     terminalIdMasked: maskIdentifier(terminalId),
+    terminalKeyPrefix: terminalKey ? `${terminalKey.slice(0, 6)}...` : null,
     terminalKeyConfigured: keyValid,
     simulatorEnabled: isSadadSimulatorEnabled(),
   }
@@ -337,31 +335,7 @@ function getLiveCredentials() {
 }
 
 function shouldSimulate(environment: ProviderEnvironmentValue): boolean {
-  if (environment === "LIVE") {
-    return false
-  }
-
-  const hasLiveCreds = Boolean(
-    process.env.SADAD_MERCHANT_ID?.trim() &&
-    process.env.SADAD_TERMINAL_ID?.trim() &&
-    process.env.SADAD_TERMINAL_KEY?.trim()
-  )
-
-  if (
-    process.env.OBH_SADAD_SIMULATOR === "false" &&
-    hasLiveCreds
-  ) {
-    return false
-  }
-
-  if (!isSadadSimulatorEnabled()) {
-    throw new PaymentProviderError(
-      "SADAD_SIMULATOR_DISABLED",
-      "The Sadad test simulator is disabled in production. Set OBH_SADAD_SIMULATOR=true only in an approved test environment."
-    )
-  }
-
-  return true
+  return environment === "TEST"
 }
 
 type SadadPaymentRequestResponse = {

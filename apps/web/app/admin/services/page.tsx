@@ -18,7 +18,7 @@ export default async function AdminServicesPage() {
       <AdminPageHeader
         eyebrow="Admin / Operations"
         title="Connected services"
-        description="Register the services that use OBH payment infrastructure, manage their return URL allowlists, and issue TEST credentials. Raw secrets are never stored."
+        description="Register the services that use OBH payment infrastructure, manage their return URL allowlists, and issue or copy TEST and LIVE credentials."
         actions={<Badge variant="outline">{services.length} registered</Badge>}
       />
       <ServicesManager services={services} />

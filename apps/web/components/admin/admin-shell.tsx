@@ -85,7 +85,30 @@ function AdminSidebarContent({
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon
-                const active = isAdminNavActive(item, pathname)
+                const active = !item.disabled && isAdminNavActive(item, pathname)
+
+                if (item.disabled) {
+                  return (
+                    <div
+                      key={item.label}
+                      aria-disabled="true"
+                      className="flex h-10 cursor-not-allowed items-center justify-between gap-3 rounded-xl px-3 text-[13px] text-muted-foreground/45 select-none"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <Icon
+                          aria-hidden="true"
+                          className="size-4 shrink-0 text-muted-foreground/35"
+                        />
+                        <span className="truncate">{item.label}</span>
+                      </span>
+                      {item.badge ? (
+                        <span className="rounded-full border border-border/70 bg-white/[0.02] px-2 py-0.5 font-mono text-[8px] tracking-[0.12em] text-muted-foreground/55 uppercase">
+                          {item.badge}
+                        </span>
+                      ) : null}
+                    </div>
+                  )
+                }
 
                 return (
                   <Link
@@ -94,19 +117,26 @@ function AdminSidebarContent({
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "group flex h-10 items-center gap-3 rounded-xl px-3 text-[13px] text-muted-foreground transition-colors duration-200 hover:bg-white/[0.045] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none",
+                      "group flex h-10 items-center justify-between gap-3 rounded-xl px-3 text-[13px] text-muted-foreground transition-colors duration-200 hover:bg-white/[0.045] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none",
                       active &&
                         "bg-white/[0.06] text-foreground shadow-[inset_0_0_0_1px_rgb(255_255_255/0.06)]"
                     )}
                   >
-                    <Icon
-                      aria-hidden="true"
-                      className={cn(
-                        "size-4 shrink-0 text-muted-foreground/70 transition-colors",
-                        active && "text-foreground"
-                      )}
-                    />
-                    <span className="truncate">{item.label}</span>
+                    <span className="flex min-w-0 items-center gap-3">
+                      <Icon
+                        aria-hidden="true"
+                        className={cn(
+                          "size-4 shrink-0 text-muted-foreground/70 transition-colors",
+                          active && "text-foreground"
+                        )}
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </span>
+                    {item.badge ? (
+                      <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[8px] tracking-[0.12em] text-muted-foreground uppercase">
+                        {item.badge}
+                      </span>
+                    ) : null}
                   </Link>
                 )
               })}

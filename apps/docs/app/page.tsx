@@ -149,7 +149,6 @@ export default function IntroductionPage() {
 
 const obh = new OBHPayments({
   secretKey: process.env.OBH_SERVICE_KEY!,
-  baseUrl: "https://pay.obh.example",
 })
 
 export async function beginCheckout(orderId: string) {

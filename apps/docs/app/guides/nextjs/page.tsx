@@ -67,13 +67,8 @@ if (!process.env.OBH_SERVICE_KEY) {
   throw new Error("OBH_SERVICE_KEY is not configured.")
 }
 
-if (!process.env.OBH_API_URL) {
-  throw new Error("OBH_API_URL is not configured.")
-}
-
 export const obh = new OBHPayments({
   secretKey: process.env.OBH_SERVICE_KEY,
-  baseUrl: process.env.OBH_API_URL,
   timeoutMs: 15_000,
 })`}
       />
@@ -333,8 +328,9 @@ export async function markOrderPaidOnce(reference: string) {
       <h2 id="deploy">Deployment checklist</h2>
       <ul>
         <li>
-          Set <code>OBH_SERVICE_KEY</code>, <code>OBH_API_URL</code>, and{" "}
-          <code>OBH_WEBHOOK_SECRET</code> as server-side secrets.
+          Set <code>OBH_SERVICE_KEY</code> and <code>OBH_WEBHOOK_SECRET</code>{" "}
+          as server-side secrets (and set <code>OBH_SIMULATOR=&quot;false&quot;</code>{" "}
+          or omit it in production).
         </li>
         <li>Register the exact production return URL in OBH Admin.</li>
         <li>Register the webhook URL and create a signing secret.</li>

@@ -112,7 +112,7 @@ function CalculatePeriodDialog({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="profit-reserve">Reserve (IRR)</Label>
+            <Label htmlFor="profit-reserve">Reserve (R)</Label>
             <Input
               id="profit-reserve"
               inputMode="decimal"
@@ -127,7 +127,7 @@ function CalculatePeriodDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="profit-tax">Tax (IRR)</Label>
+            <Label htmlFor="profit-tax">Tax (R)</Label>
             <Input
               id="profit-tax"
               inputMode="decimal"

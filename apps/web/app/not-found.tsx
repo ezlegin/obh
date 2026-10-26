@@ -1,4 +1,3 @@
-import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
 import { buttonVariants } from "@workspace/ui/components/button"
@@ -29,7 +28,19 @@ export default function NotFound() {
       </p>
 
       <Link href="/" className={`${buttonVariants({ size: "lg" })} mt-8`}>
-        <ArrowLeft aria-hidden="true" className="size-4" />
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="size-4"
+        >
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
         Return to OBH
       </Link>
     </div>

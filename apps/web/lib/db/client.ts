@@ -5,7 +5,7 @@ import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "@/lib/generated/prisma/client"
 
 const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient
+  prisma_v2?: PrismaClient
 }
 
 let prisma: PrismaClient | undefined
@@ -20,8 +20,8 @@ export function getDb(): PrismaClient {
     return prisma
   }
 
-  if (globalForPrisma.prisma) {
-    prisma = globalForPrisma.prisma
+  if (globalForPrisma.prisma_v2) {
+    prisma = globalForPrisma.prisma_v2
     return prisma
   }
 
@@ -41,7 +41,7 @@ export function getDb(): PrismaClient {
   })
 
   if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = prisma
+    globalForPrisma.prisma_v2 = prisma
   }
 
   return prisma

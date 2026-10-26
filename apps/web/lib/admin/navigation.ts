@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react"
 import {
+  Activity,
   Boxes,
   CircleDollarSign,
   CreditCard,
@@ -20,6 +21,8 @@ export type AdminNavItem = {
   description: string
   icon: LucideIcon
   exact?: boolean
+  disabled?: boolean
+  badge?: string
 }
 
 export type AdminNavGroup = {
@@ -50,22 +53,50 @@ export const adminNavigation: AdminNavGroup[] = [
         icon: CreditCard,
       },
       {
-        label: "Sadad gateway",
-        href: "/admin/gateways",
-        description: "Sadad (Bank Melli) IPG status, callback URL, and settlement accounts.",
-        icon: Landmark,
-      },
-      {
         label: "Services",
         href: "/admin/services",
         description: "Connected services and payment credentials.",
         icon: Boxes,
       },
       {
+        label: "API logs",
+        href: "/admin/api-logs",
+        description: "Authenticated service API calls and responses.",
+        icon: Activity,
+      },
+      {
         label: "Reconciliation",
         href: "/admin/reconciliation",
         description: "Provider settlements, fees, and account reconciliation.",
         icon: Scale,
+      },
+    ],
+  },
+  {
+    label: "Gateways",
+    items: [
+      {
+        label: "Sadad gateway",
+        href: "/admin/gateways",
+        description:
+          "Sadad (Bank Melli) IPG status, callback URL, and settlement accounts.",
+        icon: Landmark,
+      },
+      {
+        label: "Mellat Bank",
+        href: "#mellat-bank",
+        description: "Behpardakht Mellat IPG integration.",
+        icon: Landmark,
+        disabled: true,
+        badge: "Soon",
+      },
+      {
+        label: "Digipay",
+        href: "#digipay",
+        description: "Digipay BNPL and wallet gateway integration.",
+        icon: Landmark,
+        disabled: true,
+        badge: "Soon",
       },
     ],
   },

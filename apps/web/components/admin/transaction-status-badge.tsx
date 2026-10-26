@@ -1,9 +1,9 @@
 import { Badge } from "@workspace/ui/components/badge"
 
-import type { DevelopmentTransactionStatus } from "@/lib/admin/development-data"
+import type { DashboardTransactionStatus } from "@/server/dashboard/queries"
 
 type TransactionStatusBadgeProps = {
-  status: DevelopmentTransactionStatus
+  status: DashboardTransactionStatus
 }
 
 const statusConfig = {
@@ -18,6 +18,14 @@ const statusConfig = {
   failed: {
     label: "Failed",
     variant: "danger" as const,
+  },
+  cancelled: {
+    label: "Cancelled",
+    variant: "outline" as const,
+  },
+  expired: {
+    label: "Expired",
+    variant: "outline" as const,
   },
 }
 

@@ -33,7 +33,7 @@ function SummaryCard({
           <Icon aria-hidden="true" className="size-4" />
         </span>
         <Badge variant="outline" className="text-[9px] tracking-[0.12em]">
-          Sample
+          Live
         </Badge>
       </div>
 

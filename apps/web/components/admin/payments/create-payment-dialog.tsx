@@ -131,7 +131,7 @@ function CreatePaymentDialog({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="payment-amount">Amount (whole Rials, IRR)</Label>
+            <Label htmlFor="payment-amount">Amount (R)</Label>
             <Input
               id="payment-amount"
               inputMode="numeric"

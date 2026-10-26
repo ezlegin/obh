@@ -3,7 +3,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { Badge } from "@workspace/ui/components/badge"
-import { Button, buttonVariants } from "@workspace/ui/components/button"
+import { buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { Logo } from "@/components/logo"
@@ -41,7 +41,38 @@ export default async function SadadSimulatorPage({
   const checkout = await getSadadSimulatorView(token)
 
   if (!checkout) {
-    notFound()
+    return (
+      <main
+        id="main-content"
+        className="flex min-h-dvh items-center justify-center px-4 py-12"
+      >
+        <div className="w-full max-w-lg">
+          <div className="mb-8 flex items-center justify-between">
+            <Logo />
+            <Badge variant="warning">Sadad Simulator · TEST</Badge>
+          </div>
+
+          <div className="rounded-3xl border border-border bg-card/55 p-6 shadow-2xl sm:p-8">
+            <p className="font-mono text-[9px] tracking-[0.16em] text-muted-foreground/60 uppercase">
+              Sadad (Bank Melli) Hosted Payment Simulator
+            </p>
+            <h1 className="mt-3 text-2xl font-medium tracking-[-0.03em]">
+              Payment session not found
+            </h1>
+            <p className="mt-3 text-xs leading-6 text-muted-foreground">
+              No active <code className="font-mono">TEST</code> Sadad payment
+              session matches token{" "}
+              <code className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-foreground">
+                {token}
+              </code>
+              . Create a payment via{" "}
+              <code className="font-mono">POST /api/v1/payments</code> and open
+              the returned <code className="font-mono">checkoutUrl</code>.
+            </p>
+          </div>
+        </div>
+      </main>
+    )
   }
 
   const isPending = checkout.status === "PENDING"
@@ -70,7 +101,7 @@ export default async function SadadSimulatorPage({
           </p>
 
           <div className="mt-8 rounded-2xl border border-border bg-black/30 p-5">
-            <p className="text-xs text-muted-foreground">Amount (IRR)</p>
+            <p className="text-xs text-muted-foreground">Amount (R)</p>
             <p className="mt-2 text-3xl font-medium tracking-[-0.03em] tabular-nums">
               {formatIrrDecimal(checkout.amount)}
             </p>
@@ -133,9 +164,12 @@ export default async function SadadSimulatorPage({
                     name="PrimaryAccNo"
                     value="603799******1234"
                   />
-                  <Button type="submit" className="w-full">
+                  <button
+                    type="submit"
+                    className={cn(buttonVariants(), "w-full")}
+                  >
                     Simulate successful payment
-                  </Button>
+                  </button>
                 </form>
 
                 <form action="/api/v1/sadad/callback" method="post">
@@ -147,9 +181,15 @@ export default async function SadadSimulatorPage({
                   <input type="hidden" name="Token" value={token} />
                   <input type="hidden" name="ResCode" value="1002" />
                   <input type="hidden" name="SwitchResCode" value="-1" />
-                  <Button type="submit" variant="outline" className="w-full">
+                  <button
+                    type="submit"
+                    className={cn(
+                      buttonVariants({ variant: "outline" }),
+                      "w-full"
+                    )}
+                  >
                     Simulate failed / cancelled
-                  </Button>
+                  </button>
                 </form>
               </div>
             </>

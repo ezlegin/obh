@@ -2,13 +2,11 @@ import "server-only"
 
 import { getDb } from "@/lib/db/client"
 import { ApiError } from "@/server/api/errors"
-import { getSadadConfigStatus } from "@/server/payments/providers/registry"
 import { verifyServiceSecret } from "@/server/payments/service-credentials"
 
 export type ServiceAuthContext = {
   credentialId: string
   keyId: string
-  environment: "TEST" | "LIVE"
   service: {
     id: string
     name: string
@@ -93,17 +91,6 @@ export async function authenticateServiceRequest(
     )
   }
 
-  if (
-    credential.environment === "LIVE" &&
-    !getSadadConfigStatus().liveConfigured
-  ) {
-    throw new ApiError(
-      503,
-      "LIVE_NOT_AVAILABLE",
-      "LIVE Sadad gateway credentials are not configured on the server."
-    )
-  }
-
   await getDb().serviceCredential.update({
     where: { id: credential.id },
     data: { lastUsedAt: new Date() },
@@ -112,7 +99,6 @@ export async function authenticateServiceRequest(
   return {
     credentialId: credential.id,
     keyId: credential.keyId,
-    environment: credential.environment,
     service: {
       id: credential.service.id,
       name: credential.service.name,

@@ -8,9 +8,9 @@ import {
 } from "../server/payments/service-credentials"
 
 test("generates a public key id and one-way secret hash", () => {
-  const credential = generateServiceCredential("TEST")
+  const credential = generateServiceCredential()
 
-  assert.match(credential.keyId, /^svc_test_[a-f0-9]{16}$/)
+  assert.match(credential.keyId, /^svc_[a-f0-9]{16}$/)
   assert.equal(credential.secret.length > 30, true)
   assert.equal(
     credential.presentedKey,
@@ -18,7 +18,6 @@ test("generates a public key id and one-way secret hash", () => {
   )
   assert.equal(credential.secretHash, hashServiceSecret(credential.secret))
   assert.equal(credential.secretHash.includes(credential.secret), false)
-  assert.equal(credential.environment, "TEST")
 })
 
 test("verifies only the matching service secret", () => {

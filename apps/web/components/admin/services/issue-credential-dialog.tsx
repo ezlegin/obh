@@ -100,7 +100,7 @@ function IssueCredentialDialog({
       open
       onOpenChange={onOpenChange}
       title={`Issue credential · ${service.name}`}
-      description="The raw credential is shown exactly once. OBH stores only a SHA-256 hash of the secret."
+      description="The credential is encrypted at rest and can also be revealed or copied later from the service card."
     >
       <div className="rounded-xl border border-warning/20 bg-warning/[0.045] p-4">
         <div className="flex items-start gap-3">

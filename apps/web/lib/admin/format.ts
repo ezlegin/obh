@@ -8,7 +8,7 @@ const compactFormatter = new Intl.NumberFormat("en-US", {
 })
 
 export function formatIrr(value: number) {
-  return `${irrFormatter.format(value)} IRR`
+  return `${irrFormatter.format(value)} R`
 }
 
 /**
@@ -23,7 +23,7 @@ export function formatIrrDecimal(value: string) {
   const fraction = fractionPart.replace(/0+$/, "")
   const formatted = fraction ? `${grouped}.${fraction}` : grouped
 
-  return `${negative ? "-" : ""}${formatted} IRR`
+  return `${negative ? "-" : ""}${formatted} R`
 }
 
 export function formatCompactIrr(value: number) {

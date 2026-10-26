@@ -1,5 +1,12 @@
+import {
+  classifyApiErrorForLog,
+  recordAuthenticatedApiCall,
+} from "@/server/api/api-logs"
 import { apiErrorResponse, apiJson, createRequestId } from "@/server/api/errors"
-import { authenticateServiceRequest } from "@/server/api/service-auth"
+import {
+  authenticateServiceRequest,
+  type ServiceAuthContext,
+} from "@/server/api/service-auth"
 import { getApiPayment } from "@/server/payments/api-payment-service"
 
 export const runtime = "nodejs"
@@ -10,12 +17,28 @@ export async function GET(
   context: { params: Promise<{ reference: string }> }
 ) {
   const requestId = createRequestId()
+  const startedAt = Date.now()
+  let auth: ServiceAuthContext | null = null
+  let referenceParam = ""
 
   try {
-    const auth = await authenticateServiceRequest(request)
+    auth = await authenticateServiceRequest(request)
     const { reference } = await context.params
+    referenceParam = reference ?? ""
 
     if (!reference || reference.length > 64) {
+      await recordAuthenticatedApiCall({
+        requestId,
+        request,
+        auth,
+        method: "GET",
+        path: `/api/v1/payments/${referenceParam}`,
+        statusCode: 404,
+        durationMs: Date.now() - startedAt,
+        errorCode: "PAYMENT_NOT_FOUND",
+        errorMessage: "Payment was not found.",
+      })
+
       return apiJson(
         {
           error: {
@@ -34,8 +57,36 @@ export async function GET(
       reference
     )
 
+    await recordAuthenticatedApiCall({
+      requestId,
+      request,
+      auth,
+      method: "GET",
+      path: `/api/v1/payments/${reference}`,
+      statusCode: 200,
+      durationMs: Date.now() - startedAt,
+      paymentReference: payment.reference,
+      externalOrderId: payment.externalOrderId,
+      amount: payment.amount,
+      simulator: payment.environment === "test",
+    })
+
     return apiJson({ data: payment }, { status: 200, requestId })
   } catch (error) {
+    if (auth) {
+      const classified = classifyApiErrorForLog(error)
+      await recordAuthenticatedApiCall({
+        requestId,
+        request,
+        auth,
+        method: "GET",
+        path: `/api/v1/payments/${referenceParam}`,
+        statusCode: classified.statusCode,
+        durationMs: Date.now() - startedAt,
+        errorCode: classified.errorCode,
+        errorMessage: classified.errorMessage,
+      })
+    }
     return apiErrorResponse(error, requestId)
   }
 }

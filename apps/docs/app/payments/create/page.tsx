@@ -72,7 +72,7 @@ export default function CreatePaymentPage() {
             type: "string",
             required: true,
             description:
-              "Positive decimal string, maximum two decimal places and 18 integer digits. Never a JavaScript number.",
+              "Positive integer string in Iranian Rials (IRR), 1–18 digits. Never a JavaScript number.",
           },
           {
             name: "currency",
@@ -110,6 +110,14 @@ export default function CreatePaymentPage() {
             description:
               "1–191 visible ASCII characters. Reuse it when retrying the same request. Generated as sdk_<uuid> when omitted.",
           },
+          {
+            name: "simulator",
+            type: "boolean",
+            required: false,
+            defaultValue: "process.env.OBH_SIMULATOR === 'true'",
+            description:
+              "When true, routes the payment to the OBH Sadad simulator instead of the live Sadad IPG.",
+          },
         ]}
       />
 
@@ -140,8 +148,9 @@ export default function CreatePaymentPage() {
             <code>amount</code>
           </td>
           <td>
-            Matches <code>^\d&#123;1,18&#125;(\.\d&#123;1,2&#125;)?$</code> and is
-            greater than zero. Leading zeros and <code>"0"</code> are rejected.
+            Matches <code>^\d&#123;1,18&#125;$</code> (whole Iranian Rials) and
+            is greater than zero. Leading zeros, decimals, and <code>"0"</code>{" "}
+            are rejected.
           </td>
         </tr>
         <tr>
@@ -200,8 +209,8 @@ await obh.startPayment({ amount: 245000000 /* ... */ })
 // Invalid: zero
 await obh.startPayment({ amount: "0" /* ... */ })
 
-// Invalid: three decimal places
-await obh.startPayment({ amount: "10.999" /* ... */ })`}
+// Invalid: decimals (IRR amounts are whole integers)
+await obh.startPayment({ amount: "10.99" /* ... */ })`}
       />
 
       <h2 id="return-url">Return URLs</h2>
@@ -297,12 +306,20 @@ await obh.startPayment({ amount: "10.999" /* ... */ })`}
   "reference": "OBH-8B30F9C07A52D1E4",
   "service": "igraphical",
   "externalOrderId": "IG-8821",
-  "amount": "245000000.00",
+  "amount": "245000000",
   "currency": "IRR",
-  "environment": "test",
+  "environment": "live",
   "status": "pending",
   "description": "Annual design workspace",
-  "checkoutUrl": "https://provider.example/checkout/sess_123",
+  "checkoutUrl": "https://sadad.shaparak.ir/VPG/Purchase?Token=...",
+  "receipt": {
+    "orderNumber": "1042",
+    "traceNumber": null,
+    "referenceNumber": null,
+    "maskedCardNumber": null,
+    "resultCode": "0",
+    "resultMessage": null
+  },
   "createdAt": "2026-10-18T08:00:00.000Z",
   "completedAt": null,
   "verifiedAt": null
@@ -322,9 +339,8 @@ await obh.startPayment({ amount: "10.999" /* ... */ })`}
           do not use a browser redirect. Do not dereference it blindly.
         </li>
         <li>
-          <strong>The amount is normalized.</strong> OBH returns it with two
-          decimal places, even if you sent <code>"245000000"</code>. Compare
-          normalized values rather than the exact string you sent.
+          <strong>The amount is returned in whole Iranian Rials (IRR).</strong>{" "}
+          OBH returns the integer string (e.g. <code>"245000000"</code>).
         </li>
       </ul>
 

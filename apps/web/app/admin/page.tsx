@@ -6,10 +6,11 @@ import { AdminPageHeader } from "@/components/admin/admin-page"
 import { CashflowChart } from "@/components/admin/cashflow-chart"
 import { DashboardAlerts } from "@/components/admin/dashboard-alerts"
 import { DashboardTransactions } from "@/components/admin/dashboard-transactions"
-import { DevelopmentDataNotice } from "@/components/admin/development-data-notice"
 import { SummaryCard } from "@/components/admin/summary-card"
-import { developmentDashboardData } from "@/lib/admin/development-data"
 import { formatIrr } from "@/lib/admin/format"
+import { getDashboardDataForAdmin } from "@/server/dashboard/queries"
+
+export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   title: {
@@ -17,55 +18,55 @@ export const metadata: Metadata = {
   },
 }
 
-const summaryCards = [
-  {
-    id: "balance",
-    label: "Total business balance",
-    value: developmentDashboardData.summary.totalBalance,
-    hint: "Across sample accounts",
-    icon: Wallet,
-    change: "+6.2%",
-    changeTone: "positive" as const,
-  },
-  {
-    id: "revenue",
-    label: "Revenue",
-    value: developmentDashboardData.summary.revenue,
-    hint: "vs previous sample period",
-    icon: TrendingUp,
-    change: "+12.8%",
-    changeTone: "positive" as const,
-  },
-  {
-    id: "expenses",
-    label: "Expenses",
-    value: developmentDashboardData.summary.expenses,
-    hint: "vs previous sample period",
-    icon: Receipt,
-    change: "+4.1%",
-    changeTone: "negative" as const,
-  },
-  {
-    id: "profit",
-    label: "Net profit",
-    value: developmentDashboardData.summary.netProfit,
-    hint: "vs previous sample period",
-    icon: PiggyBank,
-    change: "+18.4%",
-    changeTone: "positive" as const,
-  },
-]
+export default async function AdminDashboardPage() {
+  const dashboard = await getDashboardDataForAdmin()
 
-export default function AdminDashboardPage() {
+  const summaryCards = [
+    {
+      id: "balance",
+      label: "Total business balance",
+      value: dashboard.summary.totalBalance,
+      hint: `Across ${dashboard.summary.accountCount} active account${dashboard.summary.accountCount === 1 ? "" : "s"}`,
+      icon: Wallet,
+      change: `${dashboard.summary.accountCount} active`,
+      changeTone: "neutral" as const,
+    },
+    {
+      id: "revenue",
+      label: "Revenue",
+      value: dashboard.summary.revenue,
+      hint: "vs previous month",
+      icon: TrendingUp,
+      change: dashboard.summary.revenueChangeLabel,
+      changeTone: dashboard.summary.revenueChangeTone,
+    },
+    {
+      id: "expenses",
+      label: "Expenses",
+      value: dashboard.summary.expenses,
+      hint: "vs previous month",
+      icon: Receipt,
+      change: dashboard.summary.expensesChangeLabel,
+      changeTone: dashboard.summary.expensesChangeTone,
+    },
+    {
+      id: "profit",
+      label: "Net profit",
+      value: dashboard.summary.netProfit,
+      hint: "vs previous month",
+      icon: PiggyBank,
+      change: dashboard.summary.profitChangeLabel,
+      changeTone: dashboard.summary.profitChangeTone,
+    },
+  ]
+
   return (
     <>
       <AdminPageHeader
         eyebrow="Admin / Overview"
         title="Financial overview"
-        description="A complete dashboard interface prepared for real OBH data. The components below are interactive, but every figure is clearly identified development data."
+        description="Live summary of OBH gateway balances, verified payment revenue, operating expenses, and recent transactions."
       />
-
-      <DevelopmentDataNotice />
 
       <section aria-labelledby="summary-heading" className="mt-8">
         <div className="flex items-end justify-between gap-4">
@@ -77,7 +78,7 @@ export default function AdminDashboardPage() {
               id="summary-heading"
               className="mt-2 text-xl font-medium tracking-[-0.025em]"
             >
-              Sample period · {developmentDashboardData.summary.periodLabel}
+              Current period · {dashboard.summary.periodLabel}
             </h2>
           </div>
         </div>
@@ -98,23 +99,23 @@ export default function AdminDashboardPage() {
       </section>
 
       <div className="mt-4">
-        <CashflowChart data={developmentDashboardData.cashflow} />
+        <CashflowChart
+          data={dashboard.cashflow}
+          rangeLabel={dashboard.cashflowRangeLabel}
+        />
       </div>
 
       <div className="mt-4 grid items-start gap-4 md:grid-cols-2">
-        <AccountBalances accounts={developmentDashboardData.accounts} />
-        <DashboardAlerts alerts={developmentDashboardData.alerts} />
+        <AccountBalances accounts={dashboard.accounts} />
+        <DashboardAlerts alerts={dashboard.alerts} />
       </div>
 
       <div className="mt-4">
         <DashboardTransactions
-          transactions={developmentDashboardData.transactions}
+          transactions={dashboard.transactions}
+          serviceNames={dashboard.services}
         />
       </div>
-
-      <p className="mt-6 text-center font-mono text-[9px] tracking-[0.1em] text-muted-foreground/45 uppercase">
-        Development data / Not connected to financial records
-      </p>
     </>
   )
 }

@@ -103,7 +103,6 @@ test("sends service auth and an idempotency key when starting a payment", async 
   const calls: Array<{ url: string; init: RequestInit }> = []
   const client = new OBHPayments({
     secretKey: "svc_test_key.secret",
-    baseUrl: "http://localhost:3100",
     fetch: async (input, init) => {
       calls.push({ url: String(input), init: init ?? {} })
       return jsonResponse({ data: payment }, 201)
@@ -121,7 +120,7 @@ test("sends service auth and an idempotency key when starting a payment", async 
   assert.equal(result.reference, "OBH-ABC12345")
   assert.equal(result.receipt.orderNumber, "1001")
   assert.equal(calls.length, 1)
-  assert.equal(calls[0]?.url, "http://localhost:3100/api/v1/payments")
+  assert.equal(calls[0]?.url, "https://obhco.ir/api/v1/payments")
   const headers = new Headers(calls[0]?.init.headers)
   assert.equal(headers.get("authorization"), "Bearer svc_test_key.secret")
   assert.match(headers.get("idempotency-key") ?? "", /^sdk_/)
@@ -131,6 +130,7 @@ test("sends service auth and an idempotency key when starting a payment", async 
     amount: "150000",
     currency: "IRR",
     description: "Test",
+    simulator: false,
     returnUrl: "https://afarinai.ir/payments/return",
     metadata: { plan: "annual" },
   })

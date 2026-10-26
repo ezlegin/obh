@@ -1,10 +1,10 @@
 import { Badge } from "@workspace/ui/components/badge"
 
-import type { DevelopmentAccount } from "@/lib/admin/development-data"
 import { formatIrr } from "@/lib/admin/format"
+import type { DashboardAccount } from "@/server/dashboard/queries"
 
 type AccountBalancesProps = {
-  accounts: readonly DevelopmentAccount[]
+  accounts: readonly DashboardAccount[]
 }
 
 function AccountBalances({ accounts }: AccountBalancesProps) {
@@ -19,7 +19,7 @@ function AccountBalances({ accounts }: AccountBalancesProps) {
             Balance snapshot
           </h2>
         </div>
-        <Badge variant="outline">Sample</Badge>
+        <Badge variant="outline">{accounts.length} active</Badge>
       </div>
 
       <div className="mt-3 divide-y divide-border">
@@ -33,6 +33,9 @@ function AccountBalances({ accounts }: AccountBalancesProps) {
                   <p className="text-sm font-medium">{account.name}</p>
                   <p className="mt-1 font-mono text-[9px] tracking-[0.06em] text-muted-foreground/60 uppercase">
                     {account.kind} · {account.environment}
+                    {account.reconciledAt
+                      ? ` · Reconciled ${account.reconciledAt}`
+                      : ""}
                   </p>
                 </div>
                 <Badge
@@ -85,8 +88,9 @@ function AccountBalances({ accounts }: AccountBalancesProps) {
       </div>
 
       <p className="mt-5 border-t border-border pt-4 text-[10px] leading-4 text-muted-foreground/60">
-        Actual balances represent reconciliation snapshots. Calculated balances
-        are derived from recorded movements. Both are sample values here.
+        Actual balances reflect the latest reconciliation snapshot (or match
+        calculated balances when unreconciled). Calculated balances are derived
+        from verified database movements.
       </p>
     </div>
   )

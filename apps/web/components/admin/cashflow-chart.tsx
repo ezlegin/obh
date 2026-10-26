@@ -22,9 +22,10 @@ type CashflowPoint = {
 
 type CashflowChartProps = {
   data: readonly CashflowPoint[]
+  rangeLabel: string
 }
 
-function CashflowChart({ data }: CashflowChartProps) {
+function CashflowChart({ data, rangeLabel }: CashflowChartProps) {
   return (
     <div className="min-w-0 rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -36,11 +37,11 @@ function CashflowChart({ data }: CashflowChartProps) {
             Revenue and expenses
           </h2>
           <p className="mt-2 text-xs text-muted-foreground">
-            Sample movement for 11–17 October 2026, in IRR.
+            Recorded daily movement for {rangeLabel}, in R.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
-          <Badge variant="outline">Sample</Badge>
+          <Badge variant="outline">Last 7 days</Badge>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.06em] text-muted-foreground/70 uppercase">
               <span
@@ -63,7 +64,7 @@ function CashflowChart({ data }: CashflowChartProps) {
       <div
         className="mt-7 h-[320px] w-full"
         role="img"
-        aria-label="Sample chart showing daily revenue and expenses from 11 to 17 October 2026"
+        aria-label={`Chart showing daily revenue and expenses for ${rangeLabel}`}
       >
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart

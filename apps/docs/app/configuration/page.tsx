@@ -45,7 +45,8 @@ export default function ConfigurationPage() {
 
 type OBHPaymentsOptions = {
   secretKey: string
-  baseUrl: string
+  simulator?: boolean
+  baseUrl?: string
   timeoutMs?: number
   fetch?: typeof fetch
 }`}
@@ -61,11 +62,20 @@ type OBHPaymentsOptions = {
               "A server-side service credential beginning with svc_. The constructor rejects anything else.",
           },
           {
+            name: "simulator",
+            type: "boolean",
+            required: false,
+            defaultValue: 'process.env.OBH_SIMULATOR === "true"',
+            description:
+              "When true, routes payments to the OBH Sadad simulator instead of the live Sadad IPG.",
+          },
+          {
             name: "baseUrl",
             type: "string",
-            required: true,
+            required: false,
+            defaultValue: '"https://obhco.ir/api/v1"',
             description:
-              "Absolute OBH origin. HTTPS is required except for localhost development. /api/v1 is appended automatically.",
+              "Hardcoded to https://obhco.ir/api/v1 by default. Can only be overridden for local OBH core development.",
           },
           {
             name: "timeoutMs",
@@ -180,7 +190,6 @@ type OBHPaymentsOptions = {
         language="ts"
         code={`const obh = new OBHPayments({
   secretKey: process.env.OBH_SERVICE_KEY!,
-  baseUrl: process.env.OBH_API_URL!,
   timeoutMs: 10_000,
 })`}
       />
@@ -202,7 +211,6 @@ type OBHPaymentsOptions = {
         language="ts"
         code={`const obh = new OBHPayments({
   secretKey: process.env.OBH_SERVICE_KEY!,
-  baseUrl: process.env.OBH_API_URL!,
   fetch: async (input, init) => {
     const startedAt = performance.now()
 
@@ -253,14 +261,13 @@ import { OBHPayments } from "@obh/payments"
 
 export const obh = new OBHPayments({
   secretKey: process.env.OBH_SERVICE_KEY!,
-  baseUrl: process.env.OBH_API_URL!,
 })`}
       />
 
       <h2 id="environment-variables">Environment variables</h2>
       <p>
         Use names that make the trust boundary obvious. Never use a{" "}
-        <code>NEXT_PUBLIC_</code> (or equivalent) prefix for either value.
+        <code>NEXT_PUBLIC_</code> (or equivalent) prefix for secret values.
       </p>
 
       <Table
@@ -273,13 +280,13 @@ export const obh = new OBHPayments({
       >
         <tr>
           <td><code>OBH_SERVICE_KEY</code></td>
-          <td>The svc_ credential. Server-only.</td>
+          <td>The svc_ credential generated for your service. Server-only.</td>
         </tr>
         <tr>
-          <td><code>OBH_API_URL</code></td>
+          <td><code>OBH_SIMULATOR</code></td>
           <td>
-            The API origin. Often public information, but keeping it beside the
-            key is simpler.
+            Optional. When set to <code>&quot;true&quot;</code>, routes payments
+            to the OBH Sadad simulator instead of the live Sadad gateway.
           </td>
         </tr>
         <tr>
@@ -292,30 +299,26 @@ export const obh = new OBHPayments({
 
       <Callout variant="warning" title="A missing variable is not a nice error">
         <p>
-          If <code>OBH_API_URL</code> is undefined, the constructor throws
-          “baseUrl must be an absolute URL.” If{" "}
-          <code>OBH_SERVICE_KEY</code> is undefined, it throws “secretKey must
-          be an OBH service credential.” Validate configuration at startup so
-          you learn about it before a customer does.
+          If <code>OBH_SERVICE_KEY</code> is undefined, the constructor throws
+          “secretKey must be an OBH service credential.” Validate configuration
+          at startup so you learn about it before a customer does.
         </p>
       </Callout>
 
       <h2 id="multiple-services">Multiple services</h2>
       <p>
-        One client represents one credential, one service, and one origin.
-        Create a separate client for each service you operate; do not share a
-        key across services.
+        One client represents one credential and one service. Create a separate
+        client for each service you operate; do not share a key across
+        services.
       </p>
       <CodeBlock
         language="ts"
         code={`export const igraphical = new OBHPayments({
   secretKey: process.env.IGRAPHICAL_SERVICE_KEY!,
-  baseUrl: process.env.OBH_API_URL!,
 })
 
 export const otherService = new OBHPayments({
   secretKey: process.env.OTHER_SERVICE_KEY!,
-  baseUrl: process.env.OBH_API_URL!,
 })`}
       />
 

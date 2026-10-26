@@ -14,6 +14,10 @@ type DashboardAlertsProps = {
 }
 
 function DashboardAlerts({ alerts }: DashboardAlertsProps) {
+  const warningCount = alerts.filter(
+    (alert) => alert.severity === "warning"
+  ).length
+
   return (
     <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
@@ -25,7 +29,11 @@ function DashboardAlerts({ alerts }: DashboardAlertsProps) {
             Needs review
           </h2>
         </div>
-        <Badge variant="warning">Sample</Badge>
+        <Badge variant={warningCount > 0 ? "warning" : "outline"}>
+          {warningCount > 0
+            ? `${warningCount} warning${warningCount === 1 ? "" : "s"}`
+            : "Healthy"}
+        </Badge>
       </div>
 
       <div className="mt-4 space-y-2">
@@ -60,8 +68,8 @@ function DashboardAlerts({ alerts }: DashboardAlertsProps) {
       </div>
 
       <p className="mt-5 border-t border-border pt-4 text-[10px] leading-4 text-muted-foreground/60">
-        These alerts are demonstration data. No real reconciliation is being
-        reported.
+        Alerts are evaluated in real time against gateway configuration,
+        reconciliation snapshots, payment statuses, and webhook deliveries.
       </p>
     </div>
   )

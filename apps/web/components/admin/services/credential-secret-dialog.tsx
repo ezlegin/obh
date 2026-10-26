@@ -43,10 +43,10 @@ function CredentialSecretDialog({
         }
       }}
       title="Credential issued"
-      description="Copy this credential now. It will not be shown again and cannot be recovered."
+      description="Copy this credential now or anytime later from the service's credentials list."
     >
       <div className="flex items-center gap-2">
-        <Badge variant="warning">Test</Badge>
+        <Badge variant="success">Active</Badge>
         <Badge variant="outline">{credential.label}</Badge>
       </div>
 

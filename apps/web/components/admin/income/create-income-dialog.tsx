@@ -95,7 +95,7 @@ function CreateIncomeDialog({
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="income-amount">Amount (IRR)</Label>
+            <Label htmlFor="income-amount">Amount (R)</Label>
             <Input
               id="income-amount"
               inputMode="decimal"

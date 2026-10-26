@@ -12,6 +12,7 @@ import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
+import type { IssuedCredential } from "@/components/admin/services/issue-credential-dialog"
 import { registerConnectedServiceAction } from "@/app/admin/services/actions"
 
 const registerServiceSchema = z
@@ -102,7 +103,7 @@ type RegisterServiceValues = z.infer<typeof registerServiceSchema>
 type RegisterServiceDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreated: () => void
+  onCreated: (credential?: IssuedCredential) => void
 }
 
 function RegisterServiceDialog({
@@ -158,12 +159,22 @@ function RegisterServiceDialog({
       })
 
       if (!result.ok) {
-        setServerError(result.error ?? "The service could not be registered.")
+        setServerError(result.error ?? "The service could not be generated.")
         return
       }
 
       onOpenChange(false)
-      onCreated()
+      onCreated(
+        result.presentedKey && result.credential
+          ? {
+              presentedKey: result.presentedKey,
+              keyId: result.credential.keyId,
+              label: result.credential.label,
+              environment: result.credential.environment,
+              createdAt: result.credential.createdAt,
+            }
+          : undefined
+      )
     })
   }
 
@@ -171,8 +182,8 @@ function RegisterServiceDialog({
     <AdminDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Register a connected service"
-      description="Services authenticate with OBH through credentials issued separately below. Return URLs are exact allowlist entries for later payment API validation."
+      title="Generate a connected service"
+      description="Creates the connected service and automatically generates its single API key. Set OBH_SIMULATOR=true in the service's environment to use the OBH Sadad simulator."
       className="max-w-2xl"
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
@@ -302,10 +313,10 @@ function RegisterServiceDialog({
             {isPending ? (
               <>
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                Registering…
+                Generating…
               </>
             ) : (
-              "Register service"
+              "Generate service & API key"
             )}
           </Button>
         </div>

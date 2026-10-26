@@ -35,6 +35,7 @@ export const createPaymentRequestSchema = z
     description: z.string().trim().min(1).max(500),
     returnUrl: httpUrlSchema.optional(),
     metadata: metadataSchema.optional(),
+    simulator: z.boolean().optional(),
   })
   .strict()
 

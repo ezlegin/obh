@@ -8,9 +8,9 @@ export type CredentialEnvironment = "TEST" | "LIVE"
  * 256-bit secret is appropriate here; passwords must use a slow KDF instead.
  */
 export function generateServiceCredential(
-  environment: CredentialEnvironment = "TEST"
+  environment: CredentialEnvironment = "LIVE"
 ) {
-  const keyId = `svc_${environment.toLowerCase()}_${randomBytes(8).toString("hex")}`
+  const keyId = `svc_${randomBytes(8).toString("hex")}`
   const secret = randomBytes(32).toString("base64url")
 
   return {

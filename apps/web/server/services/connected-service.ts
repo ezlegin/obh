@@ -9,6 +9,7 @@ import type {
 import { DomainError } from "@/server/errors"
 import { generateServiceCredential } from "@/server/payments/service-credentials"
 import {
+  encryptServiceCredentialSecret,
   encryptWebhookSecret,
   generateWebhookSecret,
 } from "@/server/payments/webhook-secret"
@@ -18,6 +19,10 @@ export async function createConnectedService(
   values: CreateConnectedServiceInput
 ) {
   const db = getDb()
+  const generated = generateServiceCredential()
+  const secretEncrypted = encryptServiceCredentialSecret(
+    generated.presentedKey
+  )
 
   try {
     return await db.$transaction(async (tx) => {
@@ -33,6 +38,24 @@ export async function createConnectedService(
         },
       })
 
+      const credential = await tx.serviceCredential.create({
+        data: {
+          serviceId: service.id,
+          keyId: generated.keyId,
+          secretHash: generated.secretHash,
+          secretEncrypted,
+          label: "API key",
+          environment: generated.environment,
+        },
+        select: {
+          id: true,
+          keyId: true,
+          label: true,
+          environment: true,
+          createdAt: true,
+        },
+      })
+
       await tx.auditLog.create({
         data: {
           actorId,
@@ -44,11 +67,16 @@ export async function createConnectedService(
             slug: service.slug,
             domain: service.domain,
             isActive: service.isActive,
+            keyId: credential.keyId,
           },
         },
       })
 
-      return service
+      return {
+        service,
+        credential,
+        presentedKey: generated.presentedKey,
+      }
     })
   } catch (error) {
     if (
@@ -116,14 +144,22 @@ export async function issueServiceCredential(
   }
 
   const credential = generateServiceCredential(values.environment)
+  const secretEncrypted = encryptServiceCredentialSecret(
+    credential.presentedKey
+  )
 
   const stored = await db.$transaction(async (tx) => {
+    await tx.serviceCredential.deleteMany({
+      where: { serviceId: service.id },
+    })
+
     const created = await tx.serviceCredential.create({
       data: {
         serviceId: service.id,
         keyId: credential.keyId,
         secretHash: credential.secretHash,
-        label: values.label,
+        secretEncrypted,
+        label: values.label || "API key",
         environment: values.environment,
       },
       select: {
@@ -270,4 +306,62 @@ export async function rotateWebhookSecret(actorId: string, serviceId: string) {
     secret,
     createdAt: createdAt.toISOString(),
   }
+}
+
+export async function deleteConnectedService(
+  actorId: string,
+  serviceId: string
+) {
+  const db = getDb()
+
+  const service = await db.connectedService.findUnique({
+    where: { id: serviceId },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      domain: true,
+    },
+  })
+
+  if (!service) {
+    throw new DomainError("SERVICE_NOT_FOUND", "Service was not found.")
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.payment.updateMany({
+      where: { serviceId: service.id },
+      data: { serviceId: null },
+    })
+
+    await tx.webhookDelivery.deleteMany({
+      where: { serviceId: service.id },
+    })
+
+    await tx.paymentIdempotencyRecord.deleteMany({
+      where: { serviceId: service.id },
+    })
+
+    await tx.serviceCredential.deleteMany({
+      where: { serviceId: service.id },
+    })
+
+    await tx.connectedService.delete({
+      where: { id: service.id },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "connected_service.deleted",
+        entityType: "ConnectedService",
+        entityId: service.id,
+        before: {
+          name: service.name,
+          slug: service.slug,
+          domain: service.domain,
+        },
+      },
+    })
+  })
 }

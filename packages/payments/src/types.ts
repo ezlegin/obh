@@ -49,6 +49,11 @@ export type StartPaymentInput = {
   returnUrl?: string
   metadata?: Record<string, unknown>
   /**
+   * Optional per-request override for the OBH Sadad simulator.
+   * Defaults to the client's `simulator` option or `process.env.OBH_SIMULATOR === "true"`.
+   */
+  simulator?: boolean
+  /**
    * Optional caller-supplied idempotency key. If omitted, the SDK generates
    * one for the request. Reuse the same key when retrying that request.
    */
@@ -59,10 +64,17 @@ export type VerifyReturnInput =
   URL | string | URLSearchParams | Record<string, string | string[] | undefined>
 
 export type OBHPaymentsOptions = {
-  /** Server-side service credential, e.g. svc_test_xxx.yyy. Never expose this. */
+  /** Server-side service credential, e.g. svc_xxx.yyy. Never expose this. */
   secretKey: string
-  /** OBH origin, e.g. http://localhost:3100. */
-  baseUrl: string
+  /**
+   * Optional override for the OBH API origin. Defaults to `"https://obhco.ir/api/v1"`.
+   */
+  baseUrl?: string
+  /**
+   * When true, routes payments to the OBH Sadad simulator (`/pay/sadad/[token]`)
+   * instead of the real Sadad gateway. Defaults to `process.env.OBH_SIMULATOR === "true"`.
+   */
+  simulator?: boolean
   timeoutMs?: number
   fetch?: typeof fetch
 }

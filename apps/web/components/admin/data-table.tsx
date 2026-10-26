@@ -26,6 +26,7 @@ type DataTableProps<T> = {
     columnId: string
     direction: SortDirection
   }
+  onRowClick?: (row: T) => void
   minWidthClassName?: string
   className?: string
 }
@@ -37,6 +38,7 @@ function DataTable<T>({
   caption,
   emptyState,
   defaultSort,
+  onRowClick,
   minWidthClassName = "min-w-[44rem]",
   className,
 }: DataTableProps<T>) {
@@ -149,7 +151,26 @@ function DataTable<T>({
             sortedRows.map((row) => (
               <tr
                 key={getRowId(row)}
-                className="border-b border-border/80 transition-colors last:border-b-0 hover:bg-white/[0.02]"
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                onKeyDown={
+                  onRowClick
+                    ? (event) => {
+                        if (
+                          event.target === event.currentTarget &&
+                          (event.key === "Enter" || event.key === " ")
+                        ) {
+                          event.preventDefault()
+                          onRowClick(row)
+                        }
+                      }
+                    : undefined
+                }
+                tabIndex={onRowClick ? 0 : undefined}
+                className={cn(
+                  "border-b border-border/80 transition-colors last:border-b-0 hover:bg-white/[0.02]",
+                  onRowClick &&
+                    "cursor-pointer hover:bg-white/[0.04] focus-visible:bg-white/[0.04] focus-visible:outline-none"
+                )}
               >
                 {columns.map((column) => (
                   <td

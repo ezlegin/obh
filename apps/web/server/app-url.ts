@@ -1,9 +1,13 @@
 export function getAppBaseUrl(fallbackOrigin?: string) {
+  if (process.env.NODE_ENV !== "production") {
+    return "http://localhost:3000"
+  }
+
   const configured =
     process.env.APP_URL ??
     process.env.NEXT_PUBLIC_APP_URL ??
     fallbackOrigin ??
-    "http://localhost:3100"
+    "https://obhco.ir"
 
   const url = new URL(configured)
 

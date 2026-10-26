@@ -7,11 +7,11 @@ import { Button } from "@workspace/ui/components/button"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { TransactionStatusBadge } from "@/components/admin/transaction-status-badge"
-import type { DevelopmentTransaction } from "@/lib/admin/development-data"
 import { formatDevelopmentDateTime, formatIrr } from "@/lib/admin/format"
+import type { DashboardTransaction } from "@/server/dashboard/queries"
 
 type TransactionDetailDialogProps = {
-  transaction: DevelopmentTransaction | null
+  transaction: DashboardTransaction | null
   onOpenChange: (open: boolean) => void
 }
 
@@ -39,11 +39,15 @@ function TransactionDetailDialog({
       open
       onOpenChange={onOpenChange}
       title={transaction.reference}
-      description="A sample payment from the dashboard development preview."
+      description="Payment record from the OBH ledger."
     >
       <div className="flex flex-wrap items-center gap-2">
         <TransactionStatusBadge status={transaction.status} />
-        <Badge variant="outline">Sample transaction</Badge>
+        <Badge
+          variant={transaction.environment === "LIVE" ? "info" : "outline"}
+        >
+          {transaction.environment === "LIVE" ? "Live IPG" : "Simulator"}
+        </Badge>
       </div>
 
       <p className="mt-5 text-xl font-semibold tracking-[-0.03em] tabular-nums">
@@ -57,6 +61,14 @@ function TransactionDetailDialog({
         <DetailRow label="Service" value={transaction.service} />
         <DetailRow label="Provider" value={transaction.provider} />
         <DetailRow
+          label="Gateway OrderId"
+          value={
+            <span className="font-mono text-xs">
+              {transaction.gatewayOrderId}
+            </span>
+          }
+        />
+        <DetailRow
           label="External order"
           value={
             <span className="font-mono text-xs">
@@ -64,8 +76,38 @@ function TransactionDetailDialog({
             </span>
           }
         />
+        {transaction.traceNumber ? (
+          <DetailRow
+            label="Trace number"
+            value={
+              <span className="font-mono text-xs">
+                {transaction.traceNumber}
+              </span>
+            }
+          />
+        ) : null}
+        {transaction.providerReference ? (
+          <DetailRow
+            label="RetrivalRefNo"
+            value={
+              <span className="font-mono text-xs">
+                {transaction.providerReference}
+              </span>
+            }
+          />
+        ) : null}
+        {transaction.maskedCardNumber ? (
+          <DetailRow
+            label="Card"
+            value={
+              <span className="font-mono text-xs">
+                {transaction.maskedCardNumber}
+              </span>
+            }
+          />
+        ) : null}
         <DetailRow
-          label="Created"
+          label="Timestamp"
           value={formatDevelopmentDateTime(transaction.occurredAt)}
         />
         <DetailRow
@@ -76,14 +118,13 @@ function TransactionDetailDialog({
               : "Awaiting verification"
           }
         />
+        {transaction.gatewayResultText ? (
+          <DetailRow
+            label="Gateway message"
+            value={transaction.gatewayResultText}
+          />
+        ) : null}
       </dl>
-
-      <div className="mt-6 rounded-xl border border-border bg-white/[0.025] p-4">
-        <p className="text-xs leading-5 text-muted-foreground">
-          This is demonstration data. It does not exist in the database and does
-          not represent a real payment.
-        </p>
-      </div>
 
       <div className="mt-6 flex justify-end border-t border-border pt-5">
         <Button variant="outline" onClick={() => onOpenChange(false)}>

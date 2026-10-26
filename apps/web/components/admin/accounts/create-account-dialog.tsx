@@ -127,7 +127,7 @@ function CreateBusinessAccountDialog({
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="account-opening-balance">
-              Opening balance (IRR)
+              Opening balance (R)
             </Label>
             <Input
               id="account-opening-balance"

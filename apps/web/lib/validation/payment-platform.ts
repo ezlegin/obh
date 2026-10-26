@@ -77,6 +77,10 @@ export const toggleConnectedServiceSchema = z.object({
   isActive: z.boolean(),
 })
 
+export const deleteConnectedServiceSchema = z.object({
+  serviceId: z.string().uuid(),
+})
+
 export const revokeServiceCredentialSchema = z.object({
   credentialId: z.string().uuid(),
 })

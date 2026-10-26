@@ -10,6 +10,7 @@ import type {
 } from "./types.js"
 
 const SDK_VERSION = "0.1.0"
+const DEFAULT_BASE_URL = "https://obhco.ir/api/v1"
 const DEFAULT_TIMEOUT_MS = 15_000
 const VALID_STATUSES = new Set<PaymentStatus>([
   "pending",
@@ -194,6 +195,7 @@ function extractReturnReference(input: VerifyReturnInput): string {
 export class OBHPayments {
   readonly #secretKey: string
   readonly #apiBaseUrl: string
+  readonly #simulator: boolean
   readonly #timeoutMs: number
   readonly #fetch: typeof fetch
 
@@ -221,8 +223,17 @@ export class OBHPayments {
       throw invalidArgument("A fetch implementation is required.")
     }
 
+    const envSimulator =
+      typeof process !== "undefined" &&
+      typeof process.env === "object" &&
+      process.env?.OBH_SIMULATOR?.trim().toLowerCase() === "true"
+
     this.#secretKey = options.secretKey
-    this.#apiBaseUrl = normalizeBaseUrl(options.baseUrl)
+    this.#apiBaseUrl =
+      options.baseUrl !== undefined
+        ? normalizeBaseUrl(options.baseUrl)
+        : DEFAULT_BASE_URL
+    this.#simulator = options.simulator ?? envSimulator
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
     this.#fetch = fetchImpl
   }
@@ -233,11 +244,14 @@ export class OBHPayments {
     const idempotencyKey =
       input.idempotencyKey ?? `sdk_${globalThis.crypto.randomUUID()}`
 
+    const simulator = input.simulator ?? this.#simulator
+
     const body: Record<string, unknown> = {
       externalOrderId: input.externalOrderId,
       amount: input.amount,
       currency: input.currency ?? "IRR",
       description: input.description,
+      simulator,
     }
 
     if (input.returnUrl !== undefined) {

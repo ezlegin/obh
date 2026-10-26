@@ -1,15 +1,19 @@
 "use client"
 
 import {
-  Ban,
   Boxes,
+  Check,
   Copy,
+  Eye,
+  EyeOff,
   Globe2,
   KeyRound,
   Link2,
   Loader2,
   Plus,
   Power,
+  RefreshCw,
+  Trash2,
   Webhook,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -20,17 +24,15 @@ import { Button } from "@workspace/ui/components/button"
 
 import { AdminEmptyState } from "@/components/admin/empty-state"
 import { CredentialSecretDialog } from "@/components/admin/services/credential-secret-dialog"
-import {
-  IssueCredentialDialog,
-  type IssuedCredential,
-} from "@/components/admin/services/issue-credential-dialog"
+import type { IssuedCredential } from "@/components/admin/services/issue-credential-dialog"
 import { RegisterServiceDialog } from "@/components/admin/services/register-service-dialog"
 import {
   WebhookSecretDialog,
   type IssuedWebhookSecret,
 } from "@/components/admin/services/webhook-secret-dialog"
 import {
-  revokeServiceCredentialAction,
+  deleteConnectedServiceAction,
+  issueServiceCredentialAction,
   rotateWebhookSecretAction,
   toggleConnectedServiceAction,
 } from "@/app/admin/services/actions"
@@ -44,16 +46,35 @@ type ServicesManagerProps = {
 function ServicesManager({ services }: ServicesManagerProps) {
   const router = useRouter()
   const [registerOpen, setRegisterOpen] = useState(false)
-  const [credentialTarget, setCredentialTarget] =
-    useState<AdminConnectedService | null>(null)
   const [issuedCredential, setIssuedCredential] =
     useState<IssuedCredential | null>(null)
   const [issuedWebhookSecret, setIssuedWebhookSecret] =
     useState<IssuedWebhookSecret | null>(null)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
 
   const refresh = () => router.refresh()
+
+  const copyCredentialKey = async (credentialId: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiedId(credentialId)
+      window.setTimeout(() => {
+        setCopiedId((current) => (current === credentialId ? null : current))
+      }, 2000)
+    } catch {
+      setError("Could not copy credential to clipboard.")
+    }
+  }
+
+  const toggleRevealCredential = (credentialId: string) => {
+    setRevealedIds((current) => ({
+      ...current,
+      [credentialId]: !current[credentialId],
+    }))
+  }
 
   const toggleService = async (service: AdminConnectedService) => {
     setPendingKey(`service:${service.id}`)
@@ -73,27 +94,59 @@ function ServicesManager({ services }: ServicesManagerProps) {
     setPendingKey(null)
   }
 
-  const revokeCredential = async (
-    service: AdminConnectedService,
-    credentialId: string,
-    keyId: string
-  ) => {
+  const deleteService = async (service: AdminConnectedService) => {
     if (
       !window.confirm(
-        `Revoke credential ${keyId}? The connected service will lose access immediately.`
+        `Delete service "${service.name}" (${service.domain})? Its API key will be removed immediately.`
       )
     ) {
       return
     }
 
-    setPendingKey(`credential:${credentialId}`)
+    setPendingKey(`delete:${service.id}`)
     setError(null)
 
-    const result = await revokeServiceCredentialAction({ credentialId })
+    const result = await deleteConnectedServiceAction({
+      serviceId: service.id,
+    })
 
     if (!result.ok) {
-      setError(result.error ?? "The credential could not be revoked.")
+      setError(result.error ?? "The service could not be deleted.")
     } else {
+      refresh()
+    }
+
+    setPendingKey(null)
+  }
+
+  const regenerateApiKey = async (service: AdminConnectedService) => {
+    if (
+      !window.confirm(
+        `Regenerate the API key for "${service.name}"? The previous key will stop working immediately.`
+      )
+    ) {
+      return
+    }
+
+    setPendingKey(`regen:${service.id}`)
+    setError(null)
+
+    const result = await issueServiceCredentialAction({
+      serviceId: service.id,
+      label: "API key",
+      environment: "LIVE",
+    })
+
+    if (!result.ok || !result.presentedKey || !result.credential) {
+      setError(result.error ?? "The API key could not be regenerated.")
+    } else {
+      setIssuedCredential({
+        presentedKey: result.presentedKey,
+        keyId: result.credential.keyId,
+        label: result.credential.label,
+        environment: result.credential.environment,
+        createdAt: result.credential.createdAt,
+      })
       refresh()
     }
 
@@ -134,13 +187,13 @@ function ServicesManager({ services }: ServicesManagerProps) {
       <div className="mt-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <p className="font-mono text-[9px] tracking-[0.14em] text-muted-foreground/60 uppercase">
-            Registered services
+            Connected services
           </p>
           <Badge variant="outline">{services.length} total</Badge>
         </div>
         <Button type="button" onClick={() => setRegisterOpen(true)}>
           <Plus aria-hidden="true" className="size-4" />
-          Register service
+          Generate service
         </Button>
       </div>
 
@@ -153,34 +206,16 @@ function ServicesManager({ services }: ServicesManagerProps) {
         </div>
       ) : null}
 
-      <div className="mt-4">
-        <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-5">
-          <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-info/20 bg-info/10 text-info">
-              <KeyRound aria-hidden="true" className="size-4" />
-            </span>
-            <div>
-              <p className="text-xs font-medium">Credentials are shown once</p>
-              <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-                OBH stores only a one-way hash of each service secret. Only TEST
-                credentials can be issued until live provider integration is
-                approved.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {services.length === 0 ? (
         <div className="mt-4 rounded-2xl border border-border bg-card/40">
           <AdminEmptyState
             icon={Boxes}
             title="No connected services yet"
-            description="Register the first OBH service to begin issuing payment credentials. No service has been created automatically."
+            description="Generate your first connected service to automatically create its OBH API key."
             action={
               <Button type="button" onClick={() => setRegisterOpen(true)}>
                 <Plus aria-hidden="true" className="size-4" />
-                Register the first service
+                Generate first service
               </Button>
             }
           />
@@ -188,9 +223,11 @@ function ServicesManager({ services }: ServicesManagerProps) {
       ) : (
         <div className="mt-4 space-y-4">
           {services.map((service) => {
-            const activeCredentials = service.credentials.filter(
-              (credential) => !credential.revokedAt
-            )
+            const credential = service.credentials[0]
+            const isRevealed = credential
+              ? Boolean(revealedIds[credential.id])
+              : false
+            const isCopied = credential ? copiedId === credential.id : false
 
             return (
               <article
@@ -225,23 +262,13 @@ function ServicesManager({ services }: ServicesManagerProps) {
                   <div className="flex shrink-0 flex-wrap gap-2">
                     <Button
                       type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCredentialTarget(service)}
-                      disabled={
-                        pendingKey === `service:${service.id}` ||
-                        !service.isActive
-                      }
-                    >
-                      <KeyRound aria-hidden="true" className="size-3.5" />
-                      Issue test credential
-                    </Button>
-                    <Button
-                      type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => toggleService(service)}
-                      disabled={pendingKey === `service:${service.id}`}
+                      disabled={
+                        pendingKey === `service:${service.id}` ||
+                        pendingKey === `delete:${service.id}`
+                      }
                     >
                       {pendingKey === `service:${service.id}` ? (
                         <Loader2
@@ -253,112 +280,139 @@ function ServicesManager({ services }: ServicesManagerProps) {
                       )}
                       {service.isActive ? "Deactivate" : "Activate"}
                     </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteService(service)}
+                      disabled={
+                        pendingKey === `delete:${service.id}` ||
+                        pendingKey === `service:${service.id}`
+                      }
+                      className="text-danger hover:bg-danger/10 hover:text-danger"
+                    >
+                      {pendingKey === `delete:${service.id}` ? (
+                        <Loader2
+                          aria-hidden="true"
+                          className="size-3.5 animate-spin"
+                        />
+                      ) : (
+                        <Trash2 aria-hidden="true" className="size-3.5" />
+                      )}
+                      Delete
+                    </Button>
                   </div>
                 </div>
 
                 <div className="p-5 sm:p-6">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="font-mono text-[9px] tracking-[0.12em] text-muted-foreground/60 uppercase">
-                      Credentials · {activeCredentials.length} active
-                    </p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => setCredentialTarget(service)}
-                      disabled={!service.isActive}
-                    >
-                      <Plus aria-hidden="true" className="size-3" />
-                      New test credential
-                    </Button>
-                  </div>
-
-                  {service.credentials.length === 0 ? (
-                    <p className="mt-4 rounded-xl border border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground">
-                      No credentials have been issued for this service.
-                    </p>
-                  ) : (
-                    <div className="mt-3 divide-y divide-border rounded-xl border border-border">
-                      {service.credentials.map((credential) => (
-                        <div
-                          key={credential.id}
-                          className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-xs font-medium">
-                                {credential.label}
-                              </p>
-                              <Badge
-                                variant={
-                                  credential.environment === "TEST"
-                                    ? "warning"
-                                    : "success"
-                                }
-                              >
-                                {credential.environment}
-                              </Badge>
-                              {credential.revokedAt ? (
-                                <Badge variant="muted">Revoked</Badge>
-                              ) : (
-                                <Badge variant="success">Active</Badge>
-                              )}
-                            </div>
-                            <p className="mt-1.5 flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
-                              <Copy aria-hidden="true" className="size-3" />
-                              {credential.keyId}
+                  {credential ? (
+                    <div className="rounded-xl border border-border p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-xs font-medium">
+                              Service API key
                             </p>
+                            <Badge variant="success">Active</Badge>
                           </div>
-
-                          <div className="flex shrink-0 items-center gap-4">
-                            <div className="text-right">
-                              <p className="text-[9px] text-muted-foreground/55">
-                                Created{" "}
-                                {formatDevelopmentDate(credential.createdAt)}
-                              </p>
-                              <p className="mt-0.5 text-[9px] text-muted-foreground/45">
-                                Last used{" "}
-                                {credential.lastUsedAt
-                                  ? formatDevelopmentDate(credential.lastUsedAt)
-                                  : "—"}
-                              </p>
-                            </div>
-                            {!credential.revokedAt ? (
+                          <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                            <span className="break-all">
+                              {isRevealed
+                                ? credential.presentedKey
+                                : `${credential.keyId}.••••••••••••••••••••••••`}
+                            </span>
+                            <div className="inline-flex flex-wrap items-center gap-1">
                               <Button
                                 type="button"
                                 variant="ghost"
-                                size="icon-sm"
-                                aria-label={`Revoke credential ${credential.keyId}`}
+                                size="xs"
                                 onClick={() =>
-                                  revokeCredential(
-                                    service,
-                                    credential.id,
-                                    credential.keyId
-                                  )
+                                  toggleRevealCredential(credential.id)
                                 }
-                                disabled={
-                                  pendingKey === `credential:${credential.id}`
+                                aria-label={
+                                  isRevealed
+                                    ? "Hide secret key"
+                                    : "Show secret key"
                                 }
                               >
-                                {pendingKey ===
-                                `credential:${credential.id}` ? (
-                                  <Loader2
+                                {isRevealed ? (
+                                  <EyeOff
                                     aria-hidden="true"
-                                    className="size-3.5 animate-spin"
+                                    className="size-3"
                                   />
                                 ) : (
-                                  <Ban
-                                    aria-hidden="true"
-                                    className="size-3.5"
-                                  />
+                                  <Eye aria-hidden="true" className="size-3" />
+                                )}
+                                {isRevealed ? "Hide" : "Show"}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="xs"
+                                onClick={() =>
+                                  copyCredentialKey(
+                                    credential.id,
+                                    credential.presentedKey
+                                  )
+                                }
+                              >
+                                {isCopied ? (
+                                  <>
+                                    <Check
+                                      aria-hidden="true"
+                                      className="size-3"
+                                    />
+                                    Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy
+                                      aria-hidden="true"
+                                      className="size-3"
+                                    />
+                                    Copy key
+                                  </>
                                 )}
                               </Button>
-                            ) : null}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="xs"
+                                onClick={() => regenerateApiKey(service)}
+                                disabled={pendingKey === `regen:${service.id}`}
+                              >
+                                {pendingKey === `regen:${service.id}` ? (
+                                  <Loader2
+                                    aria-hidden="true"
+                                    className="size-3 animate-spin"
+                                  />
+                                ) : (
+                                  <RefreshCw
+                                    aria-hidden="true"
+                                    className="size-3"
+                                  />
+                                )}
+                                Regenerate
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      ))}
+
+                        <div className="shrink-0 text-right">
+                          <p className="text-[9px] text-muted-foreground/55">
+                            Created{" "}
+                            {formatDevelopmentDate(credential.createdAt)}
+                          </p>
+                          <p className="mt-0.5 text-[9px] text-muted-foreground/45">
+                            Last used{" "}
+                            {credential.lastUsedAt
+                              ? formatDevelopmentDate(credential.lastUsedAt)
+                              : "—"}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  )}
+                  ) : null}
 
                   {service.webhookUrl ? (
                     <div className="mt-4 flex flex-col justify-between gap-3 rounded-xl border border-border bg-white/[0.02] p-4 sm:flex-row sm:items-center">
@@ -381,6 +435,58 @@ function ServicesManager({ services }: ServicesManagerProps) {
                         <p className="mt-1 max-w-xl truncate font-mono text-[9px] text-muted-foreground/60">
                           {service.webhookUrl}
                         </p>
+                        {service.webhookSecret ? (
+                          <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                            <span className="break-all">
+                              {revealedIds[`wh:${service.id}`]
+                                ? service.webhookSecret
+                                : "whsec_••••••••••••••••••••••••"}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="xs"
+                              onClick={() =>
+                                toggleRevealCredential(`wh:${service.id}`)
+                              }
+                            >
+                              {revealedIds[`wh:${service.id}`] ? (
+                                <EyeOff aria-hidden="true" className="size-3" />
+                              ) : (
+                                <Eye aria-hidden="true" className="size-3" />
+                              )}
+                              {revealedIds[`wh:${service.id}`]
+                                ? "Hide"
+                                : "Show"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="xs"
+                              onClick={() =>
+                                copyCredentialKey(
+                                  `wh:${service.id}`,
+                                  service.webhookSecret!
+                                )
+                              }
+                            >
+                              {copiedId === `wh:${service.id}` ? (
+                                <>
+                                  <Check
+                                    aria-hidden="true"
+                                    className="size-3"
+                                  />
+                                  Copied
+                                </>
+                              ) : (
+                                <>
+                                  <Copy aria-hidden="true" className="size-3" />
+                                  Copy secret
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        ) : null}
                         {service.webhookSecretCreatedAt ? (
                           <p className="mt-1 text-[9px] text-muted-foreground/45">
                             Last rotated{" "}
@@ -446,18 +552,10 @@ function ServicesManager({ services }: ServicesManagerProps) {
       <RegisterServiceDialog
         open={registerOpen}
         onOpenChange={setRegisterOpen}
-        onCreated={refresh}
-      />
-      <IssueCredentialDialog
-        service={credentialTarget}
-        onOpenChange={(open) => {
-          if (!open) {
-            setCredentialTarget(null)
+        onCreated={(credential) => {
+          if (credential) {
+            setIssuedCredential(credential)
           }
-        }}
-        onIssued={(credential) => {
-          setCredentialTarget(null)
-          setIssuedCredential(credential)
           refresh()
         }}
       />

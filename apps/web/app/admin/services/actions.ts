@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { requireAdmin } from "@/lib/auth/guards"
 import {
   createConnectedServiceSchema,
+  deleteConnectedServiceSchema,
   issueServiceCredentialSchema,
   revokeServiceCredentialSchema,
   rotateWebhookSecretSchema,
@@ -13,6 +14,7 @@ import {
 import { DomainError } from "@/server/errors"
 import {
   createConnectedService,
+  deleteConnectedService,
   issueServiceCredential,
   revokeServiceCredential,
   rotateWebhookSecret,
@@ -64,10 +66,17 @@ export async function registerConnectedServiceAction(
   }
 
   try {
-    await createConnectedService(admin.id, parsed.data)
+    const result = await createConnectedService(admin.id, parsed.data)
     revalidatePath("/admin/services")
     revalidatePath("/admin/payments")
-    return { ok: true }
+    return {
+      ok: true,
+      presentedKey: result.presentedKey,
+      credential: {
+        ...result.credential,
+        createdAt: result.credential.createdAt.toISOString(),
+      },
+    }
   } catch (error) {
     return actionError(error)
   }
@@ -165,6 +174,26 @@ export async function rotateWebhookSecretAction(
       webhookSecret: result.secret,
       webhookSecretCreatedAt: result.createdAt,
     }
+  } catch (error) {
+    return actionError(error)
+  }
+}
+
+export async function deleteConnectedServiceAction(
+  input: unknown
+): Promise<ServiceActionResult> {
+  const admin = await requireAdmin()
+  const parsed = deleteConnectedServiceSchema.safeParse(input)
+
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid service." }
+  }
+
+  try {
+    await deleteConnectedService(admin.id, parsed.data.serviceId)
+    revalidatePath("/admin/services")
+    revalidatePath("/admin/payments")
+    return { ok: true }
   } catch (error) {
     return actionError(error)
   }

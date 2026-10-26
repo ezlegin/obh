@@ -162,19 +162,21 @@ model ConnectedService {
   @@index([isActive])
 }
 
-/// Service API credentials. Only a non-secret key identifier and a one-way
-/// secret hash are stored; the raw credential is shown once when issued.
+/// Service API credentials. Both a SHA-256 hash (for fast request
+/// authentication) and an AES-256-GCM encrypted copy (so administrators can
+/// view or copy the full credential later from the admin console) are stored.
 model ServiceCredential {
-  id          String              @id @default(uuid(7)) @db.Uuid
-  serviceId   String              @db.Uuid
-  keyId       String              @unique @db.VarChar(64)
-  secretHash  String              @db.VarChar(255)
-  label       String              @db.VarChar(120)
-  environment ProviderEnvironment @default(TEST)
-  lastUsedAt  DateTime?           @db.Timestamptz(3)
-  revokedAt   DateTime?           @db.Timestamptz(3)
-  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime            @updatedAt @db.Timestamptz(3)
+  id              String              @id @default(uuid(7)) @db.Uuid
+  serviceId       String              @db.Uuid
+  keyId           String              @unique @db.VarChar(64)
+  secretHash      String              @db.VarChar(255)
+  secretEncrypted String?             @db.Text
+  label           String              @db.VarChar(120)
+  environment     ProviderEnvironment @default(TEST)
+  lastUsedAt      DateTime?           @db.Timestamptz(3)
+  revokedAt       DateTime?           @db.Timestamptz(3)
+  createdAt       DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime            @updatedAt @db.Timestamptz(3)
 
   service ConnectedService @relation(fields: [serviceId], references: [id], onDelete: Restrict)
 
