@@ -1,0 +1,386 @@
+import type { Metadata } from "next"
+import Link from "next/link"
+
+import { Callout } from "@/components/callout"
+import { CodeBlock } from "@/components/code-block"
+import { DocPage } from "@/components/doc-page"
+import { Endpoint } from "@/components/content"
+import { Table } from "@/components/table"
+
+export const metadata: Metadata = {
+  title: "API reference",
+  description:
+    "Complete reference for the SDK surface and the underlying OBH payment HTTP API.",
+}
+
+const sections = [
+  { id: "sdk-surface", title: "SDK surface" },
+  { id: "types", title: "TypeScript types" },
+  { id: "http-api", title: "HTTP API" },
+  { id: "create-endpoint", title: "Create endpoint" },
+  { id: "retrieve-endpoint", title: "Retrieve endpoint" },
+  { id: "error-envelope", title: "Error envelope" },
+  { id: "versioning", title: "Versioning" },
+]
+
+export default function ApiReferencePage() {
+  return (
+    <DocPage
+      href="/api-reference"
+      eyebrow="Reference"
+      title="API reference"
+      description={
+        <>
+          The SDK is a thin, typed layer over two HTTP endpoints. This page is
+          the exhaustive reference for both layers — useful when you need a
+          detail, or when you cannot use the SDK.
+        </>
+      }
+      sections={sections}
+    >
+      <h2 id="sdk-surface">SDK surface</h2>
+
+      <CodeBlock
+        language="ts"
+        code={`// Package exports
+export { OBHPayments } from "@obh/payments"
+export { OBHPaymentsError, isOBHPaymentsError } from "@obh/payments"
+export type {
+  APIErrorDetail,
+  APIErrorEnvelope,
+  OBHPaymentsOptions,
+  Payment,
+  PaymentEnvironment,
+  PaymentStatus,
+  StartPaymentInput,
+} from "@obh/payments"`}
+      />
+
+      <h3>Class OBHPayments</h3>
+
+      <div className="not-prose my-4 overflow-hidden rounded-xl border border-white/10">
+        {[
+          {
+            signature: "new OBHPayments(options)",
+            body: "Validates configuration and creates a reusable client. Throws if run in a browser.",
+            href: "/configuration",
+          },
+          {
+            signature: "startPayment(input): Promise<Payment>",
+            body: "Creates a payment. Sends POST /api/v1/payments with an idempotency key.",
+            href: "/payments/create",
+          },
+          {
+            signature: "getPayment(reference): Promise<Payment>",
+            body: "Retrieves one payment. Sends GET /api/v1/payments/{reference}.",
+            href: "/payments/retrieve",
+          },
+        ].map((method, index) => (
+          <div
+            key={method.signature}
+            className={`px-4 py-3.5 ${
+              index > 0 ? "border-t border-white/[0.07]" : ""
+            }`}
+          >
+            <Link
+              href={method.href}
+              className="font-mono text-[0.78rem] text-foreground underline decoration-white/20 underline-offset-4 hover:decoration-white/60"
+            >
+              {method.signature}
+            </Link>
+            <p className="mt-1 text-[0.78rem] text-muted-foreground">
+              {method.body}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <h3>Class OBHPaymentsError</h3>
+      <CodeBlock
+        language="ts"
+        code={`class OBHPaymentsError extends Error {
+  readonly code: string
+  readonly status?: number
+  readonly requestId?: string
+  readonly details?: APIErrorDetail[]
+  readonly retryable: boolean
+  cause?: unknown
+}
+
+function isOBHPaymentsError(error: unknown): error is OBHPaymentsError`}
+      />
+
+      <h2 id="types">TypeScript types</h2>
+      <CodeBlock
+        filename="@obh/payments"
+        language="ts"
+        code={`type PaymentStatus =
+  | "pending"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "expired"
+
+type PaymentEnvironment = "test" | "live"
+
+type Payment = {
+  id: string
+  reference: string
+  service: string
+  externalOrderId: string | null
+  amount: string
+  currency: string
+  environment: PaymentEnvironment
+  status: PaymentStatus
+  description: string
+  checkoutUrl: string | null
+  createdAt: string
+  completedAt: string | null
+  verifiedAt: string | null
+}
+
+type StartPaymentInput = {
+  externalOrderId: string
+  amount: string
+  currency?: "IRR"
+  description: string
+  returnUrl?: string
+  metadata?: Record<string, unknown>
+  idempotencyKey?: string
+}
+
+type OBHPaymentsOptions = {
+  secretKey: string
+  baseUrl: string
+  timeoutMs?: number
+  fetch?: typeof fetch
+}
+
+type APIErrorDetail = {
+  field?: string
+  message: string
+}
+
+type APIErrorEnvelope = {
+  error?: {
+    code?: string
+    message?: string
+    requestId?: string
+    details?: APIErrorDetail[]
+  }
+}`}
+      />
+
+      <Callout variant="tip" title="Runtime validation is intentionally shallow">
+        <p>
+          The SDK checks that a successful response looks like a{" "}
+          <code>Payment</code> — required strings, a known status, a known
+          environment. It does not do full schema validation. Unknown fields are
+          passed through and should be ignored.
+        </p>
+      </Callout>
+
+      <h2 id="http-api">HTTP API</h2>
+      <p>
+        Base path: <code>/api/v1</code>. Transport is HTTPS in deployed
+        environments and content is UTF-8 JSON.
+      </p>
+
+      <Table
+        head={
+          <>
+            <th>Header</th>
+            <th>Value</th>
+            <th>Notes</th>
+          </>
+        }
+      >
+        <tr>
+          <td><code>Authorization</code></td>
+          <td><code>Bearer svc_...</code></td>
+          <td>Required on every request.</td>
+        </tr>
+        <tr>
+          <td><code>Content-Type</code></td>
+          <td><code>application/json</code></td>
+          <td>Required for POST.</td>
+        </tr>
+        <tr>
+          <td><code>Accept</code></td>
+          <td><code>application/json</code></td>
+          <td>Set by the SDK.</td>
+        </tr>
+        <tr>
+          <td><code>Idempotency-Key</code></td>
+          <td>1–191 printable ASCII characters</td>
+          <td>Required for POST; scoped to the service.</td>
+        </tr>
+        <tr>
+          <td><code>User-Agent</code></td>
+          <td><code>@obh/payments/0.1.0</code></td>
+          <td>Set by the SDK for diagnostics.</td>
+        </tr>
+      </Table>
+
+      <p>
+        Responses include a request identifier for support correlation. Errors
+        use a single envelope, described below.
+      </p>
+
+      <h2 id="create-endpoint">Create endpoint</h2>
+      <Endpoint method="POST" path="/api/v1/payments" />
+
+      <CodeBlock
+        filename="Request"
+        language="json"
+        code={`{
+  "externalOrderId": "IG-8821",
+  "amount": "245000000",
+  "currency": "IRR",
+  "description": "Annual design workspace",
+  "returnUrl": "https://igraphical.ir/payments/return",
+  "metadata": { "plan": "annual" }
+}`}
+      />
+
+      <CodeBlock
+        filename="201 Created"
+        language="json"
+        code={`{
+  "data": {
+    "id": "018f0000-0000-7000-8000-000000000001",
+    "reference": "OBH-8B30F9C07A52D1E4",
+    "service": "igraphical",
+    "externalOrderId": "IG-8821",
+    "amount": "245000000.00",
+    "currency": "IRR",
+    "environment": "test",
+    "status": "pending",
+    "description": "Annual design workspace",
+    "checkoutUrl": "https://provider.example/checkout/sess_123",
+    "createdAt": "2026-10-18T08:00:00.000Z",
+    "completedAt": null,
+    "verifiedAt": null
+  }
+}`}
+      />
+
+      <ul>
+        <li>
+          <strong>201</strong> — a new payment was created.
+        </li>
+        <li>
+          <strong>200</strong> — idempotent replay. The response includes{" "}
+          <code>Idempotent-Replayed: true</code>.
+        </li>
+        <li>
+          <code>checkoutUrl</code> may be <code>null</code> when the adapter
+          does not use a redirect.
+        </li>
+        <li>
+          The API chooses the configured TEST provider account. You cannot
+          select one or supply provider credentials.
+        </li>
+        <li>
+          The OBH reference is generated by OBH and sent to the provider only
+          through server-side integration.
+        </li>
+      </ul>
+
+      <CodeBlock
+        filename="curl"
+        language="bash"
+        code={`curl -sS https://pay.obh.example/api/v1/payments \\
+  -H "Authorization: Bearer $OBH_SERVICE_KEY" \\
+  -H "Content-Type: application/json" \\
+  -H "Idempotency-Key: order-IG-8821-attempt-1" \\
+  -d '{
+    "externalOrderId": "IG-8821",
+    "amount": "245000000",
+    "currency": "IRR",
+    "description": "Annual design workspace"
+  }'`}
+      />
+
+      <h2 id="retrieve-endpoint">Retrieve endpoint</h2>
+      <Endpoint method="GET" path="/api/v1/payments/{reference}" />
+
+      <CodeBlock
+        filename="200 OK"
+        language="json"
+        code={`{
+  "data": {
+    "reference": "OBH-8B30F9C07A52D1E4",
+    "status": "completed",
+    "completedAt": "2026-10-18T08:04:10.000Z",
+    "verifiedAt": "2026-10-18T08:04:10.000Z"
+  }
+}`}
+      />
+
+      <ul>
+        <li>Returns only payments belonging to the authenticated service.</li>
+        <li>
+          Unknown references and other services’ references both return{" "}
+          <code>404 PAYMENT_NOT_FOUND</code>.
+        </li>
+        <li>
+          The status is authoritative only after server-side provider
+          verification.
+        </li>
+        <li>
+          The SDK encodes the reference before building the URL. Encode it
+          yourself if you call the API directly.
+        </li>
+      </ul>
+
+      <h2 id="error-envelope">Error envelope</h2>
+      <CodeBlock
+        filename="Any non-2xx"
+        language="json"
+        code={`{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "The request could not be validated.",
+    "requestId": "req_01J9Z6K3T4QW8M2",
+    "details": [
+      {
+        "field": "amount",
+        "message": "Amount must be greater than zero."
+      }
+    ]
+  }
+}`}
+      />
+
+      <p>
+        The SDK maps this envelope to <code>OBHPaymentsError</code>. See{" "}
+        <Link href="/errors">Errors</Link> for every code and the retry rules.
+      </p>
+
+      <h2 id="versioning">Versioning</h2>
+      <ul>
+        <li>
+          The base path carries the major version: <code>/api/v1</code>.
+        </li>
+        <li>
+          Adding response fields is backward-compatible and does not require a
+          new version.
+        </li>
+        <li>Breaking changes require a new API version.</li>
+        <li>
+          The SDK version is independent of the API version. Package{" "}
+          <code>0.1.0</code> targets API <code>v1</code>.
+        </li>
+      </ul>
+
+      <Callout variant="note" title="Not implemented yet">
+        <p>
+          There is no endpoint for cancellation, refunds, captures, or listing
+          payments. Do not design around them. Rate limiting is reserved
+          (<code>429</code>) but not enforced.
+        </p>
+      </Callout>
+    </DocPage>
+  )
+}
