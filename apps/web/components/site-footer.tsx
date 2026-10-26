@@ -3,10 +3,25 @@ import Link from "next/link"
 
 import { SiteContainer } from "@/components/site-container"
 import { Logo } from "@/components/logo"
-import { footerNavigation, services } from "@/lib/site"
+import type { Dictionary } from "@/lib/i18n"
+import type { Locale } from "@/lib/i18n/config"
+import { localizeHref } from "@/lib/i18n/links"
+import { services } from "@/lib/site"
 
-function SiteFooter() {
+type SiteFooterProps = {
+  locale: Locale
+  dictionary: Dictionary
+}
+
+function SiteFooter({ locale, dictionary }: SiteFooterProps) {
   const year = new Date().getFullYear()
+  const t = dictionary.footer
+
+  const navigation = [
+    { label: t.links.about, href: localizeHref(locale, "/about-us") },
+    { label: t.links.contact, href: localizeHref(locale, "/contact-us") },
+    { label: t.links.terms, href: localizeHref(locale, "/terms") },
+  ]
 
   return (
     <footer className="border-t border-border bg-[#050505]">
@@ -14,25 +29,24 @@ function SiteFooter() {
         <div className="grid gap-12 py-16 sm:grid-cols-2 lg:grid-cols-[1.5fr_0.65fr_0.95fr_0.6fr] lg:gap-8">
           <div className="sm:col-span-2 lg:col-span-1">
             <Link
-              href="/"
-              aria-label="OBH home"
+              href={localizeHref(locale, "/")}
+              aria-label={dictionary.header.homeLabel}
               className="inline-block rounded-full focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
             >
               <Logo className="h-7" />
             </Link>
             <p className="mt-6 max-w-xs text-sm leading-6 text-muted-foreground">
-              An IT corporation building a shared financial foundation for its
-              portfolio of digital services.
+              {t.tagline}
             </p>
             <p className="mt-8 font-mono text-[10px] tracking-[0.16em] text-muted-foreground/70 uppercase">
-              Technology / Finance / Ownership
+              {t.motto}
             </p>
           </div>
 
           <div>
-            <p className="eyebrow">Navigate</p>
+            <p className="eyebrow">{t.navigate}</p>
             <ul className="mt-5 space-y-3">
-              {footerNavigation.map((item) => (
+              {navigation.map((item) => (
                 <li key={item.href}>
                   <Link
                     href={item.href}
@@ -46,7 +60,7 @@ function SiteFooter() {
           </div>
 
           <div>
-            <p className="eyebrow">Ecosystem</p>
+            <p className="eyebrow">{t.ecosystem}</p>
             <ul className="mt-5 space-y-3">
               {services.map((service) => (
                 <li key={service.href}>
@@ -59,7 +73,7 @@ function SiteFooter() {
                     {service.domain}
                     <ArrowUpRight
                       aria-hidden="true"
-                      className="size-3 text-muted-foreground/35 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                      className="size-3 text-muted-foreground/35 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 rtl:-scale-x-100"
                     />
                   </a>
                 </li>
@@ -68,26 +82,29 @@ function SiteFooter() {
           </div>
 
           <div>
-            <p className="eyebrow">Contact</p>
+            <p className="eyebrow">{t.contact}</p>
             <p className="mt-5 max-w-[13rem] text-sm leading-6 text-muted-foreground">
-              Start with the service closest to your enquiry.
+              {t.contactNote}
             </p>
             <Link
-              href="/contact-us"
+              href={localizeHref(locale, "/contact-us")}
               className="mt-5 inline-flex items-center gap-1.5 text-sm text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
             >
-              Contact OBH
-              <ArrowRight aria-hidden="true" className="size-3.5" />
+              {t.contactCta}
+              <ArrowRight
+                aria-hidden="true"
+                className="size-3.5 rtl:-scale-x-100"
+              />
             </Link>
           </div>
         </div>
 
         <div className="flex flex-col gap-3 border-t border-border py-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="font-mono text-[10px] tracking-[0.11em] text-muted-foreground/80 uppercase">
-            © {year} OBH Corporation. All rights reserved.
+            {t.copyright.replace("{year}", String(year))}
           </p>
           <p className="font-mono text-[10px] tracking-[0.11em] text-muted-foreground/65 uppercase">
-            Built for the OBH ecosystem
+            {t.builtFor}
           </p>
         </div>
       </SiteContainer>

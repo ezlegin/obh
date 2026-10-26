@@ -30,15 +30,3 @@ export const services = [
     href: "https://stucker.parallane.com",
   },
 ] as const
-
-export const siteNavigation = [
-  { label: "Ecosystem", href: "/#services" },
-  { label: "Corporation", href: "/about-us" },
-  { label: "Terms", href: "/terms" },
-] as const
-
-export const footerNavigation = [
-  { label: "About OBH", href: "/about-us" },
-  { label: "Contact", href: "/contact-us" },
-  { label: "Terms of use", href: "/terms" },
-] as const

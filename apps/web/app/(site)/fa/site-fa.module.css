@@ -1,0 +1,13 @@
+.root {
+  font-family:
+    "Vazirmatn", "Vazir", "IRANSansX", "IRANSans", "Segoe UI", Tahoma,
+    "Noto Sans Arabic", Arial, sans-serif;
+}
+
+.root :is(h1, h2, h3, h4, p, blockquote, li, a, span, dt, dd, button) {
+  letter-spacing: normal;
+}
+
+.root :is(h1, h2, h3) {
+  line-height: 1.2;
+}

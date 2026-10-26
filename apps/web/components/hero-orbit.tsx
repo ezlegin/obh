@@ -10,13 +10,23 @@ const nodePositions = [
   "left-[13%] top-[27%]",
 ] as const
 
-function HeroOrbit() {
+type HeroOrbitProps = {
+  labels: {
+    systemMap: string
+    servicesCore: string
+    payments: string
+    accounting: string
+    ownership: string
+  }
+}
+
+function HeroOrbit({ labels }: HeroOrbitProps) {
   return (
     <div className="rounded-[2rem] border border-border bg-white/[0.015] p-4 shadow-glow backdrop-blur-sm sm:p-5">
       <div className="flex items-center justify-between gap-4 px-1 pb-3">
-        <span className="eyebrow">System map</span>
+        <span className="eyebrow">{labels.systemMap}</span>
         <span className="font-mono text-[10px] tracking-[0.16em] text-muted-foreground/60 uppercase">
-          Services / Core
+          {labels.servicesCore}
         </span>
       </div>
 
@@ -61,7 +71,7 @@ function HeroOrbit() {
       </div>
 
       <div className="grid grid-cols-3 gap-2 border-t border-border px-1 pt-4">
-        {["Payments", "Accounting", "Ownership"].map((label) => (
+        {[labels.payments, labels.accounting, labels.ownership].map((label) => (
           <span
             key={label}
             className="flex items-center gap-2 font-mono text-[9px] tracking-[0.1em] text-muted-foreground/70 uppercase"

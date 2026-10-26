@@ -9,47 +9,18 @@ import { HeroOrbit } from "@/components/hero-orbit"
 import { SectionLabel } from "@/components/section-label"
 import { ServiceDirectory } from "@/components/service-directory"
 import { SiteContainer } from "@/components/site-container"
+import type { Dictionary } from "@/lib/i18n"
+import type { Locale } from "@/lib/i18n/config"
+import { localizeHref } from "@/lib/i18n/links"
 
-const platformPillars = [
-  {
-    number: "01",
-    title: "Payments, without repetition",
-    description:
-      "A centralized gateway layer so every OBH service can initiate and track payments through one integration, instead of rebuilding provider logic service by service.",
-  },
-  {
-    number: "02",
-    title: "Accounting, without blurred lines",
-    description:
-      "Revenue, expenses, balances, and cash flow held in distinct records, with exact amounts and a clear audit trail behind every financial statement.",
-  },
-  {
-    number: "03",
-    title: "Ownership, without ambiguity",
-    description:
-      "Shareholder allocations and distribution history calculated from preserved ownership records, not overwritten summaries or informal agreements.",
-  },
-] as const
+type HomePageProps = {
+  locale: Locale
+  dictionary: Dictionary
+}
 
-const principles = [
-  {
-    title: "Precision",
-    description:
-      "Financial records should be explainable to the last unit, never rounded away or presented without context.",
-  },
-  {
-    title: "Clarity",
-    description:
-      "Actual balances, calculated balances, and pending amounts should always be visibly distinct.",
-  },
-  {
-    title: "Stewardship",
-    description:
-      "Access, changes, and distributions should leave a history that can be reviewed and trusted.",
-  },
-] as const
+function HomePage({ locale, dictionary }: HomePageProps) {
+  const t = dictionary.home
 
-export default function HomePage() {
   return (
     <>
       <section className="relative isolate overflow-hidden border-b border-border">
@@ -64,47 +35,48 @@ export default function HomePage() {
                   aria-hidden="true"
                   className="size-1.5 rounded-full bg-foreground/80"
                 />
-                OBH Corporation
+                {t.corporation}
               </span>
               <span aria-hidden="true" className="h-px w-6 bg-white/15" />
-              <span className="eyebrow">Financial infrastructure</span>
+              <span className="eyebrow">{t.eyebrow}</span>
             </div>
 
             <h1 className="animate-rise mt-7 text-[clamp(3rem,7.6vw,6.8rem)] leading-[0.91] font-semibold tracking-[-0.06em] text-balance">
-              The financial core{" "}
+              {t.titleLead}{" "}
               <span className="mt-1 block text-muted-foreground/70">
-                behind every OBH service.
+                {t.titleTail}
               </span>
             </h1>
 
             <p className="animate-rise animate-delay-100 mt-8 max-w-xl text-base leading-8 text-pretty text-muted-foreground sm:text-lg">
-              One central layer for payments, accounting, and ownership —
-              designed to bring every OBH service onto the same financial truth.
+              {t.description}
             </p>
 
             <div className="animate-rise animate-delay-200 mt-10 flex flex-wrap items-center gap-3">
               <Link
                 href="#services"
-                className={cn(buttonVariants({ size: "lg" }), "pr-5")}
+                className={cn(buttonVariants({ size: "lg" }), "pe-5")}
               >
-                Explore the ecosystem
-                <ArrowDownRight aria-hidden="true" className="size-4" />
+                {t.primaryCta}
+                <ArrowDownRight
+                  aria-hidden="true"
+                  className="size-4 rtl:-scale-x-100"
+                />
               </Link>
               <Link
-                href="/about-us"
+                href={localizeHref(locale, "/about-us")}
                 className={buttonVariants({ variant: "ghost", size: "lg" })}
               >
-                About the corporation
-                <ArrowRight aria-hidden="true" className="size-4" />
+                {t.secondaryCta}
+                <ArrowRight
+                  aria-hidden="true"
+                  className="size-4 rtl:-scale-x-100"
+                />
               </Link>
             </div>
 
             <div className="animate-fade mt-14 flex max-w-lg flex-wrap gap-x-7 gap-y-3 border-t border-border pt-5">
-              {[
-                "Centralized payments",
-                "Unified accounting",
-                "Defined ownership",
-              ].map((item) => (
+              {t.highlights.map((item) => (
                 <span
                   key={item}
                   className="flex items-center gap-2 font-mono text-[9px] tracking-[0.1em] text-muted-foreground/65 uppercase"
@@ -120,7 +92,7 @@ export default function HomePage() {
           </div>
 
           <div className="animate-rise-slow animate-delay-200 lg:w-full lg:max-w-[33rem] lg:justify-self-end">
-            <HeroOrbit />
+            <HeroOrbit labels={dictionary.orbit} />
           </div>
         </SiteContainer>
       </section>
@@ -129,31 +101,30 @@ export default function HomePage() {
         <SiteContainer>
           <div className="grid gap-12 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20">
             <div>
-              <SectionLabel index="01">The premise</SectionLabel>
+              <SectionLabel index="01">{t.premise.label}</SectionLabel>
             </div>
             <div>
               <h2 className="max-w-4xl text-3xl leading-[1.12] font-medium tracking-[-0.045em] text-balance sm:text-4xl lg:text-5xl">
-                Independent services should not mean disconnected books.
+                {t.premise.title}
               </h2>
 
               <div className="mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
-                <p className="text-sm leading-7 text-muted-foreground">
-                  OBH is an IT corporation behind a portfolio of digital
-                  services. Each service has its own product focus. The group
-                  provides the shared structure that connects them.
-                </p>
-                <p className="text-sm leading-7 text-muted-foreground">
-                  Rather than letting every service build its own payment and
-                  accounting stack, OBH is building one financial layer for the
-                  whole ecosystem — with clear boundaries and a single source of
-                  truth.
-                </p>
+                {t.premise.body.map((paragraph) => (
+                  <p
+                    key={paragraph}
+                    className="text-sm leading-7 text-muted-foreground"
+                  >
+                    {paragraph}
+                  </p>
+                ))}
               </div>
 
               <div className="mt-10 flex flex-wrap gap-2">
-                <Badge variant="outline">Centralized payment layer</Badge>
-                <Badge variant="outline">Shared financial record</Badge>
-                <Badge variant="outline">Ownership history</Badge>
+                {t.premise.badges.map((badge) => (
+                  <Badge key={badge} variant="outline">
+                    {badge}
+                  </Badge>
+                ))}
               </div>
             </div>
           </div>
@@ -167,21 +138,24 @@ export default function HomePage() {
         <SiteContainer>
           <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
             <div>
-              <SectionLabel index="02">Ecosystem</SectionLabel>
+              <SectionLabel index="02">{t.ecosystem.label}</SectionLabel>
               <h2 className="mt-6 max-w-2xl text-4xl leading-[1.02] font-semibold tracking-[-0.05em] text-balance sm:text-5xl lg:text-6xl">
-                Six services.{" "}
+                {t.ecosystem.titleLead}{" "}
                 <span className="block text-muted-foreground/70">
-                  One financial standard.
+                  {t.ecosystem.titleTail}
                 </span>
               </h2>
             </div>
             <p className="max-w-sm text-sm leading-6 text-muted-foreground">
-              Independent products, connected by a shared operational
-              foundation. Visit any service at its official domain.
+              {t.ecosystem.description}
             </p>
           </div>
 
-          <ServiceDirectory size="large" className="mt-14" />
+          <ServiceDirectory
+            labels={dictionary.common}
+            size="large"
+            className="mt-14"
+          />
         </SiteContainer>
       </section>
 
@@ -193,9 +167,9 @@ export default function HomePage() {
         <SiteContainer className="relative">
           <div className="grid gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
             <div className="lg:sticky lg:top-28 lg:self-start">
-              <SectionLabel index="03">Platform direction</SectionLabel>
+              <SectionLabel index="03">{t.platform.label}</SectionLabel>
               <h2 className="mt-6 max-w-xl text-4xl leading-[1.02] font-semibold tracking-[-0.05em] text-balance sm:text-5xl">
-                A single financial layer, with clear boundaries.
+                {t.platform.title}
               </h2>
               <div className="mt-7">
                 <Badge variant="warning">
@@ -203,18 +177,16 @@ export default function HomePage() {
                     aria-hidden="true"
                     className="size-1 rounded-full bg-warning"
                   />
-                  In development
+                  {t.platform.badge}
                 </Badge>
               </div>
               <p className="mt-6 max-w-md text-sm leading-7 text-muted-foreground">
-                The OBH platform is being built in stages. It is not yet
-                publicly available, and this website does not offer live payment
-                or financial services.
+                {t.platform.description}
               </p>
             </div>
 
             <div className="border-y border-border">
-              {platformPillars.map((pillar) => (
+              {t.platform.pillars.map((pillar) => (
                 <article
                   key={pillar.number}
                   className="grid grid-cols-[2rem_1fr] gap-4 border-b border-border py-8 last:border-b-0 sm:grid-cols-[3rem_1fr] sm:gap-5 sm:py-10"
@@ -241,14 +213,14 @@ export default function HomePage() {
         <SiteContainer>
           <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
             <div>
-              <SectionLabel index="04">Principles</SectionLabel>
+              <SectionLabel index="04">{t.principles.label}</SectionLabel>
               <h2 className="mt-6 max-w-md text-4xl leading-[1.02] font-semibold tracking-[-0.05em] text-balance sm:text-5xl">
-                Quiet systems. Exact numbers.
+                {t.principles.title}
               </h2>
             </div>
 
             <div className="grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-3">
-              {principles.map((principle) => (
+              {t.principles.items.map((principle) => (
                 <article
                   key={principle.title}
                   className="bg-background p-6 sm:p-7"
@@ -279,27 +251,30 @@ export default function HomePage() {
             />
             <div className="grid gap-10 lg:grid-cols-[1fr_auto] lg:items-end">
               <div>
-                <p className="eyebrow">Start a conversation</p>
+                <p className="eyebrow">{t.closing.label}</p>
                 <h2 className="mt-5 max-w-2xl text-3xl leading-[1.06] font-semibold tracking-[-0.045em] text-balance sm:text-4xl lg:text-5xl">
-                  A clearer financial foundation starts with a conversation.
+                  {t.closing.title}
                 </h2>
               </div>
               <div className="flex flex-wrap gap-3">
                 <Link
-                  href="/contact-us"
+                  href={localizeHref(locale, "/contact-us")}
                   className={buttonVariants({ size: "lg" })}
                 >
-                  Contact OBH
-                  <ArrowRight aria-hidden="true" className="size-4" />
+                  {t.closing.primaryCta}
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="size-4 rtl:-scale-x-100"
+                  />
                 </Link>
                 <Link
-                  href="/about-us"
+                  href={localizeHref(locale, "/about-us")}
                   className={buttonVariants({
                     variant: "outline",
                     size: "lg",
                   })}
                 >
-                  About the corporation
+                  {t.closing.secondaryCta}
                 </Link>
               </div>
             </div>
@@ -309,3 +284,5 @@ export default function HomePage() {
     </>
   )
 }
+
+export { HomePage }

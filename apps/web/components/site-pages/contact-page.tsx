@@ -1,4 +1,3 @@
-import type { Metadata } from "next"
 import {
   ArrowDownRight,
   ArrowRight,
@@ -20,60 +19,50 @@ import { PageHero } from "@/components/page-hero"
 import { SectionLabel } from "@/components/section-label"
 import { ServiceDirectory } from "@/components/service-directory"
 import { SiteContainer } from "@/components/site-container"
+import type { Dictionary } from "@/lib/i18n"
+import type { Locale } from "@/lib/i18n/config"
+import { localizeHref } from "@/lib/i18n/links"
 
-export const metadata: Metadata = {
-  title: "Contact",
-  description:
-    "Reach OBH through the service closest to your enquiry, or learn more about the corporation and its ecosystem.",
+type ContactPageProps = {
+  locale: Locale
+  dictionary: Dictionary
 }
 
-const contactRoutes = [
-  {
-    icon: LifeBuoy,
-    title: "Product support",
-    description:
-      "For questions about a product, account, or order, contact the service you used directly.",
-  },
-  {
-    icon: Handshake,
-    title: "Partnerships",
-    description:
-      "For opportunities that involve more than one OBH service, begin with the service closest to the work.",
-  },
-  {
-    icon: Code2,
-    title: "Developers",
-    description:
-      "Payment SDK documentation will be published separately when the platform is ready for integrations.",
-  },
-] as const
+const routeIcons = [LifeBuoy, Handshake, Code2] as const
 
-export default function ContactPage() {
+function ContactPage({ locale, dictionary }: ContactPageProps) {
+  const t = dictionary.contact
+
   return (
     <>
       <PageHero
-        eyebrow="Contact / OBH Corporation"
+        eyebrow={t.hero.label}
         title={
           <>
-            A direct line{" "}
-            <span className="block text-muted-foreground/70">to OBH.</span>
+            {t.hero.titleLead}{" "}
+            <span className="block text-muted-foreground/70">
+              {t.hero.titleTail}
+            </span>
           </>
         }
-        description="Start with the service closest to your enquiry. Each OBH service is listed at its official domain."
+        description={t.hero.description}
       >
         <div className="flex flex-wrap gap-3">
           <Link
             href="#service-directory"
             className={buttonVariants({ variant: "outline", size: "lg" })}
           >
-            Find a service
-            <ArrowDownRight aria-hidden="true" className="size-4" />
+            {t.hero.primaryCta}
+            <ArrowDownRight
+              aria-hidden="true"
+              className="size-4 rtl:-scale-x-100"
+            />
           </Link>
           <Link
-            href="/about-us"
+            href={localizeHref(locale, "/about-us")}
             className={buttonVariants({ variant: "ghost", size: "lg" })}
           >
-            About OBH
+            {t.hero.secondaryCta}
           </Link>
         </div>
       </PageHero>
@@ -85,22 +74,20 @@ export default function ContactPage() {
         <SiteContainer>
           <div className="grid gap-14 lg:grid-cols-[1.15fr_0.85fr] lg:gap-20">
             <div>
-              <SectionLabel index="01">Service directory</SectionLabel>
+              <SectionLabel index="01">{t.directory.label}</SectionLabel>
               <h2 className="mt-6 max-w-2xl text-4xl leading-[1.02] font-semibold tracking-[-0.05em] text-balance sm:text-5xl">
-                Start with the service you know.
+                {t.directory.title}
               </h2>
               <p className="mt-6 max-w-xl text-sm leading-7 text-muted-foreground">
-                The service directory is currently the most direct route to the
-                right team. Open the relevant service below to continue on its
-                official website.
+                {t.directory.description}
               </p>
-              <ServiceDirectory className="mt-10" />
+              <ServiceDirectory labels={dictionary.common} className="mt-10" />
             </div>
 
             <aside className="lg:sticky lg:top-28 lg:self-start">
               <div className="space-y-3">
-                {contactRoutes.map((route) => {
-                  const Icon = route.icon
+                {t.routes.map((route, index) => {
+                  const Icon = routeIcons[index] ?? LifeBuoy
 
                   return (
                     <Card
@@ -120,24 +107,26 @@ export default function ContactPage() {
               </div>
 
               <div className="mt-6 rounded-2xl border border-border bg-transparent p-5">
-                <p className="eyebrow">Corporate information</p>
+                <p className="eyebrow">{t.corporate.label}</p>
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                  For the corporation’s purpose and operating model, read the
-                  About page. For website conditions, see the terms.
+                  {t.corporate.description}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
                   <Link
-                    href="/about-us"
+                    href={localizeHref(locale, "/about-us")}
                     className="inline-flex items-center gap-1.5 text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
                   >
-                    About OBH
-                    <ArrowRight aria-hidden="true" className="size-3.5" />
+                    {t.corporate.aboutLink}
+                    <ArrowRight
+                      aria-hidden="true"
+                      className="size-3.5 rtl:-scale-x-100"
+                    />
                   </Link>
                   <Link
-                    href="/terms"
+                    href={localizeHref(locale, "/terms")}
                     className="inline-flex items-center gap-1.5 text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
                   >
-                    Terms
+                    {t.corporate.termsLink}
                   </Link>
                 </div>
               </div>
@@ -150,17 +139,20 @@ export default function ContactPage() {
         <SiteContainer>
           <div className="grid gap-10 border-t border-border pt-10 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
-              <p className="eyebrow">One ecosystem</p>
+              <p className="eyebrow">{t.closing.label}</p>
               <h2 className="mt-4 max-w-2xl text-3xl leading-[1.08] font-semibold tracking-[-0.045em] text-balance sm:text-4xl">
-                Six services, each with its own front door.
+                {t.closing.title}
               </h2>
             </div>
             <Link
-              href="/#services"
+              href={localizeHref(locale, "/#services")}
               className={buttonVariants({ variant: "outline", size: "lg" })}
             >
-              View the ecosystem
-              <ArrowRight aria-hidden="true" className="size-4" />
+              {t.closing.cta}
+              <ArrowRight
+                aria-hidden="true"
+                className="size-4 rtl:-scale-x-100"
+              />
             </Link>
           </div>
         </SiteContainer>
@@ -168,3 +160,5 @@ export default function ContactPage() {
     </>
   )
 }
+
+export { ContactPage }
