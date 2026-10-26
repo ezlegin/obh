@@ -19,7 +19,11 @@ export default function PersianSiteLayout({
       dir="rtl"
       className={`${styles.root} flex min-h-dvh flex-col`}
     >
-      <SiteHeader locale="fa" dictionary={dictionary} />
+      <SiteHeader
+        locale="fa"
+        labels={dictionary.header}
+        navigation={dictionary.nav}
+      />
       <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
         {children}
       </main>

@@ -18,7 +18,8 @@ import { services } from "@/lib/site"
 
 type SiteHeaderProps = {
   locale: Locale
-  dictionary: Dictionary
+  labels: Dictionary["header"]
+  navigation: Dictionary["nav"]
 }
 
 function isActivePath(pathname: string, href: string) {
@@ -31,22 +32,22 @@ function isActivePath(pathname: string, href: string) {
   return pathname === path || pathname.startsWith(`${path}/`)
 }
 
-function SiteHeader({ locale, dictionary }: SiteHeaderProps) {
+function SiteHeader({ locale, labels, navigation }: SiteHeaderProps) {
   const pathname = usePathname()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const t = dictionary.header
+  const t = labels
 
-  const navigation = [
+  const navigationItems = [
     {
-      label: dictionary.nav.ecosystem,
+      label: navigation.ecosystem,
       href: localizeHref(locale, "/#services"),
     },
     {
-      label: dictionary.nav.corporation,
+      label: navigation.corporation,
       href: localizeHref(locale, "/about-us"),
     },
-    { label: dictionary.nav.terms, href: localizeHref(locale, "/terms") },
+    { label: navigation.terms, href: localizeHref(locale, "/terms") },
   ]
 
   const languageLabels = {
@@ -95,7 +96,7 @@ function SiteHeader({ locale, dictionary }: SiteHeaderProps) {
             aria-label={t.primaryNav}
             className="hidden items-center gap-1 md:flex"
           >
-            {navigation.map((item) => {
+            {navigationItems.map((item) => {
               const active = isActivePath(pathname, item.href)
 
               return (
@@ -191,7 +192,7 @@ function SiteHeader({ locale, dictionary }: SiteHeaderProps) {
           <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-8">
             <p className="eyebrow">{t.navigate}</p>
             <nav aria-label={t.mobileNav} className="mt-5 flex flex-col">
-              {navigation.map((item, index) => {
+              {navigationItems.map((item, index) => {
                 const active = isActivePath(pathname, item.href)
 
                 return (

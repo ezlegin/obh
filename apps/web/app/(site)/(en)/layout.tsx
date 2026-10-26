@@ -13,7 +13,11 @@ export default function EnglishSiteLayout({
 
   return (
     <div lang="en" dir="ltr" className="flex min-h-dvh flex-col">
-      <SiteHeader locale="en" dictionary={dictionary} />
+      <SiteHeader
+        locale="en"
+        labels={dictionary.header}
+        navigation={dictionary.nav}
+      />
       <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
         {children}
       </main>

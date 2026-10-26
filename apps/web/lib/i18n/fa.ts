@@ -244,6 +244,15 @@ export const fa: Dictionary = {
       primaryCta: "یافتن یک خدمت",
       secondaryCta: "درباره OBH",
     },
+    details: {
+      label: "تماس مستقیم",
+      title: "به‌طور مستقیم با شرکت در تماس باشید.",
+      description:
+        "شماره تلفن، ایمیل و نشانی دفتر ما برای موضوعاتی که باید مستقیماً به OBH برسد، در اینجا آمده است.",
+      phone: "تلفن",
+      email: "ایمیل",
+      address: "نشانی",
+    },
     directory: {
       label: "فهرست خدمات",
       title: "با خدمتی که می‌شناسید شروع کنید.",

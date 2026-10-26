@@ -250,6 +250,15 @@ export const en = {
       primaryCta: "Find a service",
       secondaryCta: "About OBH",
     },
+    details: {
+      label: "Direct contact",
+      title: "Reach the corporation directly.",
+      description:
+        "Our office phone, email, and address are listed here for anything that should come straight to OBH.",
+      phone: "Phone",
+      email: "Email",
+      address: "Address",
+    },
     directory: {
       label: "Service directory",
       title: "Start with the service you know.",

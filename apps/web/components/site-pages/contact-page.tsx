@@ -4,6 +4,9 @@ import {
   Code2,
   Handshake,
   LifeBuoy,
+  Mail,
+  MapPin,
+  Phone,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -19,6 +22,7 @@ import { PageHero } from "@/components/page-hero"
 import { SectionLabel } from "@/components/section-label"
 import { ServiceDirectory } from "@/components/service-directory"
 import { SiteContainer } from "@/components/site-container"
+import { getContactDetails, phoneHref } from "@/lib/contact"
 import type { Dictionary } from "@/lib/i18n"
 import type { Locale } from "@/lib/i18n/config"
 import { localizeHref } from "@/lib/i18n/links"
@@ -32,6 +36,8 @@ const routeIcons = [LifeBuoy, Handshake, Code2] as const
 
 function ContactPage({ locale, dictionary }: ContactPageProps) {
   const t = dictionary.contact
+  const details = getContactDetails()
+  const hasDetails = Boolean(details.phone || details.email || details.address)
 
   return (
     <>
@@ -66,6 +72,81 @@ function ContactPage({ locale, dictionary }: ContactPageProps) {
           </Link>
         </div>
       </PageHero>
+
+      {hasDetails ? (
+        <section
+          aria-labelledby="contact-details"
+          className="border-b border-border"
+        >
+          <SiteContainer className="py-16 sm:py-20">
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+              <div>
+                <p className="eyebrow">{t.details.label}</p>
+                <h2
+                  id="contact-details"
+                  className="mt-4 max-w-2xl text-3xl leading-[1.08] font-semibold tracking-[-0.045em] text-balance sm:text-4xl"
+                >
+                  {t.details.title}
+                </h2>
+              </div>
+              <p className="max-w-sm text-sm leading-6 text-muted-foreground">
+                {t.details.description}
+              </p>
+            </div>
+
+            <dl className="mt-10 grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
+              {details.phone ? (
+                <div className="bg-background p-6 sm:p-7">
+                  <dt className="flex items-center gap-2 font-mono text-[10px] tracking-[0.14em] text-muted-foreground/70 uppercase">
+                    <Phone aria-hidden="true" className="size-3.5" />
+                    {t.details.phone}
+                  </dt>
+                  <dd className="mt-4">
+                    <a
+                      href={phoneHref(details.phone)}
+                      className="inline-flex text-lg font-medium tracking-[-0.01em] text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+                    >
+                      <span dir="ltr">{details.phone}</span>
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+
+              {details.email ? (
+                <div className="bg-background p-6 sm:p-7">
+                  <dt className="flex items-center gap-2 font-mono text-[10px] tracking-[0.14em] text-muted-foreground/70 uppercase">
+                    <Mail aria-hidden="true" className="size-3.5" />
+                    {t.details.email}
+                  </dt>
+                  <dd className="mt-4">
+                    <a
+                      href={`mailto:${details.email}`}
+                      className="inline-flex text-lg font-medium tracking-[-0.01em] text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+                    >
+                      <span dir="ltr">{details.email}</span>
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+
+              {details.address ? (
+                <div className="bg-background p-6 sm:col-span-2 sm:p-7 lg:col-span-1">
+                  <dt className="flex items-center gap-2 font-mono text-[10px] tracking-[0.14em] text-muted-foreground/70 uppercase">
+                    <MapPin aria-hidden="true" className="size-3.5" />
+                    {t.details.address}
+                  </dt>
+                  <dd
+                    dir="auto"
+                    className="mt-4 text-sm leading-7 text-muted-foreground"
+                  >
+                    {details.address}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          </SiteContainer>
+        </section>
+      ) : null}
 
       <section
         id="service-directory"
