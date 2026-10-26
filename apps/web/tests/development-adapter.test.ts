@@ -1,54 +1,116 @@
 import assert from "node:assert/strict"
+import { randomBytes } from "node:crypto"
 import test from "node:test"
 
-import { developmentPaymentAdapter } from "../server/payments/providers/development"
+import {
+  createSadadPaymentRequestSignData,
+  createSadadVerifySignData,
+  decryptSadadSignData,
+  SADAD_PROVIDER_CODE,
+  sadadPaymentAdapter,
+} from "../server/payments/providers/sadad"
 
-test("development adapter creates a TEST-only session with a local checkout", async () => {
-  const session = await developmentPaymentAdapter.createCheckoutSession({
+test("Sadad TripleDES ECB PKCS7 SignData round-trips PaymentRequest and Verify payloads", () => {
+  const terminalKey = randomBytes(24).toString("base64")
+
+  const paymentSign = createSadadPaymentRequestSignData({
+    terminalId: "12345678",
+    orderId: "1001",
+    amount: "150000",
+    terminalKey,
+  })
+
+  assert.equal(
+    decryptSadadSignData(paymentSign, terminalKey),
+    "12345678;1001;150000"
+  )
+
+  const verifySign = createSadadVerifySignData("tok_abc_123", terminalKey)
+  assert.equal(decryptSadadSignData(verifySign, terminalKey), "tok_abc_123")
+})
+
+test("Sadad adapter creates a simulated TEST session with a local Sadad simulator URL", async () => {
+  const session = await sadadPaymentAdapter.createCheckoutSession({
     paymentReference: "OBH-TESTREF",
-    serviceSlug: "test-service",
-    amount: "1000.00",
+    gatewayOrderId: "1001",
+    serviceSlug: "afarin",
+    amount: "150000",
     currency: "IRR",
     description: "Test payment",
-    returnUrl: null,
+    returnUrl: "https://afarinai.ir/payments/return",
+    callbackUrl: "http://localhost:3100/api/v1/sadad/callback",
+    environment: "TEST",
     metadata: {},
   })
 
-  assert.match(session.providerSessionId, /^dev_sess_/)
-  assert.match(session.providerReference, /^dev_ref_/)
-  assert.match(session.checkoutUrl ?? "", /^\/pay\/dev\/dev_sess_/)
-  assert.equal(session.expiresAt.getTime() > Date.now(), true)
-  assert.deepEqual(developmentPaymentAdapter.supportedEnvironments, ["TEST"])
+  assert.match(session.providerSessionId, /^sadad_sim_/)
+  assert.match(session.checkoutUrl ?? "", /^\/pay\/sadad\/sadad_sim_/)
+  assert.equal(session.resultCode, 0)
+  assert.equal(session.simulated, true)
+  assert.deepEqual(sadadPaymentAdapter.supportedEnvironments, ["TEST", "LIVE"])
+  assert.equal(sadadPaymentAdapter.code, SADAD_PROVIDER_CODE)
 })
 
-test("development adapter returns explicit simulated success", async () => {
-  const result = await developmentPaymentAdapter.verifyPayment({
-    providerSessionId: "dev_sess_test",
-    providerReference: "dev_ref_test",
+test("Sadad adapter rejects decimal amounts", async () => {
+  await assert.rejects(
+    () =>
+      sadadPaymentAdapter.createCheckoutSession({
+        paymentReference: "OBH-TESTREF",
+        gatewayOrderId: "1001",
+        serviceSlug: "afarin",
+        amount: "150000.50",
+        currency: "IRR",
+        description: "Decimal Rial test",
+        returnUrl: null,
+        callbackUrl: "http://localhost:3100/api/v1/sadad/callback",
+        environment: "TEST",
+        metadata: {},
+      }),
+    /whole Rial integer/
+  )
+})
+
+test("Sadad adapter returns simulated Verify success with trace and retrieval numbers", async () => {
+  const result = await sadadPaymentAdapter.verifyPayment({
+    providerSessionId: "sadad_sim_test",
+    providerReference: null,
+    gatewayOrderId: "1001",
+    expectedAmount: "150000",
+    environment: "TEST",
     payload: { outcome: "success" },
   })
 
   assert.equal(result.status, "COMPLETED")
-  assert.equal(result.failureReason, null)
+  assert.equal(result.resultCode, 0)
+  assert.ok(result.providerReference)
+  assert.ok(result.traceNumber)
+  assert.equal(result.verifiedAmount, "150000")
+  assert.equal(result.verifiedOrderId, "1001")
   assert.equal(result.metadata.simulated, true)
-  assert.equal(result.metadata.environment, "TEST")
 })
 
-test("development adapter returns explicit simulated failure", async () => {
-  const result = await developmentPaymentAdapter.verifyPayment({
-    providerSessionId: "dev_sess_test",
-    providerReference: "dev_ref_test",
-    payload: { outcome: "failure" },
+test("Sadad adapter returns simulated Verify failure on non-zero ResCode", async () => {
+  const result = await sadadPaymentAdapter.verifyPayment({
+    providerSessionId: "sadad_sim_test",
+    providerReference: null,
+    gatewayOrderId: "1001",
+    expectedAmount: "150000",
+    environment: "TEST",
+    payload: { ResCode: 1002 },
   })
 
   assert.equal(result.status, "FAILED")
-  assert.match(result.failureReason ?? "", /Simulated/)
+  assert.equal(result.resultCode, 1002)
+  assert.ok(result.failureReason)
 })
 
-test("development adapter never assumes success without an explicit outcome", async () => {
-  const result = await developmentPaymentAdapter.verifyPayment({
-    providerSessionId: "dev_sess_test",
-    providerReference: "dev_ref_test",
+test("Sadad adapter never assumes success without a callback or Verify result", async () => {
+  const result = await sadadPaymentAdapter.verifyPayment({
+    providerSessionId: "sadad_sim_test",
+    providerReference: null,
+    gatewayOrderId: "1001",
+    expectedAmount: "150000",
+    environment: "TEST",
     payload: {},
   })
 

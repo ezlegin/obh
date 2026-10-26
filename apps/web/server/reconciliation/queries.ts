@@ -1,6 +1,7 @@
 import "server-only"
 
 import { getDb } from "@/lib/db/client"
+import { ensureSadadGateway } from "@/server/gateways/gateway-service"
 import { calculateProviderBalance } from "@/server/reconciliation/service"
 
 export type ProviderAccountBalanceView = {
@@ -82,6 +83,7 @@ export type ReconciliationWorkspace = {
 }
 
 export async function getReconciliationWorkspace(): Promise<ReconciliationWorkspace> {
+  await ensureSadadGateway()
   const db = getDb()
   const accountRows = await db.financialAccount.findMany({
     where: { kind: "PROVIDER" },

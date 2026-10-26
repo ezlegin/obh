@@ -1,15 +1,15 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Loader2, ShieldAlert } from "lucide-react"
+import { ChevronDown, Loader2, ShieldAlert } from "lucide-react"
 import { useEffect, useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 
-import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { NativeSelect } from "@workspace/ui/components/native-select"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { issueServiceCredentialAction } from "@/app/admin/services/actions"
@@ -21,6 +21,7 @@ const credentialSchema = z.object({
     .trim()
     .min(2, "Label must be at least 2 characters.")
     .max(120),
+  environment: z.enum(["TEST", "LIVE"]),
 })
 
 type CredentialValues = z.infer<typeof credentialSchema>
@@ -54,13 +55,13 @@ function IssueCredentialDialog({
     formState: { errors },
   } = useForm<CredentialValues>({
     resolver: zodResolver(credentialSchema),
-    defaultValues: { label: "Primary test key" },
+    defaultValues: { label: "Primary key", environment: "TEST" },
   })
 
   useEffect(() => {
     if (service) {
       setServerError(null)
-      reset({ label: "Primary test key" })
+      reset({ label: "Primary key", environment: "TEST" })
     }
   }, [service, reset])
 
@@ -75,7 +76,7 @@ function IssueCredentialDialog({
       const result = await issueServiceCredentialAction({
         serviceId: service.id,
         label: values.label,
-        environment: "TEST",
+        environment: values.environment,
       })
 
       if (!result.ok || !result.presentedKey || !result.credential) {
@@ -108,8 +109,10 @@ function IssueCredentialDialog({
             className="mt-0.5 size-4 shrink-0 text-warning"
           />
           <p className="text-xs leading-5 text-muted-foreground">
-            This credential is for the TEST environment. It cannot authorize
-            live payment operations.
+            <code className="font-mono">TEST</code> credentials route to the
+            Sadad simulator; <code className="font-mono">LIVE</code> credentials
+            route to the real Sadad terminal configured in server environment
+            variables.
           </p>
         </div>
       </div>
@@ -123,7 +126,7 @@ function IssueCredentialDialog({
           <Label htmlFor="credential-label">Label</Label>
           <Input
             id="credential-label"
-            placeholder="Primary test key"
+            placeholder="Primary key"
             aria-invalid={Boolean(errors.label)}
             {...register("label")}
           />
@@ -132,9 +135,21 @@ function IssueCredentialDialog({
           ) : null}
         </div>
 
-        <div className="flex items-center justify-between rounded-xl border border-border bg-white/[0.025] px-4 py-3">
-          <span className="text-xs text-muted-foreground">Environment</span>
-          <Badge variant="warning">Test</Badge>
+        <div className="space-y-2">
+          <Label htmlFor="credential-environment">Environment</Label>
+          <div className="relative">
+            <NativeSelect
+              id="credential-environment"
+              {...register("environment")}
+            >
+              <option value="TEST">TEST · Sadad simulator</option>
+              <option value="LIVE">LIVE · Real Sadad IPG</option>
+            </NativeSelect>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-3.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+            />
+          </div>
         </div>
 
         {serverError ? (

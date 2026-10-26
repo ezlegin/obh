@@ -21,9 +21,17 @@ type DeliveryPayload = {
     externalOrderId: string | null
     amount: string
     currency: string
-    environment: "test"
+    environment: "test" | "live"
     status: "completed" | "failed"
     description: string
+    receipt: {
+      orderNumber: string
+      traceNumber: string | null
+      referenceNumber: string | null
+      maskedCardNumber: string | null
+      resultCode: number | null
+      resultMessage: string | null
+    }
     createdAt: string
     completedAt: string | null
     verifiedAt: string | null
@@ -80,11 +88,19 @@ export async function queuePaymentWebhook(paymentId: string) {
       reference: payment.reference,
       service: payment.service.slug,
       externalOrderId: payment.externalOrderId,
-      amount: payment.amount.toFixed(2),
+      amount: payment.amount.toFixed(0),
       currency: payment.currency,
-      environment: "test",
+      environment: payment.environment === "LIVE" ? "live" : "test",
       status: payment.status === "COMPLETED" ? "completed" : "failed",
       description: payment.description,
+      receipt: {
+        orderNumber: String(payment.gatewayOrderId),
+        traceNumber: payment.traceNumber,
+        referenceNumber: payment.providerReference,
+        maskedCardNumber: payment.maskedCardNumber,
+        resultCode: payment.gatewayResultCode,
+        resultMessage: payment.gatewayResultText,
+      },
       createdAt: payment.createdAt.toISOString(),
       completedAt: payment.completedAt?.toISOString() ?? null,
       verifiedAt: payment.verifiedAt?.toISOString() ?? null,

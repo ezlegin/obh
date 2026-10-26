@@ -1,28 +1,24 @@
 import {
-  DEVELOPMENT_PROVIDER_CODE,
-  developmentPaymentAdapter,
-  isDevelopmentProviderEnabled,
-} from "./development"
+  getSadadConfigStatus,
+  isSadadSimulatorEnabled,
+  SADAD_PROVIDER_CODE,
+  SADAD_PROVIDER_NAME,
+  sadadPaymentAdapter,
+} from "./sadad"
 import type { PaymentProviderAdapter, ProviderEnvironmentValue } from "./types"
 
 const adapters = new Map<string, PaymentProviderAdapter>([
-  [developmentPaymentAdapter.code, developmentPaymentAdapter],
+  [sadadPaymentAdapter.code, sadadPaymentAdapter],
 ])
 
 export function getPaymentProviderAdapter(
-  code: string
+  code: string = SADAD_PROVIDER_CODE
 ): PaymentProviderAdapter {
-  if (code === DEVELOPMENT_PROVIDER_CODE && !isDevelopmentProviderEnabled()) {
-    throw new Error(
-      "The development provider is disabled in production. Set OBH_ENABLE_DEVELOPMENT_PROVIDER=true only in an approved test environment."
-    )
-  }
-
   const adapter = adapters.get(code)
 
   if (!adapter) {
     throw new Error(
-      `No server-side adapter is registered for provider ${code}.`
+      `No server-side adapter is registered for provider ${code}. OBH only supports ${SADAD_PROVIDER_CODE}.`
     )
   }
 
@@ -38,5 +34,10 @@ export function providerSupportsEnvironment(
   )
 }
 
-export { DEVELOPMENT_PROVIDER_CODE } from "./development"
-export { isDevelopmentProviderEnabled } from "./development"
+export {
+  getSadadConfigStatus,
+  isSadadSimulatorEnabled,
+  SADAD_PROVIDER_CODE,
+  SADAD_PROVIDER_NAME,
+  sadadPaymentAdapter,
+}

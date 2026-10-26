@@ -6,6 +6,8 @@ export type {
   OBHPaymentsOptions,
   Payment,
   PaymentEnvironment,
+  PaymentReceipt,
   PaymentStatus,
   StartPaymentInput,
+  VerifyReturnInput,
 } from "./types.js"

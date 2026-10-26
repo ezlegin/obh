@@ -1,6 +1,14 @@
 import "server-only"
 
 import { getDb } from "@/lib/db/client"
+import { ensureSadadGateway } from "@/server/gateways/gateway-service"
+import { getSadadCallbackUrl } from "@/server/payments/api-payment-service"
+import {
+  getSadadConfigStatus,
+  SADAD_PROVIDER_CODE,
+  SADAD_PROVIDER_NAME,
+  type SadadConfigStatus,
+} from "@/server/payments/providers/sadad"
 
 export type AdminServiceCredential = {
   id: string
@@ -52,12 +60,31 @@ export type AdminPaymentProvider = {
   paymentCount: number
 }
 
+export type AdminSadadGatewayOverview = {
+  providerId: string
+  code: typeof SADAD_PROVIDER_CODE
+  name: typeof SADAD_PROVIDER_NAME
+  description: string
+  callbackUrl: string
+  config: SadadConfigStatus
+  accounts: AdminProviderAccount[]
+  stats: {
+    totalPayments: number
+    verifiedPayments: number
+    failedPayments: number
+    pendingPayments: number
+    testPayments: number
+    livePayments: number
+  }
+}
+
 export type AdminPaymentStatus =
   "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED" | "EXPIRED"
 
 export type AdminPayment = {
   id: string
   reference: string
+  gatewayOrderId: string
   serviceName: string | null
   serviceDomain: string | null
   externalOrderId: string | null
@@ -70,6 +97,10 @@ export type AdminPayment = {
   providerCode: string | null
   providerAccountName: string | null
   providerReference: string | null
+  traceNumber: string | null
+  maskedCardNumber: string | null
+  gatewayResultCode: number | null
+  gatewayResultText: string | null
   paidAt: string | null
   verifiedAt: string | null
   failedAt: string | null
@@ -128,36 +159,52 @@ export async function getConnectedServicesForAdmin(): Promise<
   }))
 }
 
-export async function getPaymentProvidersForAdmin(): Promise<
-  AdminPaymentProvider[]
-> {
-  const providers = await getDb().paymentProvider.findMany({
-    orderBy: { createdAt: "asc" },
-    include: {
-      accounts: {
-        where: { kind: "PROVIDER" },
-        orderBy: { createdAt: "asc" },
+export async function getSadadGatewayForAdmin(): Promise<AdminSadadGatewayOverview> {
+  const { provider } = await ensureSadadGateway()
+  const db = getDb()
+
+  const [accounts, total, verified, failed, pending, testCount, liveCount] =
+    await Promise.all([
+      db.financialAccount.findMany({
+        where: { providerId: provider.id, kind: "PROVIDER" },
+        orderBy: { environment: "desc" },
         include: {
           provider: { select: { name: true } },
           _count: { select: { payments: true } },
         },
-      },
-      _count: { select: { payments: true } },
-    },
-  })
+      }),
+      db.payment.count({ where: { providerId: provider.id } }),
+      db.payment.count({
+        where: { providerId: provider.id, status: "COMPLETED" },
+      }),
+      db.payment.count({
+        where: { providerId: provider.id, status: "FAILED" },
+      }),
+      db.payment.count({
+        where: { providerId: provider.id, status: "PENDING" },
+      }),
+      db.payment.count({
+        where: { providerId: provider.id, environment: "TEST" },
+      }),
+      db.payment.count({
+        where: { providerId: provider.id, environment: "LIVE" },
+      }),
+    ])
 
-  return providers.map((provider) => ({
-    id: provider.id,
-    code: provider.code,
-    name: provider.name,
-    description: provider.description,
-    isActive: provider.isActive,
-    paymentCount: provider._count.payments,
-    accounts: provider.accounts.map((account) => ({
+  return {
+    providerId: provider.id,
+    code: SADAD_PROVIDER_CODE,
+    name: SADAD_PROVIDER_NAME,
+    description:
+      provider.description ??
+      "Official Sadad (Bank Melli Iran) Internet Payment Gateway.",
+    callbackUrl: getSadadCallbackUrl(),
+    config: getSadadConfigStatus(),
+    accounts: accounts.map((account) => ({
       id: account.id,
       name: account.name,
       providerId: account.providerId,
-      providerName: account.provider?.name ?? null,
+      providerName: account.provider?.name ?? SADAD_PROVIDER_NAME,
       environment: account.environment,
       currency: account.currency,
       externalReference: account.externalReference,
@@ -165,7 +212,15 @@ export async function getPaymentProvidersForAdmin(): Promise<
       paymentCount: account._count.payments,
       createdAt: account.createdAt.toISOString(),
     })),
-  }))
+    stats: {
+      totalPayments: total,
+      verifiedPayments: verified,
+      failedPayments: failed,
+      pendingPayments: pending,
+      testPayments: testCount,
+      livePayments: liveCount,
+    },
+  }
 }
 
 type PaymentRow = Awaited<
@@ -179,10 +234,11 @@ function mapAdminPayment(
   return {
     id: payment.id,
     reference: payment.reference,
+    gatewayOrderId: String(payment.gatewayOrderId),
     serviceName: null,
     serviceDomain: null,
     externalOrderId: payment.externalOrderId,
-    amount: payment.amount.toFixed(2),
+    amount: payment.amount.toFixed(0),
     currency: payment.currency,
     environment: payment.environment,
     status: payment.status,
@@ -191,6 +247,10 @@ function mapAdminPayment(
     providerCode: null,
     providerAccountName: null,
     providerReference: payment.providerReference,
+    traceNumber: payment.traceNumber,
+    maskedCardNumber: payment.maskedCardNumber,
+    gatewayResultCode: payment.gatewayResultCode,
+    gatewayResultText: payment.gatewayResultText,
     paidAt: payment.completedAt?.toISOString() ?? null,
     verifiedAt: payment.verifiedAt?.toISOString() ?? null,
     failedAt: payment.failedAt?.toISOString() ?? null,
@@ -200,6 +260,7 @@ function mapAdminPayment(
 }
 
 export async function getPaymentsForAdmin(): Promise<AdminPayment[]> {
+  await ensureSadadGateway()
   const payments = await getDb().payment.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,
@@ -218,8 +279,8 @@ export async function getPaymentsForAdmin(): Promise<AdminPayment[]> {
       ...base,
       serviceName: payment.service?.name ?? null,
       serviceDomain: payment.service?.domain ?? null,
-      providerName: payment.provider?.name ?? null,
-      providerCode: payment.provider?.code ?? null,
+      providerName: payment.provider?.name ?? SADAD_PROVIDER_NAME,
+      providerCode: payment.provider?.code ?? SADAD_PROVIDER_CODE,
       providerAccountName: payment.providerAccount?.name ?? null,
     }
   })
@@ -233,30 +294,4 @@ export async function getActiveServicesForPayment(): Promise<
     orderBy: { name: "asc" },
     select: { id: true, name: true, domain: true },
   })
-}
-
-export async function getActiveDevelopmentAccountsForPayment(): Promise<
-  Array<{ id: string; name: string; providerName: string }>
-> {
-  const accounts = await getDb().financialAccount.findMany({
-    where: {
-      kind: "PROVIDER",
-      isActive: true,
-      environment: "TEST",
-      provider: {
-        isActive: true,
-        code: "development",
-      },
-    },
-    orderBy: { name: "asc" },
-    include: {
-      provider: { select: { name: true } },
-    },
-  })
-
-  return accounts.map((account) => ({
-    id: account.id,
-    name: account.name,
-    providerName: account.provider?.name ?? "Development Gateway",
-  }))
 }

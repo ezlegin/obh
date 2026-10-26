@@ -2,10 +2,6 @@
 
 Server-side TypeScript SDK for the versioned OBH payment API.
 
-> Status: **not published**. Version `0.1.0` is prepared for an internal review.
-> It has been tested against the local OBH API and development adapter only. It
-> has **not** been tested against a real payment provider.
-
 ## Install
 
 ```bash
@@ -22,28 +18,36 @@ import { OBHPayments, isOBHPaymentsError } from "@obh/payments"
 
 const obh = new OBHPayments({
   secretKey: process.env.OBH_SERVICE_KEY!,
-  baseUrl: "https://pay.obh.example",
+  baseUrl: "https://obhco.ir",
   timeoutMs: 15_000,
 })
 
+// 1. Start a payment on your backend (amount in whole Rials, no decimals)
 const payment = await obh.startPayment({
-  externalOrderId: "IG-8821",
-  amount: "245000000",
+  externalOrderId: "AF-8821",
+  amount: "150000",
   currency: "IRR",
-  description: "Annual design workspace",
-  returnUrl: "https://igraphical.ir/payments/return",
-  metadata: { plan: "annual" },
-  // Reuse this key when retrying this exact request.
-  idempotencyKey: "order-IG-8821-attempt-1",
+  description: "Pro subscription",
+  returnUrl: "https://afarinai.ir/payments/return",
+  metadata: { plan: "pro" },
+  idempotencyKey: "order-AF-8821-attempt-1",
 })
 
 if (payment.checkoutUrl) {
-  // Redirect the customer to the provider checkout.
+  // 2. Redirect the customer's browser to payment.checkoutUrl
 }
 
-const latest = await obh.getPayment(payment.reference)
-if (latest.status === "completed") {
-  // Fulfill the order. Only the server-verified status is proof of payment.
+// 3. When the customer returns to your returnUrl, verify server-to-server:
+const verified = await obh.verifyReturn(request.url, {
+  expectedOrderId: "AF-8821",
+  expectedAmount: "150000",
+})
+
+if (verified.status === "completed") {
+  // Fulfill the order and display receipt fields:
+  // verified.receipt.orderNumber
+  // verified.receipt.traceNumber (SystemTraceNo)
+  // verified.receipt.referenceNumber (RetrivalRefNo)
 }
 ```
 
@@ -58,82 +62,27 @@ if (latest.status === "completed") {
 | `timeoutMs` | `number`       | Optional request timeout, default 15 seconds.            |
 | `fetch`     | `typeof fetch` | Optional custom fetch for tests/proxies.                 |
 
-The constructor rejects execution when `window` is defined and rejects unsafe
-base URLs. Browser-safe constants and types should be imported through a future
-browser entrypoint; currently the package is server-only.
-
 ### `startPayment(input): Promise<Payment>`
 
-Creates a payment through `POST /api/v1/payments`. If `idempotencyKey` is
-omitted, a unique key is generated. Callers should provide and persist a key when
-a request may need to be retried.
-
-The API chooses the configured TEST provider account. Services never choose a
-provider account or provide provider credentials.
+Creates a payment through `POST /api/v1/payments`. `amount` must be a positive
+whole Rial integer string without decimals (e.g. `"150000"`).
 
 ### `getPayment(reference): Promise<Payment>`
 
 Retrieves one payment through `GET /api/v1/payments/{reference}`. A service can
 only retrieve its own payments.
 
-## Statuses
+### `verifyReturn(returnInput, options?): Promise<Payment>`
 
-`pending`, `completed`, `failed`, `cancelled`, `expired`.
+Extracts `obh_reference` from the customer's return URL or query parameters,
+fetches the authoritative server-verified payment from OBH, and optionally
+asserts `expectedOrderId` and `expectedAmount`.
 
-`completed` is terminal and only set after server-side verification. A browser
-redirect is not proof of payment. A `pending` payment may still change; poll with
-backoff or rely on the configured webhook, then retrieve the authoritative status.
+## Receipt fields (`payment.receipt`)
 
-## Errors
-
-All API failures are thrown as `OBHPaymentsError`:
-
-```ts
-try {
-  await obh.startPayment(input)
-} catch (error) {
-  if (isOBHPaymentsError(error)) {
-    console.error(error.code, error.status, error.requestId)
-    if (error.code === "ORDER_CONFLICT") {
-      // The external order already exists with different details.
-    }
-  }
-}
-```
-
-Useful fields: `code`, `status`, `requestId`, `details`, `retryable`.
-Transport failures use `NETWORK_ERROR`; timeouts use `TIMEOUT`; invalid API
-responses use `INVALID_RESPONSE`.
-
-Do not log `secretKey`, webhook signing secrets, or raw provider credentials.
-
-## Webhooks
-
-The SDK does not verify inbound webhooks. Connected services must verify the
-`OBH-Signature` HMAC-SHA256 header with their own per-service webhook signing
-secret over `<timestamp>.<raw body>`, reject stale timestamps, and deduplicate by
-`OBH-Event-Id`. See the repository's `apps/web/PAYMENT_API.md` contract.
-
-## Releasing
-
-See the repository's `RELEASING.md` file. The package is prepared but has not
-been published. Do not publish without explicit approval and npm organization
-access.
-
-## Development
-
-```bash
-pnpm --filter @obh/payments build
-pnpm --filter @obh/payments typecheck
-pnpm --filter @obh/payments test
-pnpm --filter @obh/payments pack --dry-run
-```
-
-The local integration suite lives in `apps/web/tests/sdk-integration.ts` and
-requires a running local OBH API plus its test database.
-
-## Scope
-
-The SDK does not contain provider adapters, provider secrets, database access,
-webhook delivery, or Next.js dependencies. Provider integration remains
-server-side in OBH. No real provider or live payment has been tested.
+- `orderNumber`: Gateway numeric order ID (`OrderId`)
+- `traceNumber`: Transaction tracking number (`SystemTraceNo`)
+- `referenceNumber`: Transaction reference number (`RetrivalRefNo`)
+- `maskedCardNumber`: Masked card number (`PrimaryAccNo`)
+- `resultCode`: Gateway response code (`ResCode`)
+- `resultMessage`: Gateway response description (`Description`)

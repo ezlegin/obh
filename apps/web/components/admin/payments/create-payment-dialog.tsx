@@ -24,17 +24,10 @@ type PaymentServiceOption = {
   domain: string
 }
 
-type PaymentAccountOption = {
-  id: string
-  name: string
-  providerName: string
-}
-
 type CreatePaymentDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   services: PaymentServiceOption[]
-  accounts: PaymentAccountOption[]
   onCreated: () => void
 }
 
@@ -42,7 +35,6 @@ function CreatePaymentDialog({
   open,
   onOpenChange,
   services,
-  accounts,
   onCreated,
 }: CreatePaymentDialogProps) {
   const [serverError, setServerError] = useState<string | null>(null)
@@ -57,7 +49,6 @@ function CreatePaymentDialog({
     resolver: zodResolver(createDevelopmentPaymentSchema),
     defaultValues: {
       serviceId: services[0]?.id ?? "",
-      providerAccountId: accounts[0]?.id ?? "",
       amount: "",
       description: "",
       externalOrderId: "",
@@ -69,13 +60,12 @@ function CreatePaymentDialog({
       setServerError(null)
       reset({
         serviceId: services[0]?.id ?? "",
-        providerAccountId: accounts[0]?.id ?? "",
         amount: "",
         description: "",
         externalOrderId: "",
       })
     }
-  }, [open, services, accounts, reset])
+  }, [open, services, reset])
 
   const onSubmit = (values: CreateDevelopmentPaymentInputForm) => {
     setServerError(null)
@@ -97,8 +87,8 @@ function CreatePaymentDialog({
     <AdminDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Create a development payment"
-      description="This creates a TEST payment record and a simulated provider session. No real gateway is contacted and no real money moves."
+      title="Create a Sadad test payment"
+      description="This creates a TEST payment record on the auto-provisioned Sadad test account and issues a simulated Sadad token."
       className="max-w-2xl"
     >
       <div className="rounded-xl border border-warning/20 bg-warning/[0.045] p-4">
@@ -108,8 +98,8 @@ function CreatePaymentDialog({
             className="mt-0.5 size-4 shrink-0 text-warning"
           />
           <p className="text-xs leading-5 text-muted-foreground">
-            Development adapter only. The payment is stored with environment
-            TEST and is never represented as a live transaction.
+            Sadad simulator (TEST environment). Amounts must be positive whole
+            Rial integers without decimals.
           </p>
         </div>
       </div>
@@ -119,60 +109,33 @@ function CreatePaymentDialog({
         noValidate
         className="mt-5 space-y-5"
       >
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="payment-service">Connected service</Label>
-            <div className="relative">
-              <NativeSelect id="payment-service" {...register("serviceId")}>
-                {services.map((service) => (
-                  <option key={service.id} value={service.id}>
-                    {service.name} · {service.domain}
-                  </option>
-                ))}
-              </NativeSelect>
-              <ChevronDown
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 right-3.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-              />
-            </div>
-            {errors.serviceId ? (
-              <p className="text-xs text-danger">{errors.serviceId.message}</p>
-            ) : null}
+        <div className="space-y-2">
+          <Label htmlFor="payment-service">Connected service</Label>
+          <div className="relative">
+            <NativeSelect id="payment-service" {...register("serviceId")}>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name} · {service.domain}
+                </option>
+              ))}
+            </NativeSelect>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-3.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+            />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="payment-account">Provider account</Label>
-            <div className="relative">
-              <NativeSelect
-                id="payment-account"
-                {...register("providerAccountId")}
-              >
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name} · {account.providerName}
-                  </option>
-                ))}
-              </NativeSelect>
-              <ChevronDown
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 right-3.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-              />
-            </div>
-            {errors.providerAccountId ? (
-              <p className="text-xs text-danger">
-                {errors.providerAccountId.message}
-              </p>
-            ) : null}
-          </div>
+          {errors.serviceId ? (
+            <p className="text-xs text-danger">{errors.serviceId.message}</p>
+          ) : null}
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="payment-amount">Amount (IRR)</Label>
+            <Label htmlFor="payment-amount">Amount (whole Rials, IRR)</Label>
             <Input
               id="payment-amount"
-              inputMode="decimal"
-              placeholder="24500000"
+              inputMode="numeric"
+              placeholder="150000"
               aria-invalid={Boolean(errors.amount)}
               {...register("amount")}
             />
@@ -189,7 +152,7 @@ function CreatePaymentDialog({
               {...register("externalOrderId")}
             />
             <p className="text-[10px] leading-4 text-muted-foreground/60">
-              Optional here. The API will require an external order reference.
+              Optional here. The API requires an external order reference.
             </p>
           </div>
         </div>

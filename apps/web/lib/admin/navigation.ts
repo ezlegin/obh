@@ -50,9 +50,9 @@ export const adminNavigation: AdminNavGroup[] = [
         icon: CreditCard,
       },
       {
-        label: "Gateways",
+        label: "Sadad gateway",
         href: "/admin/gateways",
-        description: "Providers, accounts, fees, and reconciliation.",
+        description: "Sadad (Bank Melli) IPG status, callback URL, and settlement accounts.",
         icon: Landmark,
       },
       {

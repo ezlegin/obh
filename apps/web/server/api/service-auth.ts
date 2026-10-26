@@ -2,6 +2,7 @@ import "server-only"
 
 import { getDb } from "@/lib/db/client"
 import { ApiError } from "@/server/api/errors"
+import { getSadadConfigStatus } from "@/server/payments/providers/registry"
 import { verifyServiceSecret } from "@/server/payments/service-credentials"
 
 export type ServiceAuthContext = {
@@ -92,11 +93,14 @@ export async function authenticateServiceRequest(
     )
   }
 
-  if (credential.environment !== "TEST") {
+  if (
+    credential.environment === "LIVE" &&
+    !getSadadConfigStatus().liveConfigured
+  ) {
     throw new ApiError(
-      403,
+      503,
       "LIVE_NOT_AVAILABLE",
-      "LIVE API access is not enabled until a live provider is approved."
+      "LIVE Sadad gateway credentials are not configured on the server."
     )
   }
 

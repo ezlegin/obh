@@ -181,8 +181,10 @@ model ServiceCredential {
   @@index([serviceId, environment, revokedAt])
 }
 
-/// A payment provider integration. Provider credentials are intentionally not
-/// stored here; they remain server-side environment/secret-manager values.
+/// The payment gateway record. OBH uses exactly one gateway (Sadad, Bank
+/// Melli), provisioned automatically with code `sadad`; it is never created or
+/// edited from the admin panel. Credentials are intentionally not stored here;
+/// they remain server-side environment values.
 model PaymentProvider {
   id          String   @id @default(uuid(7)) @db.Uuid
   code        String   @unique @db.VarChar(80)
@@ -268,11 +270,18 @@ model PaymentMethod {
   @@index([isActive])
 }
 
-/// Authoritative OBH payment record. Provider callbacks and browser redirects
-/// may update this only after server-side verification in a later step.
+/// Authoritative OBH payment record. Gateway callbacks and browser redirects
+/// may update this only after server-side Sadad `Verify`.
+///
+/// Sadad field mapping:
+/// - `gatewayOrderId`    → Sadad `OrderId` (numeric, unique per terminal)
+/// - `providerSessionId` → Sadad payment `Token`
+/// - `providerReference` → Sadad `RetrivalRefNo` (reference number)
+/// - `traceNumber`       → Sadad `SystemTraceNo` (tracking number)
 model Payment {
   id                 String              @id @default(uuid(7)) @db.Uuid
   reference          String              @unique @db.VarChar(48)
+  gatewayOrderId     BigInt              @unique @default(autoincrement())
   serviceId          String?             @db.Uuid
   externalOrderId    String?             @db.VarChar(191)
   idempotencyKey     String?             @db.VarChar(191)
@@ -291,6 +300,11 @@ model Payment {
   returnUrl          String?             @db.Text
   requestFingerprint String?             @db.VarChar(64)
   paymentMethodId    String?             @db.Uuid
+  traceNumber        String?             @db.VarChar(64)
+  maskedCardNumber   String?             @db.VarChar(32)
+  gatewayResultCode  Int?
+  gatewayResultText  String?             @db.Text
+  callbackReceivedAt DateTime?           @db.Timestamptz(3)
   completedAt        DateTime?           @db.Timestamptz(3)
   verifiedAt         DateTime?           @db.Timestamptz(3)
   failedAt           DateTime?           @db.Timestamptz(3)
@@ -315,6 +329,8 @@ model Payment {
   @@index([serviceId, createdAt])
   @@index([providerAccountId, createdAt])
   @@index([providerReference])
+  @@index([providerSessionId])
+  @@index([status, callbackReceivedAt])
 }
 
 /// Every consumed service idempotency key, including keys that replay an

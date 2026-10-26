@@ -27,10 +27,9 @@ export const createPaymentRequestSchema = z
     amount: z
       .string()
       .trim()
-      .regex(/^\d{1,18}(?:\.\d{1,2})?$/, "Enter a valid amount.")
-      .refine(
-        (value) => !/^0+(?:\.0{1,2})?$/.test(value),
-        "Amount must be greater than zero."
+      .regex(
+        /^[1-9]\d{0,17}$/,
+        "Amount must be a positive whole Rial integer without decimals."
       ),
     currency: z.literal("IRR"),
     description: z.string().trim().min(1).max(500),

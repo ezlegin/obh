@@ -5,7 +5,6 @@ import { Badge } from "@workspace/ui/components/badge"
 import { AdminPageHeader } from "@/components/admin/admin-page"
 import { PaymentsManager } from "@/components/admin/payments/payments-manager"
 import {
-  getActiveDevelopmentAccountsForPayment,
   getActiveServicesForPayment,
   getPaymentsForAdmin,
 } from "@/server/payments/queries"
@@ -15,10 +14,9 @@ export const metadata: Metadata = {
 }
 
 export default async function AdminPaymentsPage() {
-  const [payments, services, accounts] = await Promise.all([
+  const [payments, services] = await Promise.all([
     getPaymentsForAdmin(),
     getActiveServicesForPayment(),
-    getActiveDevelopmentAccountsForPayment(),
   ])
 
   return (
@@ -26,14 +24,10 @@ export default async function AdminPaymentsPage() {
       <AdminPageHeader
         eyebrow="Admin / Operations"
         title="Payments"
-        description="Authoritative payment records, lifecycle status, originating service, and provider references. This step supports TEST payments through the development adapter only."
+        description="Authoritative Sadad (Bank Melli) payment records, lifecycle status, originating service, and gateway receipt numbers (OrderId, SystemTraceNo, RetrivalRefNo)."
         actions={<Badge variant="outline">{payments.length} records</Badge>}
       />
-      <PaymentsManager
-        payments={payments}
-        services={services}
-        accounts={accounts}
-      />
+      <PaymentsManager payments={payments} services={services} />
     </>
   )
 }

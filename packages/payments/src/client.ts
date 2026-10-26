@@ -3,8 +3,10 @@ import type {
   APIErrorEnvelope,
   OBHPaymentsOptions,
   Payment,
+  PaymentReceipt,
   PaymentStatus,
   StartPaymentInput,
+  VerifyReturnInput,
 } from "./types.js"
 
 const SDK_VERSION = "0.1.0"
@@ -49,6 +51,26 @@ function normalizeBaseUrl(input: string) {
   return base.endsWith("/api/v1") ? base : `${base}/api/v1`
 }
 
+function isReceipt(value: unknown): value is PaymentReceipt {
+  if (!value || typeof value !== "object") {
+    return false
+  }
+
+  const receipt = value as Partial<PaymentReceipt>
+
+  return (
+    typeof receipt.orderNumber === "string" &&
+    (receipt.traceNumber === null || typeof receipt.traceNumber === "string") &&
+    (receipt.referenceNumber === null ||
+      typeof receipt.referenceNumber === "string") &&
+    (receipt.maskedCardNumber === null ||
+      typeof receipt.maskedCardNumber === "string") &&
+    (receipt.resultCode === null || typeof receipt.resultCode === "number") &&
+    (receipt.resultMessage === null ||
+      typeof receipt.resultMessage === "string")
+  )
+}
+
 function isPayment(value: unknown): value is Payment {
   if (!value || typeof value !== "object") {
     return false
@@ -66,6 +88,7 @@ function isPayment(value: unknown): value is Payment {
     typeof payment.status === "string" &&
     VALID_STATUSES.has(payment.status as PaymentStatus) &&
     typeof payment.description === "string" &&
+    isReceipt(payment.receipt) &&
     typeof payment.createdAt === "string"
   )
 }
@@ -75,11 +98,10 @@ function validateStartInput(input: StartPaymentInput) {
     throw invalidArgument("externalOrderId must be 1–191 characters.")
   }
 
-  if (
-    !/^\d{1,18}(?:\.\d{1,2})?$/.test(input.amount) ||
-    /^0+(?:\.0{1,2})?$/.test(input.amount)
-  ) {
-    throw invalidArgument("amount must be a positive decimal string.")
+  if (!/^[1-9]\d{0,17}$/.test(input.amount)) {
+    throw invalidArgument(
+      "amount must be a positive whole Rial integer string without decimals."
+    )
   }
 
   if (input.currency !== undefined && input.currency !== "IRR") {
@@ -126,6 +148,47 @@ function validateStartInput(input: StartPaymentInput) {
       "idempotencyKey must be 1–191 visible ASCII characters."
     )
   }
+}
+
+function extractReturnReference(input: VerifyReturnInput): string {
+  let raw: string | null | undefined
+
+  if (input instanceof URL) {
+    raw =
+      input.searchParams.get("obh_reference") ??
+      input.searchParams.get("reference")
+  } else if (input instanceof URLSearchParams) {
+    raw = input.get("obh_reference") ?? input.get("reference")
+  } else if (typeof input === "string") {
+    if (input.includes("://")) {
+      try {
+        const url = new URL(input)
+        raw =
+          url.searchParams.get("obh_reference") ??
+          url.searchParams.get("reference")
+      } catch {
+        throw invalidArgument("Return URL could not be parsed.")
+      }
+    } else {
+      const params = new URLSearchParams(
+        input.startsWith("?") ? input.slice(1) : input
+      )
+      raw = params.get("obh_reference") ?? params.get("reference") ?? input
+    }
+  } else if (input && typeof input === "object") {
+    const candidate = input.obh_reference ?? input.reference
+    raw = Array.isArray(candidate) ? candidate[0] : candidate
+  }
+
+  const trimmed = raw?.trim()
+
+  if (!trimmed || !/^OBH-[A-Z0-9]{8,44}$/.test(trimmed)) {
+    throw invalidArgument(
+      "Return parameters do not contain a valid payment reference."
+    )
+  }
+
+  return trimmed
 }
 
 export class OBHPayments {
@@ -202,6 +265,43 @@ export class OBHPayments {
     return this.#request(`/payments/${encodeURIComponent(reference)}`, {
       method: "GET",
     })
+  }
+
+  /**
+   * Parses the customer's return URL or query parameters after the gateway
+   * redirect and retrieves the server-verified payment record from OBH.
+   *
+   * Never trust query string `status` flags directly; always use the returned
+   * `Payment` object (`payment.status === "completed"` and `payment.receipt`).
+   */
+  async verifyReturn(
+    input: VerifyReturnInput,
+    options?: { expectedOrderId?: string; expectedAmount?: string }
+  ): Promise<Payment> {
+    const reference = extractReturnReference(input)
+    const payment = await this.getPayment(reference)
+
+    if (
+      options?.expectedOrderId !== undefined &&
+      payment.externalOrderId !== options.expectedOrderId
+    ) {
+      throw new OBHPaymentsError(
+        "Returned payment does not match the expected external order ID.",
+        { code: "ORDER_MISMATCH" }
+      )
+    }
+
+    if (
+      options?.expectedAmount !== undefined &&
+      payment.amount !== options.expectedAmount
+    ) {
+      throw new OBHPaymentsError(
+        "Returned payment amount does not match the expected amount.",
+        { code: "AMOUNT_MISMATCH" }
+      )
+    }
+
+    return payment
   }
 
   async #request(path: string, init: RequestInit): Promise<Payment> {

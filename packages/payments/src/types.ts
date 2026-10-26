@@ -3,17 +3,38 @@ export type PaymentStatus =
 
 export type PaymentEnvironment = "test" | "live"
 
+/**
+ * Customer-facing receipt and bank reconciliation details populated from
+ * gateway verification (Sadad IPG).
+ */
+export type PaymentReceipt = {
+  /** Unique numeric order ID sent to the payment gateway (`OrderId`). */
+  orderNumber: string
+  /** Transaction tracking number (`SystemTraceNo`). */
+  traceNumber: string | null
+  /** Transaction reference number (`RetrivalRefNo`). */
+  referenceNumber: string | null
+  /** Masked card number (`PrimaryAccNo`). */
+  maskedCardNumber: string | null
+  /** Gateway result code (`ResCode`). */
+  resultCode: number | null
+  /** Gateway result description (`Description`). */
+  resultMessage: string | null
+}
+
 export type Payment = {
   id: string
   reference: string
   service: string
   externalOrderId: string | null
+  /** Whole Rial integer amount (e.g. `"150000"`). */
   amount: string
   currency: string
   environment: PaymentEnvironment
   status: PaymentStatus
   description: string
   checkoutUrl: string | null
+  receipt: PaymentReceipt
   createdAt: string
   completedAt: string | null
   verifiedAt: string | null
@@ -21,6 +42,7 @@ export type Payment = {
 
 export type StartPaymentInput = {
   externalOrderId: string
+  /** Positive whole Rial integer string (no decimals), e.g. `"150000"`. */
   amount: string
   currency?: "IRR"
   description: string
@@ -32,6 +54,9 @@ export type StartPaymentInput = {
    */
   idempotencyKey?: string
 }
+
+export type VerifyReturnInput =
+  URL | string | URLSearchParams | Record<string, string | string[] | undefined>
 
 export type OBHPaymentsOptions = {
   /** Server-side service credential, e.g. svc_test_xxx.yyy. Never expose this. */

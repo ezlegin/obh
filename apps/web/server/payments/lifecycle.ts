@@ -15,6 +15,7 @@ const allowedTransitions: Record<
 export const PAYMENT_EVENT_TYPES = {
   CREATED: "payment.created",
   PROVIDER_SESSION_CREATED: "payment.provider_session_created",
+  CALLBACK_RECEIVED: "payment.callback_received",
   VERIFIED: "payment.verified",
   FAILED: "payment.failed",
   CANCELLED: "payment.cancelled",

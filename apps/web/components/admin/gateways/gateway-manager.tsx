@@ -1,275 +1,41 @@
 "use client"
 
-import { zodResolver } from "@hookform/resolvers/zod"
 import {
+  Check,
+  Copy,
   Landmark,
-  Loader2,
-  Plus,
-  Power,
+  Lock,
+  Server,
   ShieldCheck,
-  TriangleAlert,
+  Terminal,
 } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { useEffect, useState, useTransition } from "react"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
+import { useState } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
-import { Input } from "@workspace/ui/components/input"
-import { Label } from "@workspace/ui/components/label"
 
-import { AdminDialog } from "@/components/admin/admin-dialog"
-import { AdminEmptyState } from "@/components/admin/empty-state"
-import {
-  createProviderAccountAction,
-  enableDevelopmentProviderAction,
-  toggleProviderAccountAction,
-} from "@/app/admin/gateways/actions"
-import type {
-  AdminPaymentProvider,
-  AdminProviderAccount,
-} from "@/server/payments/queries"
 import { formatDevelopmentDate } from "@/lib/admin/format"
-
-const accountSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Name must be at least 2 characters.")
-    .max(160),
-  externalReference: z.string().trim().max(191),
-})
-
-type AccountValues = z.infer<typeof accountSchema>
+import type { AdminSadadGatewayOverview } from "@/server/payments/queries"
 
 type GatewayManagerProps = {
-  providers: AdminPaymentProvider[]
+  gateway: AdminSadadGatewayOverview
 }
 
-function CreateAccountDialog({
-  provider,
-  open,
-  onOpenChange,
-  onCreated,
-}: {
-  provider: AdminPaymentProvider
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onCreated: () => void
-}) {
-  const [serverError, setServerError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+function GatewayManager({ gateway }: GatewayManagerProps) {
+  const [copied, setCopied] = useState(false)
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<AccountValues>({
-    resolver: zodResolver(accountSchema),
-    defaultValues: { name: "", externalReference: "" },
-  })
-
-  useEffect(() => {
-    if (open) {
-      setServerError(null)
-      reset()
+  const copyCallback = async () => {
+    try {
+      await navigator.clipboard.writeText(gateway.callbackUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard write unavailable
     }
-  }, [open, reset])
-
-  const onSubmit = (values: AccountValues) => {
-    setServerError(null)
-
-    startTransition(async () => {
-      const result = await createProviderAccountAction({
-        providerId: provider.id,
-        name: values.name,
-        externalReference: values.externalReference,
-      })
-
-      if (!result.ok) {
-        setServerError(result.error ?? "The account could not be created.")
-        return
-      }
-
-      onOpenChange(false)
-      onCreated()
-    })
   }
 
   return (
-    <AdminDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Add a test provider account"
-      description="This creates an internal OBH account record for the development adapter. It does not connect to a real payment provider or contain real funds."
-    >
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
-        <div className="space-y-2">
-          <Label htmlFor="provider-account-name">Account name</Label>
-          <Input
-            id="provider-account-name"
-            placeholder="Development acquiring account"
-            aria-invalid={Boolean(errors.name)}
-            {...register("name")}
-          />
-          {errors.name ? (
-            <p className="text-xs text-danger">{errors.name.message}</p>
-          ) : null}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="provider-account-reference">Provider reference</Label>
-          <Input
-            id="provider-account-reference"
-            placeholder="Optional external or merchant reference"
-            {...register("externalReference")}
-          />
-        </div>
-
-        <div className="flex items-center justify-between rounded-xl border border-border bg-white/[0.025] px-4 py-3">
-          <span className="text-xs text-muted-foreground">Environment</span>
-          <Badge variant="warning">Test</Badge>
-        </div>
-
-        {serverError ? (
-          <div
-            role="alert"
-            className="rounded-xl border border-danger/20 bg-danger/10 px-3.5 py-3 text-xs leading-5 text-danger"
-          >
-            {serverError}
-          </div>
-        ) : null}
-
-        <div className="flex flex-col-reverse gap-2 border-t border-border pt-5 sm:flex-row sm:justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isPending}>
-            {isPending ? (
-              <>
-                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                Creating…
-              </>
-            ) : (
-              "Create test account"
-            )}
-          </Button>
-        </div>
-      </form>
-    </AdminDialog>
-  )
-}
-
-function ProviderAccountRow({
-  account,
-  pending,
-  onToggle,
-}: {
-  account: AdminProviderAccount
-  pending: boolean
-  onToggle: () => void
-}) {
-  return (
-    <div className="flex flex-col gap-3 border-b border-border p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium">{account.name}</p>
-          <Badge
-            variant={account.environment === "TEST" ? "warning" : "success"}
-          >
-            {account.environment ?? "Unknown"}
-          </Badge>
-          <Badge variant={account.isActive ? "success" : "muted"}>
-            {account.isActive ? "Active" : "Inactive"}
-          </Badge>
-        </div>
-        <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
-          {account.currency} · {account.paymentCount} payments
-          {account.externalReference ? ` · ${account.externalReference}` : ""}
-        </p>
-        <p className="mt-1 text-[9px] text-muted-foreground/45">
-          Created {formatDevelopmentDate(account.createdAt)}
-        </p>
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={onToggle}
-        disabled={pending}
-        className="self-start sm:self-auto"
-      >
-        {pending ? (
-          <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
-        ) : (
-          <Power aria-hidden="true" className="size-3.5" />
-        )}
-        {account.isActive ? "Deactivate" : "Activate"}
-      </Button>
-    </div>
-  )
-}
-
-function GatewayManager({ providers }: GatewayManagerProps) {
-  const router = useRouter()
-  const [error, setError] = useState<string | null>(null)
-  const [isEnabling, startEnabling] = useTransition()
-  const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false)
-  const [pendingAccount, setPendingAccount] = useState<string | null>(null)
-
-  const developmentProvider = providers.find(
-    (provider) => provider.code === "development"
-  )
-
-  const refresh = () => router.refresh()
-
-  const enableProvider = () => {
-    setError(null)
-    startEnabling(async () => {
-      const result = await enableDevelopmentProviderAction()
-      if (!result.ok) {
-        setError(result.error ?? "The provider could not be enabled.")
-        return
-      }
-      refresh()
-    })
-  }
-
-  const toggleAccount = async (account: AdminProviderAccount) => {
-    setPendingAccount(account.id)
-    setError(null)
-
-    const result = await toggleProviderAccountAction({
-      accountId: account.id,
-      isActive: !account.isActive,
-    })
-
-    if (!result.ok) {
-      setError(result.error ?? "The account status could not be changed.")
-    } else {
-      refresh()
-    }
-
-    setPendingAccount(null)
-  }
-
-  return (
-    <>
-      {error ? (
-        <div
-          role="alert"
-          className="mt-6 rounded-xl border border-danger/20 bg-danger/10 px-4 py-3 text-xs leading-5 text-danger"
-        >
-          {error}
-        </div>
-      ) : null}
-
+    <div className="space-y-6">
       <div className="mt-8 rounded-2xl border border-border bg-card/40 p-4 sm:p-5">
         <div className="flex items-start gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-info/20 bg-info/10 text-info">
@@ -277,116 +43,270 @@ function GatewayManager({ providers }: GatewayManagerProps) {
           </span>
           <div>
             <p className="text-xs font-medium">
-              Provider secrets stay outside the database
+              Single gateway architecture · Server-side credentials only
             </p>
             <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-              Only the development adapter is available in this step. Real
-              provider credentials must remain in server-side environment or
-              secret-manager configuration; they are never entered into OBH
-              admin records.
+              OBH routes all connected service payments exclusively through{" "}
+              <span className="text-foreground">{gateway.name}</span>. Gateway
+              records cannot be added, edited, or deleted from the admin panel,
+              and <code className="font-mono">SADAD_TERMINAL_KEY</code> never
+              leaves server environment configuration.
             </p>
           </div>
         </div>
       </div>
 
-      {!developmentProvider ? (
-        <div className="mt-4 rounded-2xl border border-warning/20 bg-warning/[0.035]">
-          <AdminEmptyState
-            icon={TriangleAlert}
-            title="No gateway provider is enabled"
-            description="Enable the local development gateway to create test provider accounts and exercise payment lifecycles. No real payment network is contacted."
-            action={
-              <Button
-                type="button"
-                onClick={enableProvider}
-                disabled={isEnabling}
-              >
-                {isEnabling ? (
-                  <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                ) : (
-                  <Plus aria-hidden="true" className="size-4" />
-                )}
-                Enable development gateway
-              </Button>
-            }
-          />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-border bg-card/40 p-5">
+          <p className="font-mono text-[9px] tracking-[0.14em] text-muted-foreground/60 uppercase">
+            Total payments
+          </p>
+          <p className="mt-2 text-2xl font-medium tabular-nums">
+            {gateway.stats.totalPayments}
+          </p>
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+            {gateway.stats.livePayments} LIVE · {gateway.stats.testPayments}{" "}
+            TEST
+          </p>
         </div>
-      ) : (
-        <>
-          <div className="mt-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-            <div>
-              <p className="font-mono text-[9px] tracking-[0.14em] text-muted-foreground/60 uppercase">
-                Providers
-              </p>
-              <h2 className="mt-2 text-xl font-medium tracking-[-0.025em]">
-                {developmentProvider.name}
-              </h2>
+
+        <div className="rounded-2xl border border-border bg-card/40 p-5">
+          <p className="font-mono text-[9px] tracking-[0.14em] text-muted-foreground/60 uppercase">
+            Verified (ResCode 0)
+          </p>
+          <p className="mt-2 text-2xl font-medium text-success tabular-nums">
+            {gateway.stats.verifiedPayments}
+          </p>
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+            Confirmed via Advice/Verify
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card/40 p-5">
+          <p className="font-mono text-[9px] tracking-[0.14em] text-muted-foreground/60 uppercase">
+            Failed / Rejected
+          </p>
+          <p className="mt-2 text-2xl font-medium text-danger tabular-nums">
+            {gateway.stats.failedPayments}
+          </p>
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+            Non-zero callback or Verify
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card/40 p-5">
+          <p className="font-mono text-[9px] tracking-[0.14em] text-muted-foreground/60 uppercase">
+            Pending verification
+          </p>
+          <p className="mt-2 text-2xl font-medium text-warning tabular-nums">
+            {gateway.stats.pendingPayments}
+          </p>
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+            15-minute Sadad Verify window
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-card/40">
+          <div className="flex items-center justify-between border-b border-border p-5">
+            <div className="flex items-center gap-2.5">
+              <Terminal
+                aria-hidden="true"
+                className="size-4 text-muted-foreground"
+              />
+              <div>
+                <p className="text-sm font-medium">
+                  Terminal &amp; environment configuration
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Read from server environment variables.
+                </p>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="warning">Development adapter · TEST</Badge>
+            <Badge
+              variant={gateway.config.liveConfigured ? "success" : "warning"}
+            >
+              {gateway.config.liveConfigured ? "Ready for LIVE" : "TEST only"}
+            </Badge>
+          </div>
+
+          <div className="divide-y divide-border text-xs">
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <span className="text-muted-foreground">
+                MerchantId (<code className="font-mono">SADAD_MERCHANT_ID</code>
+                )
+              </span>
+              <span className="font-mono">
+                {gateway.config.merchantIdMasked ?? "Not set"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <span className="text-muted-foreground">
+                TerminalId (<code className="font-mono">SADAD_TERMINAL_ID</code>
+                )
+              </span>
+              <span className="font-mono">
+                {gateway.config.terminalIdMasked ?? "Not set"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <span className="text-muted-foreground">
+                3DES TerminalKey (
+                <code className="font-mono">SADAD_TERMINAL_KEY</code>)
+              </span>
               <Badge
-                variant={developmentProvider.isActive ? "success" : "muted"}
+                variant={
+                  gateway.config.terminalKeyConfigured ? "success" : "muted"
+                }
               >
-                {developmentProvider.isActive ? "Active" : "Inactive"}
+                <Lock aria-hidden="true" className="mr-1 size-3" />
+                {gateway.config.terminalKeyConfigured
+                  ? "Valid Base64 key"
+                  : "Not configured"}
+              </Badge>
+            </div>
+
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <span className="text-muted-foreground">
+                Local TEST simulator (
+                <code className="font-mono">OBH_SADAD_SIMULATOR</code>)
+              </span>
+              <Badge
+                variant={gateway.config.simulatorEnabled ? "warning" : "muted"}
+              >
+                {gateway.config.simulatorEnabled ? "Enabled" : "Disabled"}
               </Badge>
             </div>
           </div>
+        </div>
 
-          <div className="mt-4 rounded-2xl border border-border bg-card/40">
-            <div className="flex flex-col justify-between gap-3 border-b border-border p-5 sm:flex-row sm:items-center">
+        <div className="rounded-2xl border border-border bg-card/40">
+          <div className="flex items-center justify-between border-b border-border p-5">
+            <div className="flex items-center gap-2.5">
+              <Server
+                aria-hidden="true"
+                className="size-4 text-muted-foreground"
+              />
               <div>
-                <p className="text-sm font-medium">Provider accounts</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Internal account records for TEST payments only.
+                <p className="text-sm font-medium">
+                  Sadad IPG endpoints &amp; callback URL
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Register this ReturnUrl and server IP with Sadad.
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsAccountDialogOpen(true)}
-              >
-                <Plus aria-hidden="true" className="size-3.5" />
-                Add test account
-              </Button>
             </div>
-
-            {developmentProvider.accounts.length === 0 ? (
-              <AdminEmptyState
-                icon={Landmark}
-                title="No provider account yet"
-                description="Create a TEST provider account before initiating a development payment."
-                className="py-12"
-              />
-            ) : (
-              <div>
-                {developmentProvider.accounts.map((account) => (
-                  <ProviderAccountRow
-                    key={account.id}
-                    account={account}
-                    pending={pendingAccount === account.id}
-                    onToggle={() => toggleAccount(account)}
-                  />
-                ))}
-              </div>
-            )}
+            <Badge variant="outline">v1.10</Badge>
           </div>
 
-          <p className="mt-4 text-[10px] leading-5 text-muted-foreground/55">
-            Provider balances, settlements, fees, and reconciliation are modeled
-            in the database but their management workflows will be implemented
-            in a later gateway step.
-          </p>
+          <div className="divide-y divide-border text-xs">
+            <div className="px-5 py-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">
+                  OBH callback URL (<code className="font-mono">ReturnUrl</code>
+                  )
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={copyCallback}
+                >
+                  {copied ? (
+                    <>
+                      <Check aria-hidden="true" className="size-3" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy aria-hidden="true" className="size-3" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+              </div>
+              <p className="mt-1.5 break-all font-mono text-[11px] text-foreground">
+                {gateway.callbackUrl}
+              </p>
+            </div>
 
-          <CreateAccountDialog
-            provider={developmentProvider}
-            open={isAccountDialogOpen}
-            onOpenChange={setIsAccountDialogOpen}
-            onCreated={refresh}
-          />
-        </>
-      )}
-    </>
+            <div className="px-5 py-3.5">
+              <span className="text-muted-foreground">PaymentRequest API</span>
+              <p className="mt-1 break-all font-mono text-[11px] text-muted-foreground">
+                {gateway.config.requestEndpoint}
+              </p>
+            </div>
+
+            <div className="px-5 py-3.5">
+              <span className="text-muted-foreground">Hosted payment page</span>
+              <p className="mt-1 break-all font-mono text-[11px] text-muted-foreground">
+                {gateway.config.purchaseEndpoint}
+              </p>
+            </div>
+
+            <div className="px-5 py-3.5">
+              <span className="text-muted-foreground">Advice/Verify API</span>
+              <p className="mt-1 break-all font-mono text-[11px] text-muted-foreground">
+                {gateway.config.verifyEndpoint}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card/40">
+        <div className="flex flex-col justify-between gap-3 border-b border-border p-5 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2.5">
+            <Landmark
+              aria-hidden="true"
+              className="size-4 text-muted-foreground"
+            />
+            <div>
+              <p className="text-sm font-medium">
+                Provisioned settlement accounts
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Automatically managed ledger accounts for Sadad LIVE and TEST
+                payments.
+              </p>
+            </div>
+          </div>
+          <Badge variant="outline">{gateway.accounts.length} accounts</Badge>
+        </div>
+
+        <div className="divide-y divide-border">
+          {gateway.accounts.map((account) => (
+            <div
+              key={account.id}
+              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium">{account.name}</p>
+                  <Badge
+                    variant={
+                      account.environment === "TEST" ? "warning" : "success"
+                    }
+                  >
+                    {account.environment ?? "Unknown"}
+                  </Badge>
+                  <Badge variant="success">Auto-provisioned</Badge>
+                </div>
+                <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
+                  {account.currency} · {account.paymentCount} payments
+                </p>
+                <p className="mt-1 text-[9px] text-muted-foreground/45">
+                  Created {formatDevelopmentDate(account.createdAt)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 

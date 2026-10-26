@@ -10,14 +10,16 @@ import type {
   SimulateDevelopmentResultInput,
 } from "@/lib/validation/payment-platform"
 import { DomainError } from "@/server/errors"
+import { getSadadAccountForEnvironment } from "@/server/gateways/gateway-service"
+import { getSadadCallbackUrl } from "@/server/payments/api-payment-service"
 import {
   assertPaymentTransition,
   PAYMENT_EVENT_TYPES,
   type PaymentLifecycleStatus,
 } from "@/server/payments/lifecycle"
 import {
-  DEVELOPMENT_PROVIDER_CODE,
   getPaymentProviderAdapter,
+  SADAD_PROVIDER_CODE,
 } from "@/server/payments/providers/registry"
 import { queuePaymentWebhook } from "@/server/payments/webhook-service"
 
@@ -44,20 +46,14 @@ export async function createDevelopmentPayment(
   const db = getDb()
   const { values } = input
 
-  const amount = new Prisma.Decimal(values.amount)
-
-  if (!amount.isPositive()) {
-    throw new DomainError("INVALID_AMOUNT", "Amount must be greater than zero.")
-  }
-
-  const decimalPlaces = values.amount.split(".")[1]?.length ?? 0
-
-  if (values.amount.includes(".") && decimalPlaces > 2) {
+  if (!/^[1-9]\d{0,17}$/.test(values.amount)) {
     throw new DomainError(
       "INVALID_AMOUNT",
-      "Amount cannot have more than two decimal places."
+      "Amount must be a positive whole Rial integer without decimals."
     )
   }
+
+  const amount = new Prisma.Decimal(values.amount)
 
   if (input.idempotencyKey) {
     const existing = await db.payment.findFirst({
@@ -98,24 +94,8 @@ export async function createDevelopmentPayment(
     )
   }
 
-  const providerAccount = await db.financialAccount.findUnique({
-    where: { id: values.providerAccountId },
-    include: { provider: true },
-  })
-
-  if (
-    !providerAccount ||
-    !providerAccount.isActive ||
-    providerAccount.kind !== "PROVIDER" ||
-    providerAccount.environment !== "TEST" ||
-    !providerAccount.provider?.isActive ||
-    providerAccount.provider.code !== DEVELOPMENT_PROVIDER_CODE
-  ) {
-    throw new DomainError(
-      "PROVIDER_UNAVAILABLE",
-      "Select an active development provider account."
-    )
-  }
+  const { provider, account: providerAccount } =
+    await getSadadAccountForEnvironment("TEST")
 
   const existingOrder = await db.payment.findFirst({
     where: {
@@ -133,7 +113,7 @@ export async function createDevelopmentPayment(
   }
 
   const reference = createPaymentReference()
-  const externalOrderId = values.externalOrderId || `DEV-${reference}`
+  const externalOrderId = values.externalOrderId || `TEST-${reference}`
 
   let payment: Payment
   try {
@@ -150,10 +130,10 @@ export async function createDevelopmentPayment(
           status: "PENDING",
           description: values.description,
           metadata: {
-            development: true,
+            simulated: true,
             createdBy: "admin",
           },
-          providerId: providerAccount.provider?.id,
+          providerId: provider.id,
           providerAccountId: providerAccount.id,
         },
       })
@@ -164,22 +144,26 @@ export async function createDevelopmentPayment(
           type: PAYMENT_EVENT_TYPES.CREATED,
           source: "MANAGER",
           newStatus: "PENDING",
-          message: "Development payment created for local testing.",
-          metadata: { simulated: true },
+          message: "Sadad test payment created from admin console.",
+          metadata: {
+            simulated: true,
+            gatewayOrderId: String(created.gatewayOrderId),
+          },
         },
       })
 
       await tx.auditLog.create({
         data: {
           actorId: input.actorId,
-          action: "payment.development_created",
+          action: "payment.sadad_test_created",
           entityType: "Payment",
           entityId: created.id,
           after: {
             reference: created.reference,
+            gatewayOrderId: String(created.gatewayOrderId),
             serviceId: service.id,
             providerAccountId: providerAccount.id,
-            amount: amount.toFixed(2),
+            amount: amount.toFixed(0),
             status: "PENDING",
             environment: "TEST",
           },
@@ -203,14 +187,17 @@ export async function createDevelopmentPayment(
   }
 
   try {
-    const adapter = getPaymentProviderAdapter(providerAccount.provider.code)
+    const adapter = getPaymentProviderAdapter(SADAD_PROVIDER_CODE)
     const session = await adapter.createCheckoutSession({
       paymentReference: payment.reference,
+      gatewayOrderId: String(payment.gatewayOrderId),
       serviceSlug: service.slug,
-      amount: amount.toFixed(2),
+      amount: amount.toFixed(0),
       currency: "IRR",
       description: payment.description,
       returnUrl: null,
+      callbackUrl: getSadadCallbackUrl(),
+      environment: "TEST",
       metadata: { simulated: true },
     })
 
@@ -225,6 +212,8 @@ export async function createDevelopmentPayment(
           providerSessionId: session.providerSessionId,
           providerReference: session.providerReference,
           checkoutUrl,
+          gatewayResultCode: session.resultCode,
+          gatewayResultText: session.resultMessage,
         },
       })
 
@@ -235,10 +224,9 @@ export async function createDevelopmentPayment(
           source: "SYSTEM",
           previousStatus: "PENDING",
           newStatus: "PENDING",
-          message:
-            "Development provider session created. No real provider was contacted.",
+          message: "Sadad test session token created.",
           metadata: {
-            simulated: true,
+            simulated: session.simulated,
             providerSessionId: session.providerSessionId,
           },
         },
@@ -267,16 +255,16 @@ export async function createDevelopmentPayment(
           source: "SYSTEM",
           previousStatus: "PENDING",
           newStatus: "FAILED",
-          message: "Development provider session could not be created.",
+          message: "Sadad test session could not be created.",
           metadata: { simulated: true },
         },
       })
     })
 
-    await queuePaymentWebhook(payment.id).catch((error) => {
+    await queuePaymentWebhook(payment.id).catch((webhookError) => {
       console.error(
         "Webhook notification could not be delivered.",
-        error instanceof Error ? error.name : "Unknown error"
+        webhookError instanceof Error ? webhookError.name : "Unknown error"
       )
     })
 
@@ -284,7 +272,7 @@ export async function createDevelopmentPayment(
       "PROVIDER_SESSION_FAILED",
       error instanceof Error
         ? error.message
-        : "The development provider session could not be created."
+        : "The Sadad test session could not be created."
     )
   }
 
@@ -311,13 +299,10 @@ export async function simulateDevelopmentPaymentResult(
     throw new DomainError("PAYMENT_NOT_FOUND", "Payment was not found.")
   }
 
-  if (
-    payment.environment !== "TEST" ||
-    payment.provider?.code !== DEVELOPMENT_PROVIDER_CODE
-  ) {
+  if (payment.environment !== "TEST") {
     throw new DomainError(
       "LIVE_PAYMENT_PROTECTED",
-      "Only development test payments can be simulated."
+      "Only TEST environment payments can be simulated."
     )
   }
 
@@ -328,17 +313,20 @@ export async function simulateDevelopmentPaymentResult(
     )
   }
 
-  const adapter = getPaymentProviderAdapter(payment.provider.code)
+  const adapter = getPaymentProviderAdapter(SADAD_PROVIDER_CODE)
   const verification = await adapter.verifyPayment({
     providerSessionId: payment.providerSessionId,
     providerReference: payment.providerReference,
+    gatewayOrderId: String(payment.gatewayOrderId),
+    expectedAmount: payment.amount.toFixed(0),
+    environment: "TEST",
     payload: { outcome: values.outcome },
   })
 
   if (verification.status === "PENDING") {
     throw new DomainError(
       "VERIFICATION_PENDING",
-      "The development adapter did not return a terminal result."
+      "The Sadad test simulator did not return a terminal result."
     )
   }
 
@@ -357,6 +345,12 @@ export async function simulateDevelopmentPaymentResult(
       where: { id: payment.id, status: "PENDING" },
       data: {
         status: targetStatus,
+        providerReference: verification.providerReference,
+        traceNumber: verification.traceNumber,
+        maskedCardNumber: verification.maskedCardNumber,
+        gatewayResultCode: verification.resultCode,
+        gatewayResultText: verification.resultMessage,
+        callbackReceivedAt: now,
         verifiedAt: now,
         completedAt: targetStatus === "COMPLETED" ? now : null,
         failedAt: targetStatus === "FAILED" ? now : null,
@@ -374,7 +368,7 @@ export async function simulateDevelopmentPaymentResult(
       data: {
         paymentId: payment.id,
         status: targetStatus === "COMPLETED" ? "VERIFIED" : "FAILED",
-        method: "development-adapter/simulated",
+        method: "sadad/simulated",
         providerReference: verification.providerReference,
         verifiedAt: now,
         failureReason: verification.failureReason,
@@ -394,11 +388,14 @@ export async function simulateDevelopmentPaymentResult(
         newStatus: targetStatus,
         message:
           targetStatus === "COMPLETED"
-            ? "Simulated development verification succeeded."
-            : "Simulated development verification failed.",
+            ? "Simulated Sadad Verify succeeded."
+            : "Simulated Sadad Verify failed.",
         metadata: {
           simulated: true,
           outcome: values.outcome,
+          resCode: verification.resultCode,
+          retrievalRefNo: verification.providerReference,
+          systemTraceNo: verification.traceNumber,
         },
       },
     })
@@ -406,7 +403,7 @@ export async function simulateDevelopmentPaymentResult(
     await tx.auditLog.create({
       data: {
         actorId,
-        action: "payment.development_result_simulated",
+        action: "payment.sadad_result_simulated",
         entityType: "Payment",
         entityId: payment.id,
         before: { status: "PENDING" },
@@ -414,6 +411,7 @@ export async function simulateDevelopmentPaymentResult(
           status: targetStatus,
           simulated: true,
           environment: "TEST",
+          resCode: verification.resultCode,
         },
       },
     })

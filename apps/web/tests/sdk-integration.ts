@@ -110,13 +110,21 @@ function verifySignature(webhook: ReceivedWebhook) {
 
 async function completeCheckout(
   checkoutUrl: string,
+  orderNumber: string,
   outcome: "success" | "failure"
 ) {
-  const response = await fetch(`${checkoutUrl}/complete`, {
+  const token = checkoutUrl.split("/").pop() ?? ""
+  const response = await fetch(`${baseUrl}/api/v1/sadad/callback`, {
     method: "POST",
     redirect: "manual",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ outcome }),
+    body: new URLSearchParams({
+      OrderId: orderNumber,
+      Token: token,
+      ResCode: outcome === "success" ? "0" : "1002",
+      SwitchResCode: outcome === "success" ? "0" : "-1",
+      PrimaryAccNo: "603799******1234",
+    }),
   })
 
   assert.equal(response.status, 303)
@@ -138,12 +146,12 @@ async function expectSdkError(
 
 try {
   const provider = await db.paymentProvider.upsert({
-    where: { code: "development" },
+    where: { code: "sadad" },
     update: { isActive: true },
     create: {
-      code: "development",
-      name: "Development Gateway",
-      description: "Local integration test adapter.",
+      code: "sadad",
+      name: "Sadad (Bank Melli Iran)",
+      description: "Official Sadad IPG.",
       isActive: true,
     },
   })
@@ -249,7 +257,7 @@ try {
   assert.equal(payment.service, alphaSlug)
   assert.match(
     payment.checkoutUrl ?? "",
-    /^http:\/\/localhost:3100\/pay\/dev\/dev_sess_/
+    /^http:\/\/localhost:3100\/pay\/sadad\/sadad_sim_/
   )
 
   const retrieved = await alphaSdk.getPayment(payment.reference)
@@ -329,11 +337,17 @@ try {
   )
 
   assert.ok(payment.checkoutUrl)
-  await completeCheckout(payment.checkoutUrl, "success")
+  await completeCheckout(
+    payment.checkoutUrl,
+    payment.receipt.orderNumber,
+    "success"
+  )
 
   const completed = await alphaSdk.getPayment(payment.reference)
   assert.equal(completed.status, "completed")
   assert.ok(completed.verifiedAt)
+  assert.ok(completed.receipt.traceNumber)
+  assert.ok(completed.receipt.referenceNumber)
 
   const webhook = await waitFor(() =>
     received.find((item) => item.body.includes(payment.reference))
@@ -365,7 +379,11 @@ try {
   })
 
   assert.ok(failedPayment.checkoutUrl)
-  await completeCheckout(failedPayment.checkoutUrl, "failure")
+  await completeCheckout(
+    failedPayment.checkoutUrl,
+    failedPayment.receipt.orderNumber,
+    "failure"
+  )
 
   const failed = await alphaSdk.getPayment(failedPayment.reference)
   assert.equal(failed.status, "failed")

@@ -69,7 +69,7 @@ export const issueServiceCredentialSchema = z.object({
     .trim()
     .min(2, "Label must be at least 2 characters.")
     .max(120),
-  environment: z.literal("TEST"),
+  environment: z.enum(["TEST", "LIVE"]),
 })
 
 export const toggleConnectedServiceSchema = z.object({
@@ -85,31 +85,14 @@ export const rotateWebhookSecretSchema = z.object({
   serviceId: z.string().uuid(),
 })
 
-export const createProviderAccountSchema = z.object({
-  providerId: z.string().uuid(),
-  name: z
-    .string()
-    .trim()
-    .min(2, "Name must be at least 2 characters.")
-    .max(160),
-  externalReference: z.string().trim().max(191).optional().or(z.literal("")),
-})
-
-export const toggleProviderAccountSchema = z.object({
-  accountId: z.string().uuid(),
-  isActive: z.boolean(),
-})
-
 export const createDevelopmentPaymentSchema = z.object({
   serviceId: z.string().uuid(),
-  providerAccountId: z.string().uuid(),
   amount: z
     .string()
     .trim()
-    .regex(/^\d{1,18}(?:\.\d{1,2})?$/, "Enter a valid IRR amount.")
-    .refine(
-      (value) => !/^0+(?:\.0{1,2})?$/.test(value),
-      "Amount must be greater than zero."
+    .regex(
+      /^[1-9]\d{0,17}$/,
+      "Enter a positive whole Rial integer without decimals."
     ),
   description: z
     .string()
@@ -129,9 +112,6 @@ export type CreateConnectedServiceInput = z.infer<
 >
 export type IssueServiceCredentialInput = z.infer<
   typeof issueServiceCredentialSchema
->
-export type CreateProviderAccountInput = z.infer<
-  typeof createProviderAccountSchema
 >
 export type CreateDevelopmentPaymentInputForm = z.infer<
   typeof createDevelopmentPaymentSchema

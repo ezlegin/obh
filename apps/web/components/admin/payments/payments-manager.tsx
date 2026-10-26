@@ -3,7 +3,7 @@
 import {
   ArrowUpRight,
   CreditCard,
-  FlaskConical,
+  Landmark,
   Plus,
   Search,
   SearchX,
@@ -14,18 +14,16 @@ import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
-import { Button } from "@workspace/ui/components/button"
-import { buttonVariants } from "@workspace/ui/components/button"
+import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
-import { cn } from "@workspace/ui/lib/utils"
 
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table"
 import { AdminEmptyState } from "@/components/admin/empty-state"
 import { CreatePaymentDialog } from "@/components/admin/payments/create-payment-dialog"
 import { PaymentStatusBadge } from "@/components/admin/payments/payment-status-badge"
 import { SimulateResultDialog } from "@/components/admin/payments/simulate-result-dialog"
-import type { AdminPayment } from "@/server/payments/queries"
 import { formatDevelopmentDate, formatIrrDecimal } from "@/lib/admin/format"
+import type { AdminPayment } from "@/server/payments/queries"
 
 type PaymentServiceOption = {
   id: string
@@ -33,23 +31,12 @@ type PaymentServiceOption = {
   domain: string
 }
 
-type PaymentAccountOption = {
-  id: string
-  name: string
-  providerName: string
-}
-
 type PaymentsManagerProps = {
   payments: AdminPayment[]
   services: PaymentServiceOption[]
-  accounts: PaymentAccountOption[]
 }
 
-function PaymentsManager({
-  payments,
-  services,
-  accounts,
-}: PaymentsManagerProps) {
+function PaymentsManager({ payments, services }: PaymentsManagerProps) {
   const router = useRouter()
   const [search, setSearch] = useState("")
   const [createOpen, setCreateOpen] = useState(false)
@@ -57,7 +44,7 @@ function PaymentsManager({
     null
   )
 
-  const canCreate = services.length > 0 && accounts.length > 0
+  const canCreate = services.length > 0
 
   const filteredPayments = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -69,10 +56,12 @@ function PaymentsManager({
     return payments.filter((payment) =>
       [
         payment.reference,
+        payment.gatewayOrderId,
         payment.description,
         payment.serviceName,
         payment.externalOrderId,
         payment.providerReference,
+        payment.traceNumber,
       ]
         .filter(Boolean)
         .join(" ")
@@ -101,23 +90,24 @@ function PaymentsManager({
           <p className="mt-1 max-w-64 truncate text-[11px] text-muted-foreground">
             {payment.description}
           </p>
-          {payment.externalOrderId ? (
-            <p className="mt-1 max-w-64 truncate font-mono text-[9px] text-muted-foreground/50">
-              {payment.externalOrderId}
-            </p>
-          ) : null}
+          <p className="mt-1 max-w-64 truncate font-mono text-[9px] text-muted-foreground/55">
+            Sadad OrderId: {payment.gatewayOrderId}
+            {payment.externalOrderId ? ` · ${payment.externalOrderId}` : ""}
+          </p>
         </div>
       ),
     },
     {
       id: "service",
-      header: "Service",
+      header: "Service & Receipt",
       sortValue: (payment) => payment.serviceName ?? "",
       cell: (payment) => (
         <div>
           <p className="text-xs">{payment.serviceName ?? "—"}</p>
-          <p className="mt-1 text-[10px] text-muted-foreground">
-            {payment.providerName ?? "No provider"}
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+            {payment.traceNumber
+              ? `Trace ${payment.traceNumber} · Ref ${payment.providerReference ?? "—"}`
+              : (payment.providerName ?? "Sadad (Bank Melli)")}
           </p>
         </div>
       ),
@@ -154,9 +144,7 @@ function PaymentsManager({
       header: "",
       align: "right",
       cell: (payment) =>
-        payment.status === "PENDING" &&
-        payment.environment === "TEST" &&
-        payment.providerCode === "development" ? (
+        payment.status === "PENDING" && payment.environment === "TEST" ? (
           <Button
             type="button"
             variant="outline"
@@ -175,20 +163,24 @@ function PaymentsManager({
 
   return (
     <>
-      <div className="mt-8 rounded-2xl border border-warning/20 bg-warning/[0.04] p-4 sm:p-5">
+      <div className="mt-8 rounded-2xl border border-border bg-card/40 p-4 sm:p-5">
         <div className="flex items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-warning/20 bg-warning/10 text-warning">
-            <FlaskConical aria-hidden="true" className="size-4" />
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-info/20 bg-info/10 text-info">
+            <Landmark aria-hidden="true" className="size-4" />
           </span>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-medium">Development payment console</p>
-              <Badge variant="warning">TEST only</Badge>
+              <p className="text-xs font-medium">
+                Sadad (Bank Melli Iran) payment ledger
+              </p>
+              <Badge variant="outline">Single gateway</Badge>
             </div>
             <p className="mt-1.5 max-w-3xl text-[11px] leading-5 text-muted-foreground">
-              These are real OBH payment records created in TEST environment
-              through the development adapter. No real provider is contacted, no
-              redirect is involved, and no value is moved.
+              All service payments are processed through Sadad IPG using whole
+              Rial amounts, TripleDES <code className="font-mono">SignData</code>
+              , and server-side <code className="font-mono">Advice/Verify</code>
+              . Pending <code className="font-mono">TEST</code> payments can also
+              be simulated directly from this console.
             </p>
           </div>
         </div>
@@ -201,12 +193,8 @@ function PaymentsManager({
               Setup required
             </p>
             <p className="mt-2 text-sm font-medium">
-              Register a service and create a TEST provider account before
-              creating payments.
-            </p>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              Services: {services.length} active · Development accounts:{" "}
-              {accounts.length} active
+              Register at least one active connected service before creating a
+              test payment.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 md:justify-end">
@@ -215,13 +203,6 @@ function PaymentsManager({
               className={buttonVariants({ variant: "outline", size: "sm" })}
             >
               Manage services
-              <ArrowUpRight aria-hidden="true" className="size-3.5" />
-            </Link>
-            <Link
-              href="/admin/gateways"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              Configure gateway
               <ArrowUpRight aria-hidden="true" className="size-3.5" />
             </Link>
           </div>
@@ -235,7 +216,7 @@ function PaymentsManager({
               Payment records
             </p>
             <h2 className="mt-2 text-xl font-medium tracking-[-0.025em]">
-              Test transactions
+              Transactions
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -262,14 +243,14 @@ function PaymentsManager({
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search payments"
+              placeholder="Search reference, OrderId, trace..."
               aria-label="Search payments"
               className="h-10 pl-9 text-xs"
             />
           </div>
           <span className="inline-flex items-center gap-2 font-mono text-[9px] tracking-[0.06em] text-muted-foreground/55 uppercase">
             <ShieldCheck aria-hidden="true" className="size-3" />
-            Server-recorded lifecycle
+            Verified via Sadad Advice/Verify
           </span>
         </div>
 
@@ -277,7 +258,7 @@ function PaymentsManager({
           rows={filteredPayments}
           columns={columns}
           getRowId={(payment) => payment.id}
-          caption="OBH test payment records"
+          caption="OBH Sadad payment records"
           defaultSort={{ columnId: "date", direction: "desc" }}
           minWidthClassName="min-w-[50rem]"
           emptyState={
@@ -290,10 +271,10 @@ function PaymentsManager({
               }
               description={
                 search
-                  ? "Clear the search to see all recorded test payments."
+                  ? "Clear the search to see all recorded payments."
                   : canCreate
-                    ? "Create a TEST payment to exercise the payment lifecycle through the development adapter."
-                    : "Complete the service and development gateway setup first."
+                    ? "Create a TEST payment or initiate one from a connected service via @obh/payments."
+                    : "Register a connected service first."
               }
               action={
                 search ? (
@@ -321,18 +302,11 @@ function PaymentsManager({
         />
       </div>
 
-      <p className="mt-5 text-[10px] leading-5 text-muted-foreground/55">
-        External initiation and the versioned service API are defined in the
-        payment API contract and will be implemented after this foundation. The
-        admin console is the only initiation path in this step.
-      </p>
-
       {canCreate ? (
         <CreatePaymentDialog
           open={createOpen}
           onOpenChange={setCreateOpen}
           services={services}
-          accounts={accounts}
           onCreated={() => router.refresh()}
         />
       ) : null}

@@ -1,158 +1,127 @@
 import "server-only"
 
 import { getDb } from "@/lib/db/client"
-import { DomainError } from "@/server/errors"
-import { DEVELOPMENT_PROVIDER_CODE } from "@/server/payments/providers/registry"
+import {
+  SADAD_PROVIDER_CODE,
+  SADAD_PROVIDER_NAME,
+} from "@/server/payments/providers/registry"
+import type { ProviderEnvironmentValue } from "@/server/payments/providers/types"
 
-export async function ensureDevelopmentProvider(actorId: string) {
-  const db = getDb()
-
-  return db.$transaction(async (tx) => {
-    const provider = await tx.paymentProvider.upsert({
-      where: { code: DEVELOPMENT_PROVIDER_CODE },
-      update: {
-        isActive: true,
-      },
-      create: {
-        code: DEVELOPMENT_PROVIDER_CODE,
-        name: "Development Gateway",
-        description:
-          "Local-only adapter for exercising the OBH payment lifecycle. No real provider is contacted.",
-        isActive: true,
-      },
-    })
-
-    await tx.auditLog.create({
-      data: {
-        actorId,
-        action: "provider.development_enabled",
-        entityType: "PaymentProvider",
-        entityId: provider.id,
-        after: {
-          code: provider.code,
-          name: provider.name,
-          environment: "TEST",
-        },
-      },
-    })
-
-    return provider
-  })
+const SADAD_ACCOUNTS: Record<
+  ProviderEnvironmentValue,
+  { name: string; institution: string; notes: string }
+> = {
+  TEST: {
+    name: "Sadad Test Settlement (Bank Melli)",
+    institution: "Bank Melli Iran — Sadad IPG (Test)",
+    notes:
+      "Automatically provisioned Sadad test settlement account. Used for simulated or sandbox TEST payments.",
+  },
+  LIVE: {
+    name: "Sadad Live Settlement (Bank Melli)",
+    institution: "Bank Melli Iran — Sadad IPG",
+    notes:
+      "Automatically provisioned Sadad live acquiring account. Receives verified customer payments before bank settlement.",
+  },
 }
 
-export async function createDevelopmentProviderAccount(
-  actorId: string,
-  input: {
-    providerId: string
-    name: string
-    externalReference?: string
-  }
-) {
+/**
+ * Ensures the single Sadad payment gateway (`code: "sadad"`) and both its
+ * `TEST` and `LIVE` provider financial accounts exist and are active.
+ *
+ * OBH operates exclusively on Sadad (Bank Melli Iran); gateways are never
+ * manually added, edited, or deleted from the admin panel.
+ */
+export async function ensureSadadGateway() {
   const db = getDb()
 
-  const provider = await db.paymentProvider.findUnique({
-    where: { id: input.providerId },
+  const provider = await db.paymentProvider.upsert({
+    where: { code: SADAD_PROVIDER_CODE },
+    update: {
+      name: SADAD_PROVIDER_NAME,
+      isActive: true,
+    },
+    create: {
+      code: SADAD_PROVIDER_CODE,
+      name: SADAD_PROVIDER_NAME,
+      description:
+        "Official Sadad (Bank Melli Iran) Internet Payment Gateway (`sadad.shaparak.ir`). Single gateway for all OBH connected services.",
+      isActive: true,
+    },
   })
 
-  if (
-    !provider ||
-    !provider.isActive ||
-    provider.code !== DEVELOPMENT_PROVIDER_CODE
-  ) {
-    throw new DomainError(
-      "PROVIDER_NOT_AVAILABLE",
-      "The development provider is not enabled."
-    )
-  }
-
-  const duplicate = await db.financialAccount.findFirst({
+  const existingAccounts = await db.financialAccount.findMany({
     where: {
       providerId: provider.id,
-      name: input.name,
+      kind: "PROVIDER",
     },
-    select: { id: true },
+    orderBy: { createdAt: "asc" },
   })
 
-  if (duplicate) {
-    throw new DomainError(
-      "ACCOUNT_EXISTS",
-      "A provider account with that name already exists."
-    )
-  }
+  let testAccount = existingAccounts.find(
+    (account) => account.environment === "TEST"
+  )
+  let liveAccount = existingAccounts.find(
+    (account) => account.environment === "LIVE"
+  )
 
-  return db.$transaction(async (tx) => {
-    const account = await tx.financialAccount.create({
+  if (!testAccount) {
+    testAccount = await db.financialAccount.create({
       data: {
-        name: input.name,
+        name: SADAD_ACCOUNTS.TEST.name,
         kind: "PROVIDER",
         providerId: provider.id,
         environment: "TEST",
-        externalReference: input.externalReference || null,
+        institution: SADAD_ACCOUNTS.TEST.institution,
         currency: "IRR",
         openingBalance: 0,
-        notes:
-          "Development provider account. No real funds or provider connection.",
+        isActive: true,
+        notes: SADAD_ACCOUNTS.TEST.notes,
       },
     })
-
-    await tx.auditLog.create({
-      data: {
-        actorId,
-        action: "provider_account.development_created",
-        entityType: "FinancialAccount",
-        entityId: account.id,
-        after: {
-          provider: provider.code,
-          name: account.name,
-          environment: "TEST",
-        },
-      },
+  } else if (!testAccount.isActive) {
+    testAccount = await db.financialAccount.update({
+      where: { id: testAccount.id },
+      data: { isActive: true },
     })
-
-    return account
-  })
-}
-
-export async function setProviderAccountActive(
-  actorId: string,
-  accountId: string,
-  isActive: boolean
-) {
-  const db = getDb()
-
-  const account = await db.financialAccount.findUnique({
-    where: { id: accountId },
-    include: { provider: true },
-  })
-
-  if (
-    !account ||
-    account.kind !== "PROVIDER" ||
-    account.provider?.code !== DEVELOPMENT_PROVIDER_CODE
-  ) {
-    throw new DomainError(
-      "PROVIDER_ACCOUNT_NOT_FOUND",
-      "Provider account was not found."
-    )
   }
 
-  return db.$transaction(async (tx) => {
-    const updated = await tx.financialAccount.update({
-      where: { id: account.id },
-      data: { isActive },
-    })
-
-    await tx.auditLog.create({
+  if (!liveAccount) {
+    liveAccount = await db.financialAccount.create({
       data: {
-        actorId,
-        action: "provider_account.status_changed",
-        entityType: "FinancialAccount",
-        entityId: account.id,
-        before: { isActive: account.isActive },
-        after: { isActive: updated.isActive },
+        name: SADAD_ACCOUNTS.LIVE.name,
+        kind: "PROVIDER",
+        providerId: provider.id,
+        environment: "LIVE",
+        institution: SADAD_ACCOUNTS.LIVE.institution,
+        currency: "IRR",
+        openingBalance: 0,
+        isActive: true,
+        notes: SADAD_ACCOUNTS.LIVE.notes,
       },
     })
+  } else if (!liveAccount.isActive) {
+    liveAccount = await db.financialAccount.update({
+      where: { id: liveAccount.id },
+      data: { isActive: true },
+    })
+  }
 
-    return updated
-  })
+  return {
+    provider,
+    accounts: {
+      TEST: testAccount,
+      LIVE: liveAccount,
+    },
+  }
+}
+
+export async function getSadadAccountForEnvironment(
+  environment: ProviderEnvironmentValue
+) {
+  const { provider, accounts } = await ensureSadadGateway()
+  return {
+    provider,
+    account: accounts[environment],
+  }
 }
