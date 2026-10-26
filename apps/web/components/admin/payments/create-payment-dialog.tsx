@@ -12,6 +12,7 @@ import { NativeSelect } from "@workspace/ui/components/native-select"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
+import { AmountInput } from "@/components/admin/amount-input"
 import { createDevelopmentPaymentAction } from "@/app/admin/payments/actions"
 import {
   createDevelopmentPaymentSchema,
@@ -42,6 +43,7 @@ function CreatePaymentDialog({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -132,12 +134,13 @@ function CreatePaymentDialog({
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="payment-amount">Amount (R)</Label>
-            <Input
+            <AmountInput
               id="payment-amount"
-              inputMode="numeric"
-              placeholder="150000"
-              aria-invalid={Boolean(errors.amount)}
-              {...register("amount")}
+              control={control}
+              name="amount"
+              placeholder="150,000"
+              allowDecimal={false}
+              ariaInvalid={Boolean(errors.amount)}
             />
             {errors.amount ? (
               <p className="text-xs text-danger">{errors.amount.message}</p>

@@ -12,6 +12,7 @@ import { NativeSelect } from "@workspace/ui/components/native-select"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
+import { AmountInput } from "@/components/admin/amount-input"
 import { createRecurringExpenseAction } from "@/app/admin/expenses/actions"
 import {
   createRecurringExpenseSchema,
@@ -41,6 +42,7 @@ function CreateRecurringDialog({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -138,12 +140,12 @@ function CreateRecurringDialog({
 
           <div className="space-y-2">
             <Label htmlFor="recurring-amount">Amount (R)</Label>
-            <Input
+            <AmountInput
               id="recurring-amount"
-              inputMode="decimal"
-              placeholder="8500000"
-              aria-invalid={Boolean(errors.amount)}
-              {...register("amount")}
+              control={control}
+              name="amount"
+              placeholder="8,500,000"
+              ariaInvalid={Boolean(errors.amount)}
             />
             {errors.amount ? (
               <p className="text-xs text-danger">{errors.amount.message}</p>

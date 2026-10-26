@@ -11,6 +11,7 @@ import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
+import { AmountInput } from "@/components/admin/amount-input"
 import { recordReconciliationAction } from "@/app/admin/reconciliation/actions"
 import type { ProviderAccountBalanceView } from "@/server/reconciliation/queries"
 import {
@@ -35,6 +36,7 @@ function RecordReconciliationDialog({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -108,11 +110,12 @@ function RecordReconciliationDialog({
             <Label htmlFor="actual-balance">
               Actual balance ({account.currency})
             </Label>
-            <Input
+            <AmountInput
               id="actual-balance"
-              inputMode="decimal"
-              aria-invalid={Boolean(errors.actualBalance)}
-              {...register("actualBalance")}
+              control={control}
+              name="actualBalance"
+              allowNegative
+              ariaInvalid={Boolean(errors.actualBalance)}
             />
             {errors.actualBalance ? (
               <p className="text-xs text-danger">

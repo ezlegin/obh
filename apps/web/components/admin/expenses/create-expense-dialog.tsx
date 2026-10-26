@@ -12,6 +12,7 @@ import { NativeSelect } from "@workspace/ui/components/native-select"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
+import { AmountInput } from "@/components/admin/amount-input"
 import { createExpenseAction } from "@/app/admin/expenses/actions"
 import {
   createExpenseSchema,
@@ -41,6 +42,7 @@ function CreateExpenseDialog({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -93,7 +95,7 @@ function CreateExpenseDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Record an expense"
-      description="Expenses begin pending. Attach supporting documents, then mark the expense paid against a business payment source."
+      description="Expenses begin pending. After saving, attach a PDF or image reference from the expense detail, then mark the expense paid against a business payment source."
       className="max-w-2xl"
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
@@ -121,12 +123,12 @@ function CreateExpenseDialog({
 
           <div className="space-y-2">
             <Label htmlFor="expense-amount">Amount (R)</Label>
-            <Input
+            <AmountInput
               id="expense-amount"
-              inputMode="decimal"
-              placeholder="12000000"
-              aria-invalid={Boolean(errors.amount)}
-              {...register("amount")}
+              control={control}
+              name="amount"
+              placeholder="12,000,000"
+              ariaInvalid={Boolean(errors.amount)}
             />
             {errors.amount ? (
               <p className="text-xs text-danger">{errors.amount.message}</p>

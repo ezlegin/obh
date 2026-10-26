@@ -5,6 +5,13 @@ import { mkdir, readFile, unlink, writeFile } from "node:fs/promises"
 import path from "node:path"
 
 import { getDb } from "@/lib/db/client"
+import {
+  deleteCloudinaryDocument,
+  getCloudinaryDocumentUrl,
+  parseCloudinaryStorageKey,
+  toCloudinaryStorageKey,
+  uploadExpenseDocumentToCloudinary,
+} from "@/server/accounting/cloudinary"
 import { DomainError } from "@/server/errors"
 
 export const MAX_EXPENSE_DOCUMENT_BYTES = 10 * 1024 * 1024
@@ -122,12 +129,27 @@ export async function attachExpenseDocument(
   }
 
   const extension = allowedTypes[mimeType]
-  const storageKey = `${expenseId}/${randomUUID()}.${extension}`
-  const absolutePath = getDocumentPath(storageKey)
   const checksumSha256 = createHash("sha256").update(buffer).digest("hex")
+  const cloudinaryUpload = await uploadExpenseDocumentToCloudinary({
+    buffer,
+    fileName: cleanFileName(file.name),
+    mimeType,
+    expenseId,
+    extension,
+  })
 
-  await mkdir(path.dirname(absolutePath), { recursive: true })
-  await writeFile(absolutePath, buffer, { flag: "wx" })
+  let storageKey: string
+  let absolutePath: string | null = null
+
+  if (cloudinaryUpload) {
+    storageKey = toCloudinaryStorageKey(cloudinaryUpload.publicId)
+  } else {
+    storageKey = `${expenseId}/${randomUUID()}.${extension}`
+    absolutePath = getDocumentPath(storageKey)
+
+    await mkdir(path.dirname(absolutePath), { recursive: true })
+    await writeFile(absolutePath, buffer, { flag: "wx" })
+  }
 
   try {
     return await db.$transaction(async (tx) => {
@@ -153,6 +175,7 @@ export async function attachExpenseDocument(
             fileName: document.fileName,
             mimeType: document.mimeType,
             byteSize: document.byteSize,
+            storage: cloudinaryUpload ? "cloudinary" : "local",
           },
         },
       })
@@ -160,7 +183,19 @@ export async function attachExpenseDocument(
       return document
     })
   } catch (error) {
-    await unlink(absolutePath).catch(() => undefined)
+    if (cloudinaryUpload) {
+      await deleteCloudinaryDocument(cloudinaryUpload.publicId).catch(
+        (cleanupError: unknown) => {
+          console.error(
+            "Cloudinary document could not be removed after a failed record.",
+            cleanupError instanceof Error ? cleanupError.name : "Unknown error"
+          )
+        }
+      )
+    } else if (absolutePath) {
+      await unlink(absolutePath).catch(() => undefined)
+    }
+
     throw error
   }
 }
@@ -201,6 +236,20 @@ export async function deleteExpenseDocument(
     })
   })
 
+  const cloudinaryPublicId = parseCloudinaryStorageKey(document.storageKey)
+
+  if (cloudinaryPublicId) {
+    await deleteCloudinaryDocument(cloudinaryPublicId).catch(
+      (error: unknown) => {
+        console.error(
+          "Cloudinary expense document could not be removed.",
+          error instanceof Error ? error.name : "Unknown error"
+        )
+      }
+    )
+    return
+  }
+
   await unlink(getDocumentPath(document.storageKey)).catch((error: unknown) => {
     if (
       !(error instanceof Error) ||
@@ -230,6 +279,33 @@ export async function getExpenseDocumentForDownload(documentId: string) {
 
   if (!document) {
     return null
+  }
+
+  const cloudinaryPublicId = parseCloudinaryStorageKey(document.storageKey)
+
+  if (cloudinaryPublicId) {
+    const url = getCloudinaryDocumentUrl(cloudinaryPublicId)
+
+    if (!url) {
+      throw new DomainError(
+        "DOCUMENT_STORAGE_UNAVAILABLE",
+        "Cloudinary is not configured."
+      )
+    }
+
+    const response = await fetch(url, { cache: "no-store" })
+
+    if (!response.ok) {
+      throw new DomainError(
+        "DOCUMENT_NOT_FOUND",
+        "Document could not be retrieved."
+      )
+    }
+
+    return {
+      ...document,
+      file: Buffer.from(await response.arrayBuffer()),
+    }
   }
 
   const absolutePath = getDocumentPath(document.storageKey)

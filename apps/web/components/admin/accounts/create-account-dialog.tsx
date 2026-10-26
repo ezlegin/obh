@@ -11,6 +11,7 @@ import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
+import { AmountInput } from "@/components/admin/amount-input"
 import { createBusinessAccountAction } from "@/app/admin/accounts/actions"
 import {
   createBusinessAccountSchema,
@@ -32,6 +33,7 @@ function CreateBusinessAccountDialog({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -126,14 +128,13 @@ function CreateBusinessAccountDialog({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="account-opening-balance">
-              Opening balance (R)
-            </Label>
-            <Input
+            <Label htmlFor="account-opening-balance">Opening balance (R)</Label>
+            <AmountInput
               id="account-opening-balance"
-              inputMode="decimal"
-              aria-invalid={Boolean(errors.openingBalance)}
-              {...register("openingBalance")}
+              control={control}
+              name="openingBalance"
+              allowNegative
+              ariaInvalid={Boolean(errors.openingBalance)}
             />
             {errors.openingBalance ? (
               <p className="text-xs text-danger">

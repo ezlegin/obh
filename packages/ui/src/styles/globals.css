@@ -10,8 +10,9 @@
 @theme inline {
   --font-heading: var(--font-inter);
   --font-sans: var(--font-inter);
-  --font-mono: "SFMono-Regular", ui-monospace, "Cascadia Mono", "Segoe UI Mono",
-    Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --font-mono:
+    "SFMono-Regular", ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo,
+    Monaco, Consolas, "Liberation Mono", monospace;
 
   --color-success: var(--success);
   --color-info: var(--info);
@@ -130,6 +131,18 @@
       "cv11" 1,
       "ss01" 1;
     text-rendering: optimizeLegibility;
+  }
+
+  /* Native dropdown menus must match the dark interface; otherwise Windows
+     renders light option rows with unreadable light text. */
+  select {
+    color-scheme: dark;
+  }
+
+  select option,
+  select optgroup {
+    background-color: #0b0b0b;
+    color: var(--foreground);
   }
 
   ::selection {

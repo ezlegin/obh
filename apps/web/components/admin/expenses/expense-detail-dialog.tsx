@@ -218,9 +218,9 @@ function ExpenseDetailDialog({
       <section className="mt-6">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-medium">Supporting documents</p>
+            <p className="text-xs font-medium">Reference documents</p>
             <p className="mt-1 text-[10px] text-muted-foreground">
-              PDF, PNG, JPEG, or WebP · maximum 10 MB · private to managers
+              PDF, PNG, JPEG, or WebP · maximum 10 MB · manager-only access
             </p>
           </div>
           <Badge variant="outline">{expense.documents.length} attached</Badge>
@@ -232,7 +232,7 @@ function ExpenseDetailDialog({
               aria-hidden="true"
               className="mt-0.5 size-3.5 shrink-0 text-warning"
             />
-            This category requires a supporting document before the expense can
+            This category requires a reference document before the expense can
             be marked paid.
           </div>
         ) : null}
@@ -294,7 +294,7 @@ function ExpenseDetailDialog({
           </div>
         ) : (
           <p className="mt-3 rounded-xl border border-dashed border-border px-4 py-5 text-center text-[11px] text-muted-foreground">
-            No supporting documents attached.
+            No reference documents attached.
           </p>
         )}
 
@@ -303,7 +303,7 @@ function ExpenseDetailDialog({
             ref={fileInputRef}
             type="file"
             accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
-            aria-label="Supporting document"
+            aria-label="Reference document"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             className="block min-w-0 flex-1 cursor-pointer rounded-full border border-border bg-white/[0.025] text-xs text-muted-foreground file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-white/[0.06] file:px-3 file:py-2 file:text-xs file:text-foreground"
           />

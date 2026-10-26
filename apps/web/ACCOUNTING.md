@@ -48,23 +48,31 @@ Categories are managed in the Expenses workspace.
 - Categories currently cannot be renamed after creation. Create a replacement
   category when reporting semantics change.
 
-## Supporting documents
+## Reference documents
 
 Only `PDF`, `PNG`, `JPEG`, and `WebP` files up to **10 MB** are accepted. The
 server checks the file signature in addition to the declared MIME type.
 
 - Metadata lives in `ExpenseDocument`; binaries are never stored in PostgreSQL.
-- Local development stores files under `apps/web/storage/expense-documents/` by
-  default. Set `EXPENSE_DOCUMENT_DIR` to override this.
-- The storage directory is gitignored and must not be served as a static folder.
+- When `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and
+  `CLOUDINARY_API_SECRET` are configured, new reference files are uploaded to
+  Cloudinary under `obh/expense-documents` (override with
+  `CLOUDINARY_EXPENSE_FOLDER`). Uploads are signed server-side and the secret is
+  never exposed to the browser.
+- Without Cloudinary credentials, local development stores files under
+  `apps/web/storage/expense-documents/` by default. Set `EXPENSE_DOCUMENT_DIR`
+  to override this.
+- The local storage directory is gitignored and must not be served as a static
+  folder.
 - Downloads go through `/admin/expenses/documents/[id]`, require an active
   manager session, use `Content-Disposition: attachment`, and disable inline
-  rendering and caching.
+  rendering and caching. Cloudinary files are proxied through the same route, so
+  their storage URL is not exposed to the browser.
 - Checksums are recorded for integrity verification.
 - Uploads require a same-origin admin request.
-- Local storage is not production-ready object storage. Production must move
-  files to private object storage with equivalent authorization, retention, and
-  backup controls. Antivirus/content scanning is not implemented.
+- Local storage is not production-ready object storage. Cloudinary is the
+  intended production backend; consent/retention policy and antivirus scanning
+  are still not implemented.
 
 ## Recurring expenses
 

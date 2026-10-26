@@ -86,7 +86,7 @@ function AdminDialog({
           onOpenChange(false)
         }
       }}
-      className="m-auto w-[calc(100vw-2rem)] max-w-xl border-0 bg-transparent p-0 text-foreground"
+      className="m-auto w-[calc(100vw-2rem)] max-w-xl border-0 bg-transparent p-0 text-foreground backdrop:bg-black/70 backdrop:backdrop-blur-sm"
     >
       <div
         className={cn(

@@ -11,6 +11,7 @@ import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
+import { AmountInput } from "@/components/admin/amount-input"
 import { calculateProfitPeriodAction } from "@/app/admin/distributions/actions"
 import {
   calculateProfitPeriodSchema,
@@ -33,6 +34,7 @@ function CalculatePeriodDialog({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -113,11 +115,11 @@ function CalculatePeriodDialog({
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="profit-reserve">Reserve (R)</Label>
-            <Input
+            <AmountInput
               id="profit-reserve"
-              inputMode="decimal"
-              aria-invalid={Boolean(errors.reserveAmount)}
-              {...register("reserveAmount")}
+              control={control}
+              name="reserveAmount"
+              ariaInvalid={Boolean(errors.reserveAmount)}
             />
             {errors.reserveAmount ? (
               <p className="text-xs text-danger">
@@ -128,11 +130,11 @@ function CalculatePeriodDialog({
 
           <div className="space-y-2">
             <Label htmlFor="profit-tax">Tax (R)</Label>
-            <Input
+            <AmountInput
               id="profit-tax"
-              inputMode="decimal"
-              aria-invalid={Boolean(errors.taxAmount)}
-              {...register("taxAmount")}
+              control={control}
+              name="taxAmount"
+              ariaInvalid={Boolean(errors.taxAmount)}
             />
             {errors.taxAmount ? (
               <p className="text-xs text-danger">{errors.taxAmount.message}</p>

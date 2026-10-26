@@ -12,6 +12,7 @@ import { NativeSelect } from "@workspace/ui/components/native-select"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
+import { AmountInput } from "@/components/admin/amount-input"
 import { recordSettlementAction } from "@/app/admin/reconciliation/actions"
 import type { ProviderAccountBalanceView } from "@/server/reconciliation/queries"
 import {
@@ -38,6 +39,7 @@ function RecordSettlementDialog({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -119,11 +121,11 @@ function RecordSettlementDialog({
             <Label htmlFor="settlement-amount">
               Amount ({account.currency})
             </Label>
-            <Input
+            <AmountInput
               id="settlement-amount"
-              inputMode="decimal"
-              aria-invalid={Boolean(errors.amount)}
-              {...register("amount")}
+              control={control}
+              name="amount"
+              ariaInvalid={Boolean(errors.amount)}
             />
             {errors.amount ? (
               <p className="text-xs text-danger">{errors.amount.message}</p>
