@@ -1,8 +1,9 @@
-import { ArrowRight, ArrowUpRight } from "lucide-react"
+import { ArrowRight, ArrowUpRight, Mail, MapPin, Phone } from "lucide-react"
 import Link from "next/link"
 
 import { SiteContainer } from "@/components/site-container"
 import { Logo } from "@/components/logo"
+import { getContactDetails, phoneHref } from "@/lib/contact"
 import type { Dictionary } from "@/lib/i18n"
 import type { Locale } from "@/lib/i18n/config"
 import { localizeHref } from "@/lib/i18n/links"
@@ -16,6 +17,7 @@ type SiteFooterProps = {
 function SiteFooter({ locale, dictionary }: SiteFooterProps) {
   const year = new Date().getFullYear()
   const t = dictionary.footer
+  const details = getContactDetails()
 
   const navigation = [
     { label: t.links.about, href: localizeHref(locale, "/about-us") },
@@ -26,7 +28,7 @@ function SiteFooter({ locale, dictionary }: SiteFooterProps) {
   return (
     <footer className="border-t border-border bg-[#050505]">
       <SiteContainer>
-        <div className="grid gap-12 py-16 sm:grid-cols-2 lg:grid-cols-[1.5fr_0.65fr_0.95fr_0.6fr] lg:gap-8">
+        <div className="grid gap-12 py-16 sm:grid-cols-2 lg:grid-cols-[1.4fr_0.55fr_0.85fr_1fr] lg:gap-8">
           <div className="sm:col-span-2 lg:col-span-1">
             <Link
               href={localizeHref(locale, "/")}
@@ -83,9 +85,47 @@ function SiteFooter({ locale, dictionary }: SiteFooterProps) {
 
           <div>
             <p className="eyebrow">{t.contact}</p>
-            <p className="mt-5 max-w-[13rem] text-sm leading-6 text-muted-foreground">
-              {t.contactNote}
-            </p>
+            <ul className="mt-5 space-y-3">
+              {details.phone ? (
+                <li>
+                  <a
+                    href={phoneHref(details.phone)}
+                    className="group inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+                  >
+                    <Phone
+                      aria-hidden="true"
+                      className="size-3.5 shrink-0 text-muted-foreground/50"
+                    />
+                    <span dir="ltr">{details.phone}</span>
+                  </a>
+                </li>
+              ) : null}
+              {details.email ? (
+                <li>
+                  <a
+                    href={`mailto:${details.email}`}
+                    className="group inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+                  >
+                    <Mail
+                      aria-hidden="true"
+                      className="size-3.5 shrink-0 text-muted-foreground/50"
+                    />
+                    <span dir="ltr">{details.email}</span>
+                  </a>
+                </li>
+              ) : null}
+              {details.address ? (
+                <li className="flex gap-2 text-sm leading-6 text-muted-foreground">
+                  <MapPin
+                    aria-hidden="true"
+                    className="mt-1 size-3.5 shrink-0 text-muted-foreground/50"
+                  />
+                  <span dir="auto" className="max-w-[16rem]">
+                    {details.address}
+                  </span>
+                </li>
+              ) : null}
+            </ul>
             <Link
               href={localizeHref(locale, "/contact-us")}
               className="mt-5 inline-flex items-center gap-1.5 text-sm text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
