@@ -4,6 +4,7 @@ import test from "node:test"
 import { Prisma } from "../lib/generated/prisma/client"
 import {
   allocateWholeIrr,
+  applyCompanyRetention,
   applyLossCarryforward,
   calculateNetProfit,
   validateOwnershipTotal,
@@ -99,4 +100,42 @@ test("builds Tehran monthly ranges", () => {
 
   const february = monthRange("2028-02")
   assert.equal(february.endsOn, "2028-02-29")
+})
+
+test("retains configurable percentage in company and distributes remaining pool by unchanged ownership", () => {
+  const netProfit = decimal(10_000_000)
+  const retention = applyCompanyRetention({
+    profitAfterLoss: netProfit,
+    retentionPercentage: decimal(40),
+  })
+
+  assert.equal(retention.retainedFromPercentage.toFixed(2), "4000000.00")
+  assert.equal(retention.totalRetained.toFixed(2), "4000000.00")
+  assert.equal(retention.distributable.toFixed(2), "6000000.00")
+
+  const allocation = allocateWholeIrr(retention.distributable, [
+    { shareholderId: "shareholder-a", percentage: "60.0000" },
+    { shareholderId: "shareholder-b", percentage: "40.0000" },
+  ])
+
+  assert.deepEqual(
+    allocation.allocations.map((item) => ({
+      shareholderId: item.shareholderId,
+      percentage: item.percentage.toFixed(4),
+      amount: item.amount.toFixed(2),
+    })),
+    [
+      {
+        shareholderId: "shareholder-a",
+        percentage: "60.0000",
+        amount: "3600000.00",
+      },
+      {
+        shareholderId: "shareholder-b",
+        percentage: "40.0000",
+        amount: "2400000.00",
+      },
+    ]
+  )
+  assert.equal(allocation.unallocatedResidual.toFixed(2), "0.00")
 })

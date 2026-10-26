@@ -1,6 +1,13 @@
 "use client"
 
-import { Building2, Landmark, Loader2, Plus, Power } from "lucide-react"
+import {
+  Building2,
+  Landmark,
+  Loader2,
+  Plus,
+  Power,
+  Trash2,
+} from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
@@ -10,7 +17,10 @@ import { Button } from "@workspace/ui/components/button"
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table"
 import { AdminEmptyState } from "@/components/admin/empty-state"
 import { CreateBusinessAccountDialog } from "@/components/admin/accounts/create-account-dialog"
-import { toggleBusinessAccountAction } from "@/app/admin/accounts/actions"
+import {
+  deleteBusinessAccountAction,
+  toggleBusinessAccountAction,
+} from "@/app/admin/accounts/actions"
 import type { AdminBusinessAccount } from "@/server/accounting/queries"
 import { formatAccountingDate, formatIrrDecimal } from "@/lib/admin/format"
 
@@ -21,7 +31,7 @@ function AccountsManager({ accounts }: { accounts: AdminBusinessAccount[] }) {
   const [error, setError] = useState<string | null>(null)
 
   const toggleAccount = async (account: AdminBusinessAccount) => {
-    setPendingId(account.id)
+    setPendingId(`toggle:${account.id}`)
     setError(null)
 
     const result = await toggleBusinessAccountAction({
@@ -31,6 +41,31 @@ function AccountsManager({ accounts }: { accounts: AdminBusinessAccount[] }) {
 
     if (!result.ok) {
       setError(result.error ?? "The account status could not be changed.")
+    } else {
+      router.refresh()
+    }
+
+    setPendingId(null)
+  }
+
+  const removeAccount = async (account: AdminBusinessAccount) => {
+    if (
+      !window.confirm(
+        `Remove payment source "${account.name}"? Linked expenses and income records will remain in the ledger.`
+      )
+    ) {
+      return
+    }
+
+    setPendingId(`delete:${account.id}`)
+    setError(null)
+
+    const result = await deleteBusinessAccountAction({
+      accountId: account.id,
+    })
+
+    if (!result.ok) {
+      setError(result.error ?? "The payment source could not be removed.")
     } else {
       router.refresh()
     }
@@ -54,17 +89,20 @@ function AccountsManager({ accounts }: { accounts: AdminBusinessAccount[] }) {
       ),
     },
     {
-      id: "opening",
-      header: "Opening balance",
+      id: "balance",
+      header: "Current balance",
       align: "right",
-      sortValue: (account) => Number(account.openingBalance),
+      sortValue: (account) => Number(account.calculatedBalance),
       cell: (account) => (
         <div>
-          <p className="text-xs">{formatIrrDecimal(account.openingBalance)}</p>
+          <p className="text-xs font-medium tabular-nums">
+            {formatIrrDecimal(account.calculatedBalance)}
+          </p>
           <p className="mt-1 text-[9px] text-muted-foreground">
+            Opening: {formatIrrDecimal(account.openingBalance)}
             {account.openingBalanceAt
-              ? formatAccountingDate(account.openingBalanceAt)
-              : "No date"}
+              ? ` (${formatAccountingDate(account.openingBalanceAt)})`
+              : ""}
           </p>
         </div>
       ),
@@ -95,20 +133,37 @@ function AccountsManager({ accounts }: { accounts: AdminBusinessAccount[] }) {
       header: "",
       align: "right",
       cell: (account) => (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => toggleAccount(account)}
-          disabled={pendingId === account.id}
-        >
-          {pendingId === account.id ? (
-            <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
-          ) : (
-            <Power aria-hidden="true" className="size-3.5" />
-          )}
-          {account.isActive ? "Deactivate" : "Activate"}
-        </Button>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => toggleAccount(account)}
+            disabled={pendingId === `toggle:${account.id}`}
+          >
+            {pendingId === `toggle:${account.id}` ? (
+              <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+            ) : (
+              <Power aria-hidden="true" className="size-3.5" />
+            )}
+            {account.isActive ? "Deactivate" : "Activate"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Remove ${account.name}`}
+            onClick={() => removeAccount(account)}
+            disabled={pendingId === `delete:${account.id}`}
+            className="text-danger hover:bg-danger/10 hover:text-danger"
+          >
+            {pendingId === `delete:${account.id}` ? (
+              <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+            ) : (
+              <Trash2 aria-hidden="true" className="size-3.5" />
+            )}
+          </Button>
+        </div>
       ),
     },
   ]

@@ -84,3 +84,66 @@ export async function setBusinessAccountActive(
     return updated
   })
 }
+
+export async function deleteBusinessAccount(
+  actorId: string,
+  accountId: string
+) {
+  const db = getDb()
+  const account = await db.financialAccount.findUnique({
+    where: { id: accountId },
+  })
+
+  if (!account || account.kind !== "BUSINESS") {
+    throw new DomainError(
+      "ACCOUNT_NOT_FOUND",
+      "Business payment source was not found."
+    )
+  }
+
+  return db.$transaction(async (tx) => {
+    await tx.expense.updateMany({
+      where: { accountId: account.id },
+      data: { accountId: null },
+    })
+    await tx.income.updateMany({
+      where: { accountId: account.id },
+      data: { accountId: null },
+    })
+    await tx.recurringExpense.updateMany({
+      where: { accountId: account.id },
+      data: { accountId: null },
+    })
+    await tx.accountReconciliation.deleteMany({
+      where: { accountId: account.id },
+    })
+    await tx.capitalContribution.deleteMany({
+      where: { accountId: account.id },
+    })
+    await tx.shareholderPayout.deleteMany({
+      where: { accountId: account.id },
+    })
+    await tx.transfer.deleteMany({
+      where: {
+        OR: [{ fromAccountId: account.id }, { toAccountId: account.id }],
+      },
+    })
+    await tx.financialAccount.delete({
+      where: { id: account.id },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "business_account.deleted",
+        entityType: "FinancialAccount",
+        entityId: account.id,
+        before: {
+          name: account.name,
+          institution: account.institution,
+          openingBalance: account.openingBalance.toFixed(2),
+        },
+      },
+    })
+  })
+}

@@ -243,3 +243,91 @@ export async function endOwnershipRecord(
     return updated
   })
 }
+
+export async function deleteShareholder(
+  actorId: string,
+  shareholderId: string
+) {
+  const db = getDb()
+  const shareholder = await db.shareholder.findUnique({
+    where: { id: shareholderId },
+    include: {
+      distributions: { select: { id: true } },
+    },
+  })
+
+  if (!shareholder) {
+    throw new DomainError("SHAREHOLDER_NOT_FOUND", "Shareholder was not found.")
+  }
+
+  return db.$transaction(async (tx) => {
+    const distIds = shareholder.distributions.map((d) => d.id)
+    if (distIds.length > 0) {
+      await tx.shareholderPayout.deleteMany({
+        where: { profitDistributionId: { in: distIds } },
+      })
+      await tx.profitDistribution.deleteMany({
+        where: { shareholderId: shareholder.id },
+      })
+    }
+    await tx.capitalContribution.deleteMany({
+      where: { shareholderId: shareholder.id },
+    })
+    await tx.ownershipRecord.deleteMany({
+      where: { shareholderId: shareholder.id },
+    })
+    await tx.shareholder.delete({
+      where: { id: shareholder.id },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "shareholder.deleted",
+        entityType: "Shareholder",
+        entityId: shareholder.id,
+        before: {
+          name: shareholder.name,
+          email: shareholder.email,
+        },
+      },
+    })
+  })
+}
+
+export async function deleteOwnershipRecord(
+  actorId: string,
+  ownershipRecordId: string
+) {
+  const db = getDb()
+  const record = await db.ownershipRecord.findUnique({
+    where: { id: ownershipRecordId },
+    include: { shareholder: { select: { name: true } } },
+  })
+
+  if (!record) {
+    throw new DomainError(
+      "OWNERSHIP_NOT_FOUND",
+      "Ownership record was not found."
+    )
+  }
+
+  return db.$transaction(async (tx) => {
+    await tx.ownershipRecord.delete({
+      where: { id: record.id },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "ownership_record.deleted",
+        entityType: "OwnershipRecord",
+        entityId: record.id,
+        before: {
+          shareholder: record.shareholder.name,
+          percentage: record.percentage.toFixed(4),
+        },
+      },
+    })
+  })
+}

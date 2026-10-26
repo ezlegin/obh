@@ -111,6 +111,10 @@ export const simulateDevelopmentResultSchema = z.object({
   outcome: z.enum(["success", "failure"]),
 })
 
+export const deletePaymentSchema = z.object({
+  paymentId: z.string().uuid(),
+})
+
 export type CreateConnectedServiceInput = z.infer<
   typeof createConnectedServiceSchema
 >

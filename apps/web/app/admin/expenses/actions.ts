@@ -7,7 +7,10 @@ import {
   createExpenseCategorySchema,
   createExpenseSchema,
   createRecurringExpenseSchema,
+  deleteExpenseCategorySchema,
   deleteExpenseDocumentSchema,
+  deleteExpenseSchema,
+  deleteRecurringExpenseSchema,
   generateRecurringExpenseSchema,
   markExpensePaidSchema,
   recurringExpenseActionSchema,
@@ -16,13 +19,19 @@ import {
 import { DomainError } from "@/server/errors"
 import {
   createExpenseCategory,
+  deleteExpenseCategory,
   setExpenseCategoryActive,
 } from "@/server/accounting/categories"
 import { deleteExpenseDocument } from "@/server/accounting/documents"
-import { createExpense, markExpensePaid } from "@/server/accounting/expenses"
+import {
+  createExpense,
+  deleteExpense,
+  markExpensePaid,
+} from "@/server/accounting/expenses"
 import {
   changeRecurringExpenseStatus,
   createRecurringExpense,
+  deleteRecurringExpense,
   generateRecurringExpense,
 } from "@/server/accounting/recurring"
 
@@ -216,6 +225,69 @@ export async function deleteExpenseDocumentAction(
   try {
     await deleteExpenseDocument(admin.id, parsed.data.documentId)
     revalidatePath("/admin/expenses")
+    return { ok: true }
+  } catch (error) {
+    return actionError(error)
+  }
+}
+
+export async function deleteExpenseAction(
+  input: unknown
+): Promise<ExpenseActionResult> {
+  const admin = await requireAdmin()
+  const parsed = deleteExpenseSchema.safeParse(input)
+
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid expense." }
+  }
+
+  try {
+    await deleteExpense(admin.id, parsed.data.expenseId)
+    revalidatePath("/admin/expenses")
+    revalidatePath("/admin/accounts")
+    revalidatePath("/admin/income")
+    revalidatePath("/admin")
+    return { ok: true }
+  } catch (error) {
+    return actionError(error)
+  }
+}
+
+export async function deleteExpenseCategoryAction(
+  input: unknown
+): Promise<ExpenseActionResult> {
+  const admin = await requireAdmin()
+  const parsed = deleteExpenseCategorySchema.safeParse(input)
+
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid category." }
+  }
+
+  try {
+    await deleteExpenseCategory(admin.id, parsed.data.categoryId)
+    revalidatePath("/admin/expenses")
+    revalidatePath("/admin/accounts")
+    revalidatePath("/admin")
+    return { ok: true }
+  } catch (error) {
+    return actionError(error)
+  }
+}
+
+export async function deleteRecurringExpenseAction(
+  input: unknown
+): Promise<ExpenseActionResult> {
+  const admin = await requireAdmin()
+  const parsed = deleteRecurringExpenseSchema.safeParse(input)
+
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid recurring expense." }
+  }
+
+  try {
+    await deleteRecurringExpense(admin.id, parsed.data.recurringExpenseId)
+    revalidatePath("/admin/expenses")
+    revalidatePath("/admin")
     return { ok: true }
   } catch (error) {
     return actionError(error)

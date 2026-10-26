@@ -8,6 +8,7 @@ import type {
 } from "@/lib/validation/accounting"
 import { DomainError } from "@/server/errors"
 import { parseDateOnly } from "@/server/accounting/dates"
+import { deleteExpenseDocument } from "@/server/accounting/documents"
 
 async function getActiveBusinessAccount(accountId: string) {
   const account = await getDb().financialAccount.findUnique({
@@ -22,6 +23,21 @@ async function getActiveBusinessAccount(accountId: string) {
   }
 
   return account
+}
+
+async function resolveDefaultBusinessAccountId(accountId?: string) {
+  if (accountId) {
+    const account = await getActiveBusinessAccount(accountId)
+    return account.id
+  }
+
+  const defaultAccount = await getDb().financialAccount.findFirst({
+    where: { kind: "BUSINESS", isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  })
+
+  return defaultAccount?.id ?? null
 }
 
 export async function createExpense(
@@ -40,24 +56,25 @@ export async function createExpense(
     )
   }
 
-  if (values.accountId) {
-    await getActiveBusinessAccount(values.accountId)
-  }
-
+  const resolvedAccountId = await resolveDefaultBusinessAccountId(
+    values.accountId
+  )
   const amount = new Prisma.Decimal(values.amount)
+  const now = new Date()
 
   return db.$transaction(async (tx) => {
     const expense = await tx.expense.create({
       data: {
         categoryId: category.id,
-        accountId: values.accountId || null,
+        accountId: resolvedAccountId,
         amount,
         currency: "IRR",
         spentOn: parseDateOnly(values.spentOn),
         description: values.description,
         notes: values.notes || null,
         externalReference: values.externalReference || null,
-        status: "PENDING",
+        status: "PAID",
+        paidAt: now,
       },
     })
 
@@ -72,6 +89,7 @@ export async function createExpense(
           amount: amount.toFixed(2),
           status: expense.status,
           spentOn: values.spentOn,
+          accountId: resolvedAccountId,
         },
       },
     })
@@ -87,32 +105,14 @@ export async function markExpensePaid(
   const db = getDb()
   const expense = await db.expense.findUnique({
     where: { id: values.expenseId },
-    include: {
-      category: true,
-      _count: { select: { documents: true } },
-    },
   })
 
   if (!expense) {
     throw new DomainError("EXPENSE_NOT_FOUND", "Expense was not found.")
   }
 
-  if (expense.status === "PAID") {
-    throw new DomainError(
-      "EXPENSE_ALREADY_PAID",
-      "This expense is already marked paid."
-    )
-  }
-
   if (expense.status === "VOIDED") {
     throw new DomainError("EXPENSE_VOIDED", "This expense is voided.")
-  }
-
-  if (expense.category.requiresDocument && expense._count.documents === 0) {
-    throw new DomainError(
-      "DOCUMENT_REQUIRED",
-      "Attach at least one supporting document before marking this expense paid."
-    )
   }
 
   const account = await getActiveBusinessAccount(values.accountId)
@@ -122,7 +122,7 @@ export async function markExpensePaid(
       where: { id: expense.id },
       data: {
         status: "PAID",
-        paidAt: new Date(),
+        paidAt: expense.paidAt ?? new Date(),
         accountId: account.id,
       },
     })
@@ -143,5 +143,42 @@ export async function markExpensePaid(
     })
 
     return updated
+  })
+}
+
+export async function deleteExpense(actorId: string, expenseId: string) {
+  const db = getDb()
+  const expense = await db.expense.findUnique({
+    where: { id: expenseId },
+    include: {
+      documents: { select: { id: true } },
+    },
+  })
+
+  if (!expense) {
+    throw new DomainError("EXPENSE_NOT_FOUND", "Expense was not found.")
+  }
+
+  for (const doc of expense.documents) {
+    await deleteExpenseDocument(actorId, doc.id).catch(() => undefined)
+  }
+
+  return db.$transaction(async (tx) => {
+    await tx.expenseDocument.deleteMany({ where: { expenseId: expense.id } })
+    await tx.expense.delete({ where: { id: expense.id } })
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "expense.deleted",
+        entityType: "Expense",
+        entityId: expense.id,
+        before: {
+          description: expense.description,
+          amount: expense.amount.toFixed(2),
+          status: expense.status,
+        },
+      },
+    })
   })
 }

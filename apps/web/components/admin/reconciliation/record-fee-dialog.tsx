@@ -98,28 +98,19 @@ function RecordFeeDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={`Record provider fee · ${account.name}`}
-      description="Settled fees reduce the calculated provider balance. Pending fees are tracked but not deducted until settled."
+      description="Recorded fees are immediately settled and deducted from the calculated provider balance."
       className="max-w-2xl"
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
         <input type="hidden" {...register("providerAccountId")} />
+        <input type="hidden" {...register("status")} />
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="fee-kind">Fee kind</Label>
-            <NativeSelect id="fee-kind" {...register("kind")}>
-              <option value="GATEWAY_FEE">Gateway fee</option>
-              <option value="COMMISSION">Commission</option>
-            </NativeSelect>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="fee-status">Status</Label>
-            <NativeSelect id="fee-status" {...register("status")}>
-              <option value="SETTLED">Settled</option>
-              <option value="PENDING">Pending</option>
-            </NativeSelect>
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="fee-kind">Fee kind</Label>
+          <NativeSelect id="fee-kind" {...register("kind")}>
+            <option value="GATEWAY_FEE">Gateway fee</option>
+            <option value="COMMISSION">Commission</option>
+          </NativeSelect>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">

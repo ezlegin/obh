@@ -132,6 +132,8 @@ export type AdminProfitPeriod = {
   totalRevenue: string
   totalExpenses: string
   providerFees: string
+  retentionPercentage: string
+  retainedEarnings: string
   reserveAmount: string
   taxAmount: string
   netProfit: string
@@ -154,10 +156,12 @@ export type DistributionsWorkspace = {
   periods: AdminProfitPeriod[]
   accounts: Array<{ id: string; name: string }>
   currentMonth: string
+  defaultRetentionPercentage: string
   summary: {
     draftCount: number
     approvedCount: number
     closedCount: number
+    totalRetainedEarnings: string
     totalDistributable: string
     totalPaid: string
     lossCarryforward: string
@@ -166,7 +170,7 @@ export type DistributionsWorkspace = {
 
 export async function getDistributionsWorkspace(): Promise<DistributionsWorkspace> {
   const db = getDb()
-  const [periods, accounts] = await Promise.all([
+  const [periods, accounts, latestPolicyLog] = await Promise.all([
     db.profitPeriod.findMany({
       orderBy: { startsOn: "desc" },
       take: 60,
@@ -189,8 +193,32 @@ export async function getDistributionsWorkspace(): Promise<DistributionsWorkspac
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    db.auditLog.findFirst({
+      where: {
+        entityType: "RetentionPolicy",
+        entityId: "default",
+      },
+      orderBy: { createdAt: "desc" },
+      select: { after: true },
+    }),
   ])
 
+  let defaultRetentionPercentage = "40"
+  if (
+    latestPolicyLog?.after &&
+    typeof latestPolicyLog.after === "object" &&
+    !Array.isArray(latestPolicyLog.after) &&
+    "retentionPercentage" in latestPolicyLog.after &&
+    typeof latestPolicyLog.after.retentionPercentage === "string"
+  ) {
+    defaultRetentionPercentage = String(
+      Number(latestPolicyLog.after.retentionPercentage)
+    )
+  } else if (periods[0]?.retentionPercentage) {
+    defaultRetentionPercentage = String(Number(periods[0].retentionPercentage))
+  }
+
+  let totalRetainedEarnings = new Prisma.Decimal(0)
   let totalDistributable = new Prisma.Decimal(0)
   let totalPaid = new Prisma.Decimal(0)
   let draftCount = 0
@@ -210,7 +238,12 @@ export async function getDistributionsWorkspace(): Promise<DistributionsWorkspac
       closedCount += 1
     }
 
+    const periodRetained = (
+      period.reserveAmount ?? new Prisma.Decimal(0)
+    ).plus(period.unallocatedResidual ?? new Prisma.Decimal(0))
+
     if (period.status !== "DRAFT") {
+      totalRetainedEarnings = totalRetainedEarnings.plus(periodRetained)
       totalDistributable = totalDistributable.plus(
         period.distributableAmount ?? new Prisma.Decimal(0)
       )
@@ -270,6 +303,8 @@ export async function getDistributionsWorkspace(): Promise<DistributionsWorkspac
       totalRevenue: (period.totalRevenue ?? 0).toFixed(2),
       totalExpenses: (period.totalExpenses ?? 0).toFixed(2),
       providerFees: (period.providerFees ?? 0).toFixed(2),
+      retentionPercentage: (period.retentionPercentage ?? 0).toFixed(2),
+      retainedEarnings: (period.reserveAmount ?? 0).toFixed(2),
       reserveAmount: (period.reserveAmount ?? 0).toFixed(2),
       taxAmount: (period.taxAmount ?? 0).toFixed(2),
       netProfit: (period.netProfit ?? 0).toFixed(2),
@@ -293,10 +328,12 @@ export async function getDistributionsWorkspace(): Promise<DistributionsWorkspac
     periods: mapped,
     accounts,
     currentMonth: currentMonthValue(),
+    defaultRetentionPercentage,
     summary: {
       draftCount,
       approvedCount,
       closedCount,
+      totalRetainedEarnings: totalRetainedEarnings.toFixed(2),
       totalDistributable: totalDistributable.toFixed(2),
       totalPaid: totalPaid.toFixed(2),
       lossCarryforward: lossCarryforward.toFixed(2),

@@ -39,6 +39,7 @@ function CreateExpenseDialog({
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const firstCategory = categories[0]
+  const firstAccount = accounts[0]
 
   const {
     register,
@@ -50,7 +51,7 @@ function CreateExpenseDialog({
     resolver: zodResolver(createExpenseSchema),
     defaultValues: {
       categoryId: firstCategory?.id ?? "",
-      accountId: "",
+      accountId: firstAccount?.id ?? "",
       amount: "",
       spentOn: todayInputValue(),
       description: "",
@@ -64,7 +65,7 @@ function CreateExpenseDialog({
       setServerError(null)
       reset({
         categoryId: firstCategory?.id ?? "",
-        accountId: "",
+        accountId: firstAccount?.id ?? "",
         amount: "",
         spentOn: todayInputValue(),
         description: "",
@@ -72,7 +73,7 @@ function CreateExpenseDialog({
         externalReference: "",
       })
     }
-  }, [open, firstCategory?.id, reset])
+  }, [open, firstCategory?.id, firstAccount?.id, reset])
 
   const onSubmit = (values: CreateExpenseInput) => {
     setServerError(null)
@@ -95,7 +96,7 @@ function CreateExpenseDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Record an expense"
-      description="Expenses begin pending. After saving, attach a PDF or image reference from the expense detail, then mark the expense paid against a business payment source."
+      description="Recorded expenses are immediately marked paid and deducted from the business balance."
       className="max-w-2xl"
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">

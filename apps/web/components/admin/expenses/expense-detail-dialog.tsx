@@ -23,6 +23,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { ExpenseStatusBadge } from "@/components/admin/accounting/status-badges"
 import {
+  deleteExpenseAction,
   deleteExpenseDocumentAction,
   markExpensePaidAction,
 } from "@/app/admin/expenses/actions"
@@ -157,6 +158,30 @@ function ExpenseDetailDialog({
     }
 
     setPendingAction(null)
+  }
+
+  const removeExpense = async () => {
+    if (
+      !window.confirm(
+        `Remove expense "${expense.description}"? This cannot be undone.`
+      )
+    ) {
+      return
+    }
+
+    setPendingAction("delete-expense")
+    setError(null)
+
+    const result = await deleteExpenseAction({ expenseId: expense.id })
+
+    if (!result.ok) {
+      setError(result.error ?? "The expense could not be removed.")
+      setPendingAction(null)
+      return
+    }
+
+    onClose()
+    router.refresh()
   }
 
   return (
@@ -361,9 +386,7 @@ function ExpenseDetailDialog({
               <Button
                 type="button"
                 onClick={markPaid}
-                disabled={
-                  pendingAction === "paid" || !accountId || documentMissing
-                }
+                disabled={pendingAction === "paid" || !accountId}
               >
                 {pendingAction === "paid" ? (
                   <Loader2 aria-hidden="true" className="size-4 animate-spin" />
@@ -376,6 +399,27 @@ function ExpenseDetailDialog({
           )}
         </section>
       ) : null}
+
+      <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={removeExpense}
+          disabled={pendingAction === "delete-expense"}
+          className="text-danger hover:bg-danger/10 hover:text-danger"
+        >
+          {pendingAction === "delete-expense" ? (
+            <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+          ) : (
+            <Trash2 aria-hidden="true" className="size-3.5" />
+          )}
+          Remove expense
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={onClose}>
+          Close
+        </Button>
+      </div>
 
       {error ? (
         <div

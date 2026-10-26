@@ -1,5 +1,8 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { PiggyBank, Receipt, TrendingUp, Wallet } from "lucide-react"
+
+import { cn } from "@workspace/ui/lib/utils"
 
 import { AccountBalances } from "@/components/admin/account-balances"
 import { AdminPageHeader } from "@/components/admin/admin-page"
@@ -8,7 +11,11 @@ import { DashboardAlerts } from "@/components/admin/dashboard-alerts"
 import { DashboardTransactions } from "@/components/admin/dashboard-transactions"
 import { SummaryCard } from "@/components/admin/summary-card"
 import { formatIrr } from "@/lib/admin/format"
-import { getDashboardDataForAdmin } from "@/server/dashboard/queries"
+import {
+  DASHBOARD_PERIOD_OPTIONS,
+  getDashboardDataForAdmin,
+  parseDashboardPeriod,
+} from "@/server/dashboard/queries"
 
 export const dynamic = "force-dynamic"
 
@@ -18,8 +25,14 @@ export const metadata: Metadata = {
   },
 }
 
-export default async function AdminDashboardPage() {
-  const dashboard = await getDashboardDataForAdmin()
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string | string[] }>
+}) {
+  const params = await searchParams
+  const selectedPeriod = parseDashboardPeriod(params.period)
+  const dashboard = await getDashboardDataForAdmin(selectedPeriod)
 
   const summaryCards = [
     {
@@ -35,7 +48,7 @@ export default async function AdminDashboardPage() {
       id: "revenue",
       label: "Revenue",
       value: dashboard.summary.revenue,
-      hint: "vs previous month",
+      hint: dashboard.summary.comparisonHint,
       icon: TrendingUp,
       change: dashboard.summary.revenueChangeLabel,
       changeTone: dashboard.summary.revenueChangeTone,
@@ -44,7 +57,7 @@ export default async function AdminDashboardPage() {
       id: "expenses",
       label: "Expenses",
       value: dashboard.summary.expenses,
-      hint: "vs previous month",
+      hint: dashboard.summary.comparisonHint,
       icon: Receipt,
       change: dashboard.summary.expensesChangeLabel,
       changeTone: dashboard.summary.expensesChangeTone,
@@ -53,7 +66,7 @@ export default async function AdminDashboardPage() {
       id: "profit",
       label: "Net profit",
       value: dashboard.summary.netProfit,
-      hint: "vs previous month",
+      hint: dashboard.summary.comparisonHint,
       icon: PiggyBank,
       change: dashboard.summary.profitChangeLabel,
       changeTone: dashboard.summary.profitChangeTone,
@@ -69,7 +82,7 @@ export default async function AdminDashboardPage() {
       />
 
       <section aria-labelledby="summary-heading" className="mt-8">
-        <div className="flex items-end justify-between gap-4">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
             <p className="font-mono text-[9px] tracking-[0.14em] text-muted-foreground/60 uppercase">
               Summary
@@ -78,8 +91,34 @@ export default async function AdminDashboardPage() {
               id="summary-heading"
               className="mt-2 text-xl font-medium tracking-[-0.025em]"
             >
-              Current period · {dashboard.summary.periodLabel}
+              {dashboard.summary.periodLabel}
             </h2>
+          </div>
+
+          <div
+            role="group"
+            aria-label="Filter dashboard period"
+            className="inline-flex flex-wrap items-center gap-0.5 self-start rounded-xl border border-border bg-white/[0.02] p-0.5 lg:self-auto"
+          >
+            {DASHBOARD_PERIOD_OPTIONS.map((option) => {
+              const active = dashboard.period === option.id
+              return (
+                <Link
+                  key={option.id}
+                  href={`/admin?period=${option.id}`}
+                  scroll={false}
+                  aria-current={active ? "true" : undefined}
+                  className={cn(
+                    "rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    active
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {option.label}
+                </Link>
+              )
+            })}
           </div>
         </div>
 
@@ -102,6 +141,7 @@ export default async function AdminDashboardPage() {
         <CashflowChart
           data={dashboard.cashflow}
           rangeLabel={dashboard.cashflowRangeLabel}
+          badgeLabel={dashboard.cashflowBadgeLabel}
         />
       </div>
 

@@ -434,3 +434,42 @@ export async function simulateDevelopmentPaymentResult(
 
   return updated
 }
+
+export async function deletePayment(actorId: string, paymentId: string) {
+  const db = getDb()
+  const payment = await db.payment.findUnique({
+    where: { id: paymentId },
+  })
+
+  if (!payment) {
+    throw new DomainError("PAYMENT_NOT_FOUND", "Payment was not found.")
+  }
+
+  return db.$transaction(async (tx) => {
+    await tx.providerFee.deleteMany({ where: { paymentId: payment.id } })
+    await tx.paymentIdempotencyRecord.deleteMany({
+      where: { paymentId: payment.id },
+    })
+    await tx.webhookDelivery.deleteMany({ where: { paymentId: payment.id } })
+    await tx.paymentVerification.deleteMany({
+      where: { paymentId: payment.id },
+    })
+    await tx.paymentEvent.deleteMany({ where: { paymentId: payment.id } })
+    await tx.payment.delete({ where: { id: payment.id } })
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "payment.deleted",
+        entityType: "Payment",
+        entityId: payment.id,
+        before: {
+          reference: payment.reference,
+          amount: payment.amount.toFixed(2),
+          status: payment.status,
+          environment: payment.environment,
+        },
+      },
+    })
+  })
+}

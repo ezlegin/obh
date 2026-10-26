@@ -5,11 +5,13 @@ import { revalidatePath } from "next/cache"
 import { requireAdmin } from "@/lib/auth/guards"
 import {
   createDevelopmentPaymentSchema,
+  deletePaymentSchema,
   simulateDevelopmentResultSchema,
 } from "@/lib/validation/payment-platform"
 import { DomainError } from "@/server/errors"
 import {
   createDevelopmentPayment,
+  deletePayment,
   simulateDevelopmentPaymentResult,
 } from "@/server/payments/payment-service"
 
@@ -91,6 +93,27 @@ export async function simulateDevelopmentPaymentResultAction(
       paymentId: payment.id,
       reference: payment.reference,
     }
+  } catch (error) {
+    return actionError(error)
+  }
+}
+
+export async function deletePaymentAction(
+  input: unknown
+): Promise<PaymentActionResult> {
+  const admin = await requireAdmin()
+  const parsed = deletePaymentSchema.safeParse(input)
+
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid payment." }
+  }
+
+  try {
+    await deletePayment(admin.id, parsed.data.paymentId)
+    revalidatePath("/admin/payments")
+    revalidatePath("/admin/reconciliation")
+    revalidatePath("/admin")
+    return { ok: true }
   } catch (error) {
     return actionError(error)
   }

@@ -3,20 +3,23 @@
 import {
   BadgeDollarSign,
   Banknote,
+  Building2,
   CheckCircle2,
   History,
   Loader2,
   PieChart,
   Plus,
-  Scale,
+  Trash2,
   TrendingDown,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
+import { Input } from "@workspace/ui/components/input"
+import { Label } from "@workspace/ui/components/label"
 
 import { AccountingStat } from "@/components/admin/accounting/accounting-stat"
 import {
@@ -27,7 +30,11 @@ import { AdminDialog } from "@/components/admin/admin-dialog"
 import { AdminEmptyState } from "@/components/admin/empty-state"
 import { CalculatePeriodDialog } from "@/components/admin/distributions/calculate-period-dialog"
 import { PayoutDialog } from "@/components/admin/distributions/payout-dialog"
-import { approveProfitPeriodAction } from "@/app/admin/distributions/actions"
+import {
+  approveProfitPeriodAction,
+  deleteProfitPeriodAction,
+  updateRetentionPolicyAction,
+} from "@/app/admin/distributions/actions"
 import type {
   AdminProfitDistribution,
   AdminProfitPeriod,
@@ -44,12 +51,16 @@ function PeriodCard({
   period,
   onOpen,
   onApprove,
+  onDelete,
   approving,
+  deleting,
 }: {
   period: AdminProfitPeriod
   onOpen: () => void
   onApprove: () => void
+  onDelete: () => void
   approving: boolean
+  deleting: boolean
 }) {
   return (
     <article className="rounded-2xl border border-border bg-card/40 p-5">
@@ -66,13 +77,8 @@ function PeriodCard({
             {formatAccountingDate(period.endsOn)} · {period.ownershipTotal}%
             ownership snapshot
           </p>
-          {period.approvedByName ? (
-            <p className="mt-1 text-[10px] text-muted-foreground/60">
-              Approved by {period.approvedByName}
-            </p>
-          ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" size="sm" onClick={onOpen}>
             View allocations
           </Button>
@@ -91,10 +97,25 @@ function PeriodCard({
               Approve period
             </Button>
           ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Remove ${formatAccountingMonth(period.month)} period`}
+            onClick={onDelete}
+            disabled={deleting}
+            className="text-danger hover:bg-danger/10 hover:text-danger"
+          >
+            {deleting ? (
+              <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+            ) : (
+              <Trash2 aria-hidden="true" className="size-3.5" />
+            )}
+          </Button>
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
         <div className="rounded-xl border border-border bg-white/[0.02] p-3">
           <p className="text-[9px] text-muted-foreground">Revenue</p>
           <p className="mt-1 text-xs font-medium tabular-nums">
@@ -107,8 +128,19 @@ function PeriodCard({
             {formatIrrDecimal(period.netProfit)}
           </p>
         </div>
+        <div className="rounded-xl border border-info/25 bg-info/[0.04] p-3">
+          <p className="text-[9px] text-muted-foreground">
+            Retained in company ({Number(period.retentionPercentage)}%)
+          </p>
+          <p className="mt-1 text-xs font-medium tabular-nums">
+            {formatIrrDecimal(period.retainedEarnings)}
+          </p>
+        </div>
         <div className="rounded-xl border border-border bg-white/[0.02] p-3">
-          <p className="text-[9px] text-muted-foreground">Distributable</p>
+          <p className="text-[9px] text-muted-foreground">
+            Shareholder pool (
+            {Number((100 - Number(period.retentionPercentage)).toFixed(4))}%)
+          </p>
           <p className="mt-1 text-xs font-medium tabular-nums">
             {formatIrrDecimal(period.distributableAmount)}
           </p>
@@ -153,11 +185,57 @@ function PeriodDetailDialog({
     >
       <div className="flex flex-wrap items-center gap-2">
         <ProfitPeriodStatusBadge status={period.status} />
+        <Badge variant="outline">
+          {Number(period.retentionPercentage)}% company retained
+        </Badge>
+        <Badge variant="outline">
+          {Number((100 - Number(period.retentionPercentage)).toFixed(4))}%
+          shareholder pool
+        </Badge>
         <Badge variant="outline">{period.ownershipTotal}% ownership</Badge>
       </div>
 
       <div className="mt-4">
-        <div className="grid gap-2 rounded-xl border border-border p-4 text-xs sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-info/25 bg-info/[0.04] p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium">
+                Company Retained Earnings ({Number(period.retentionPercentage)}
+                %)
+              </p>
+              <Badge variant="outline">Company record</Badge>
+            </div>
+            <p className="mt-2 text-lg font-medium tabular-nums">
+              {formatIrrDecimal(period.retainedEarnings)}
+            </p>
+            <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
+              Remains in the company for future growth and expenses. Does not
+              belong to a separate shareholder.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-white/[0.02] p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium">
+                Shareholder Distributable Pool (
+                {Number((100 - Number(period.retentionPercentage)).toFixed(4))}
+                %)
+              </p>
+              <Badge variant="outline">
+                {period.ownershipTotal}% ownership
+              </Badge>
+            </div>
+            <p className="mt-2 text-lg font-medium tabular-nums">
+              {formatIrrDecimal(period.distributableAmount)}
+            </p>
+            <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
+              Distributed among shareholders according to their unchanged
+              ownership percentages.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 grid gap-2 rounded-xl border border-border p-4 text-xs sm:grid-cols-3">
           <p>
             Revenue{" "}
             <span className="float-right tabular-nums">
@@ -177,12 +255,6 @@ function PeriodDetailDialog({
             </span>
           </p>
           <p>
-            Reserve{" "}
-            <span className="float-right tabular-nums">
-              {formatIrrDecimal(period.reserveAmount)}
-            </span>
-          </p>
-          <p>
             Tax{" "}
             <span className="float-right tabular-nums">
               {formatIrrDecimal(period.taxAmount)}
@@ -192,6 +264,12 @@ function PeriodDetailDialog({
             Net profit{" "}
             <span className="float-right tabular-nums">
               {formatIrrDecimal(period.netProfit)}
+            </span>
+          </p>
+          <p>
+            Retained ({Number(period.retentionPercentage)}%){" "}
+            <span className="float-right tabular-nums">
+              {formatIrrDecimal(period.retainedEarnings)}
             </span>
           </p>
           <p>
@@ -207,7 +285,7 @@ function PeriodDetailDialog({
             </span>
           </p>
           <p>
-            Distributable{" "}
+            Distributable ({Number((100 - Number(period.retentionPercentage)).toFixed(4))}%){" "}
             <span className="float-right tabular-nums">
               {formatIrrDecimal(period.distributableAmount)}
             </span>
@@ -351,6 +429,27 @@ function DistributionsWorkspace({
     useState<AdminProfitDistribution | null>(null)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [retentionInput, setRetentionInput] = useState(
+    data.defaultRetentionPercentage
+  )
+  const [retentionSavedMessage, setRetentionSavedMessage] = useState<
+    string | null
+  >(null)
+
+  useEffect(() => {
+    setRetentionInput(data.defaultRetentionPercentage)
+  }, [data.defaultRetentionPercentage])
+
+  const parsedRetention = Number.parseFloat(retentionInput || "0")
+  const previewRetention =
+    Number.isFinite(parsedRetention) &&
+    parsedRetention >= 0 &&
+    parsedRetention <= 100
+      ? parsedRetention
+      : 0
+  const previewShareholderShare = Number(
+    (100 - previewRetention).toFixed(4)
+  )
 
   const selectedPeriod =
     data.periods.find((period) => period.id === selectedPeriodId) ?? null
@@ -358,6 +457,27 @@ function DistributionsWorkspace({
     shareholderCount > 0 && currentOwnershipTotal === "100.0000"
 
   const refresh = () => router.refresh()
+
+  const saveRetentionPolicy = async () => {
+    setPendingKey("retention-policy")
+    setError(null)
+    setRetentionSavedMessage(null)
+
+    const result = await updateRetentionPolicyAction({
+      retentionPercentage: retentionInput,
+    })
+
+    if (!result.ok) {
+      setError(result.error ?? "The retention percentage could not be updated.")
+    } else {
+      setRetentionSavedMessage(
+        `Default company retention updated to ${previewRetention}% (${previewShareholderShare}% distributed to shareholders).`
+      )
+      refresh()
+    }
+
+    setPendingKey(null)
+  }
 
   const approve = async (period: AdminProfitPeriod) => {
     if (
@@ -384,13 +504,47 @@ function DistributionsWorkspace({
     setPendingKey(null)
   }
 
+  const removePeriod = async (period: AdminProfitPeriod) => {
+    if (
+      !window.confirm(
+        `Remove the ${formatAccountingMonth(period.month)} profit period? Any allocations and payout records for this period will also be removed.`
+      )
+    ) {
+      return
+    }
+
+    setPendingKey(`delete:${period.id}`)
+    setError(null)
+
+    const result = await deleteProfitPeriodAction({
+      profitPeriodId: period.id,
+    })
+
+    if (!result.ok) {
+      setError(result.error ?? "The profit period could not be removed.")
+    } else {
+      if (selectedPeriodId === period.id) {
+        setSelectedPeriodId(null)
+      }
+      refresh()
+    }
+
+    setPendingKey(null)
+  }
+
   return (
     <>
       <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AccountingStat
-          label="Total distributable"
+          label="Company retained earnings"
+          value={formatIrrDecimal(data.summary.totalRetainedEarnings)}
+          hint="Net profit kept in the company for future growth & expenses."
+          icon={Building2}
+        />
+        <AccountingStat
+          label="Shareholder distributable"
           value={formatIrrDecimal(data.summary.totalDistributable)}
-          hint="Approved and closed monthly periods."
+          hint="Remaining net profit allocated to shareholders."
           icon={PieChart}
         />
         <AccountingStat
@@ -400,18 +554,114 @@ function DistributionsWorkspace({
           icon={BadgeDollarSign}
         />
         <AccountingStat
-          label="Open periods"
-          value={String(data.summary.draftCount + data.summary.approvedCount)}
-          hint="Draft or approved periods awaiting payout completion."
-          icon={Scale}
-        />
-        <AccountingStat
           label="Loss carried forward"
           value={formatIrrDecimal(data.summary.lossCarryforward)}
-          hint="Accumulated approved losses to offset future profit."
+          hint="Accumulated losses to offset future profit."
           icon={TrendingDown}
         />
       </div>
+
+      <section className="mt-6 rounded-2xl border border-border bg-card/40 p-5">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2">
+              <Building2 aria-hidden="true" className="size-4 text-info" />
+              <h2 className="text-sm font-medium">
+                Configurable Company Retention Policy
+              </h2>
+            </div>
+            <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+              Configure the percentage of monthly net profit that remains in the
+              company as retained earnings for future growth and expenses. Only
+              the remaining{" "}
+              <span className="font-medium text-foreground">
+                {previewShareholderShare}%
+              </span>{" "}
+              is distributed among shareholders according to their unchanged
+              ownership percentages.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="w-44 space-y-1.5">
+              <Label htmlFor="retention-percentage-input" className="text-xs">
+                Company retention (%)
+              </Label>
+              <Input
+                id="retention-percentage-input"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={retentionInput}
+                onChange={(event) => {
+                  setRetentionInput(event.target.value)
+                  setRetentionSavedMessage(null)
+                }}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={saveRetentionPolicy}
+              disabled={pendingKey === "retention-policy"}
+            >
+              {pendingKey === "retention-policy" ? (
+                <>
+                  <Loader2
+                    aria-hidden="true"
+                    className="size-3.5 animate-spin"
+                  />
+                  Saving…
+                </>
+              ) : (
+                "Save retention %"
+              )}
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 rounded-xl border border-border bg-white/[0.02] p-3.5 text-[11px] text-muted-foreground sm:grid-cols-3">
+          <div>
+            <span className="font-medium text-foreground">
+              Company retained ({previewRetention}%):
+            </span>{" "}
+            Kept in the company ledger (not assigned to a separate shareholder).
+          </div>
+          <div>
+            <span className="font-medium text-foreground">
+              Shareholder pool ({previewShareholderShare}%):
+            </span>{" "}
+            Allocated across shareholders using their existing{" "}
+            {currentOwnershipTotal}% ownership.
+          </div>
+          <div>
+            <span className="font-medium text-foreground">
+              Example on 10,000,000:
+            </span>{" "}
+            {Math.round(10_000_000 * (previewRetention / 100)).toLocaleString(
+              "en-US"
+            )}{" "}
+            retained ·{" "}
+            {Math.round(
+              10_000_000 * (previewShareholderShare / 100)
+            ).toLocaleString("en-US")}{" "}
+            distributed (60% owner →{" "}
+            {Math.round(
+              10_000_000 * (previewShareholderShare / 100) * 0.6
+            ).toLocaleString("en-US")}
+            , 40% owner →{" "}
+            {Math.round(
+              10_000_000 * (previewShareholderShare / 100) * 0.4
+            ).toLocaleString("en-US")}
+            ).
+          </div>
+        </div>
+
+        {retentionSavedMessage ? (
+          <p className="mt-3 text-xs text-success">{retentionSavedMessage}</p>
+        ) : null}
+      </section>
 
       {!ownershipReady ? (
         <div className="mt-4 rounded-xl border border-warning/20 bg-warning/[0.045] p-4">
@@ -506,7 +756,9 @@ function DistributionsWorkspace({
               period={period}
               onOpen={() => setSelectedPeriodId(period.id)}
               onApprove={() => approve(period)}
+              onDelete={() => removePeriod(period)}
               approving={pendingKey === period.id}
+              deleting={pendingKey === `delete:${period.id}`}
             />
           ))}
         </div>
@@ -514,6 +766,7 @@ function DistributionsWorkspace({
 
       <CalculatePeriodDialog
         currentMonth={data.currentMonth}
+        defaultRetentionPercentage={data.defaultRetentionPercentage}
         open={calculateOpen}
         onOpenChange={setCalculateOpen}
         onCalculated={(id) => {

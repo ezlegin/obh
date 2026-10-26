@@ -5,11 +5,13 @@ import { revalidatePath } from "next/cache"
 import { requireAdmin } from "@/lib/auth/guards"
 import {
   createBusinessAccountSchema,
+  deleteBusinessAccountSchema,
   toggleBusinessAccountSchema,
 } from "@/lib/validation/accounting"
 import { DomainError } from "@/server/errors"
 import {
   createBusinessAccount,
+  deleteBusinessAccount,
   setBusinessAccountActive,
 } from "@/server/accounting/accounts"
 
@@ -52,6 +54,7 @@ export async function createBusinessAccountAction(
     revalidatePath("/admin/accounts")
     revalidatePath("/admin/expenses")
     revalidatePath("/admin/income")
+    revalidatePath("/admin")
     return { ok: true }
   } catch (error) {
     return actionError(error)
@@ -77,6 +80,29 @@ export async function toggleBusinessAccountAction(
     revalidatePath("/admin/accounts")
     revalidatePath("/admin/expenses")
     revalidatePath("/admin/income")
+    revalidatePath("/admin")
+    return { ok: true }
+  } catch (error) {
+    return actionError(error)
+  }
+}
+
+export async function deleteBusinessAccountAction(
+  input: unknown
+): Promise<AccountingActionResult> {
+  const admin = await requireAdmin()
+  const parsed = deleteBusinessAccountSchema.safeParse(input)
+
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid payment source." }
+  }
+
+  try {
+    await deleteBusinessAccount(admin.id, parsed.data.accountId)
+    revalidatePath("/admin/accounts")
+    revalidatePath("/admin/expenses")
+    revalidatePath("/admin/income")
+    revalidatePath("/admin")
     return { ok: true }
   } catch (error) {
     return actionError(error)

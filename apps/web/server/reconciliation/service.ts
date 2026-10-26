@@ -132,7 +132,7 @@ export async function recordProviderFee(
         providerAccountId: account.id,
         paymentId: values.paymentId || null,
         kind: values.kind,
-        status: values.status,
+        status: "SETTLED",
         amount,
         currency: account.currency,
         chargedAt: parseDateOnly(values.chargedAt),
@@ -274,5 +274,87 @@ export async function recordReconciliation(
     })
 
     return reconciliation
+  })
+}
+
+export async function deleteProviderFee(actorId: string, feeId: string) {
+  const db = getDb()
+  const fee = await db.providerFee.findUnique({ where: { id: feeId } })
+  if (!fee) {
+    throw new DomainError("FEE_NOT_FOUND", "Provider fee was not found.")
+  }
+
+  return db.$transaction(async (tx) => {
+    await tx.providerFee.delete({ where: { id: fee.id } })
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "provider_fee.deleted",
+        entityType: "ProviderFee",
+        entityId: fee.id,
+        before: {
+          accountId: fee.providerAccountId,
+          amount: fee.amount.toFixed(2),
+          kind: fee.kind,
+        },
+      },
+    })
+  })
+}
+
+export async function deleteSettlement(actorId: string, transferId: string) {
+  const db = getDb()
+  const transfer = await db.transfer.findUnique({ where: { id: transferId } })
+  if (!transfer) {
+    throw new DomainError("SETTLEMENT_NOT_FOUND", "Settlement was not found.")
+  }
+
+  return db.$transaction(async (tx) => {
+    await tx.transfer.delete({ where: { id: transfer.id } })
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "provider_settlement.deleted",
+        entityType: "Transfer",
+        entityId: transfer.id,
+        before: {
+          reference: transfer.reference,
+          amount: transfer.amount.toFixed(2),
+        },
+      },
+    })
+  })
+}
+
+export async function deleteReconciliation(
+  actorId: string,
+  reconciliationId: string
+) {
+  const db = getDb()
+  const reconciliation = await db.accountReconciliation.findUnique({
+    where: { id: reconciliationId },
+  })
+  if (!reconciliation) {
+    throw new DomainError(
+      "RECONCILIATION_NOT_FOUND",
+      "Reconciliation record was not found."
+    )
+  }
+
+  return db.$transaction(async (tx) => {
+    await tx.accountReconciliation.delete({ where: { id: reconciliation.id } })
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "provider_account.reconciliation_deleted",
+        entityType: "AccountReconciliation",
+        entityId: reconciliation.id,
+        before: {
+          accountId: reconciliation.accountId,
+          actualBalance: reconciliation.actualBalance.toFixed(2),
+          calculatedBalance: reconciliation.calculatedBalance.toFixed(2),
+        },
+      },
+    })
   })
 }

@@ -20,6 +20,15 @@ const percentageSchema = z
     return parsed > 0 && parsed <= 100
   }, "Percentage must be greater than 0 and at most 100.")
 
+const nonNegativePercentageSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{1,3}(?:\.\d{1,4})?$/, "Use a percentage between 0 and 100.")
+  .refine((value) => {
+    const parsed = Number(value)
+    return parsed >= 0 && parsed <= 100
+  }, "Retention percentage must be between 0 and 100.")
+
 const nonNegativeAmountSchema = z
   .string()
   .trim()
@@ -68,9 +77,14 @@ export const endOwnershipRecordSchema = z.object({
 
 export const calculateProfitPeriodSchema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/, "Choose a month."),
-  reserveAmount: nonNegativeAmountSchema,
+  retentionPercentage: nonNegativePercentageSchema,
+  reserveAmount: nonNegativeAmountSchema.optional().or(z.literal("")),
   taxAmount: nonNegativeAmountSchema,
   adjustmentNote: z.string().trim().max(2000).optional().or(z.literal("")),
+})
+
+export const updateRetentionPolicySchema = z.object({
+  retentionPercentage: nonNegativePercentageSchema,
 })
 
 export const approveProfitPeriodSchema = z.object({
@@ -82,6 +96,18 @@ export const recordShareholderPayoutSchema = z.object({
   accountId: uuidSchema,
   externalReference: z.string().trim().max(191).optional().or(z.literal("")),
   note: z.string().trim().max(1000).optional().or(z.literal("")),
+})
+
+export const deleteShareholderSchema = z.object({
+  shareholderId: uuidSchema,
+})
+
+export const deleteOwnershipRecordSchema = z.object({
+  ownershipRecordId: uuidSchema,
+})
+
+export const deleteProfitPeriodSchema = z.object({
+  profitPeriodId: uuidSchema,
 })
 
 export type CreateShareholderInput = z.infer<typeof createShareholderSchema>

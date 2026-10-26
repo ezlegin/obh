@@ -4,10 +4,8 @@ import { Prisma } from "@/lib/generated/prisma/client"
 import { getDb } from "@/lib/db/client"
 import {
   addDays,
-  currentMonthValue,
   formatDateOnly,
   formatMonthLabel,
-  monthRange,
   parseDateOnly,
   todayDateOnlyInTehran,
 } from "@/server/accounting/dates"
@@ -17,6 +15,43 @@ import {
   SADAD_PROVIDER_NAME,
 } from "@/server/payments/providers/sadad"
 import { calculateProviderBalance } from "@/server/reconciliation/service"
+
+export type DashboardPeriod =
+  | "today"
+  | "weekly"
+  | "monthly"
+  | "3m"
+  | "6m"
+  | "annual"
+
+export const DASHBOARD_PERIOD_OPTIONS: ReadonlyArray<{
+  id: DashboardPeriod
+  label: string
+}> = [
+  { id: "today", label: "Today" },
+  { id: "weekly", label: "Weekly" },
+  { id: "monthly", label: "Monthly" },
+  { id: "3m", label: "3 months" },
+  { id: "6m", label: "6 months" },
+  { id: "annual", label: "Annual" },
+]
+
+export function parseDashboardPeriod(
+  value: string | string[] | undefined
+): DashboardPeriod {
+  const raw = Array.isArray(value) ? value[0] : value
+  if (
+    raw === "today" ||
+    raw === "weekly" ||
+    raw === "monthly" ||
+    raw === "3m" ||
+    raw === "6m" ||
+    raw === "annual"
+  ) {
+    return raw
+  }
+  return "monthly"
+}
 
 export type DashboardTransactionStatus =
   | "completed"
@@ -70,12 +105,14 @@ export type DashboardCashflowPoint = {
 }
 
 export type DashboardData = {
+  period: DashboardPeriod
   summary: {
     totalBalance: number
     revenue: number
     expenses: number
     netProfit: number
     periodLabel: string
+    comparisonHint: string
     accountCount: number
     completedPaymentCount: number
     paidExpenseCount: number
@@ -87,12 +124,15 @@ export type DashboardData = {
     profitChangeTone: "positive" | "negative" | "neutral"
   }
   cashflowRangeLabel: string
+  cashflowBadgeLabel: string
   cashflow: DashboardCashflowPoint[]
   accounts: DashboardAccount[]
   transactions: DashboardTransaction[]
   services: string[]
   alerts: DashboardAlert[]
 }
+
+const TEHRAN_OFFSET = "+03:30"
 
 function toNumber(value: Prisma.Decimal | null | undefined): number {
   if (!value) {
@@ -109,6 +149,23 @@ function formatDayShortLabel(dateOnly: string): string {
   }).format(new Date(`${dateOnly}T00:00:00.000Z`))
 }
 
+function formatDayWithYearLabel(dateOnly: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${dateOnly}T00:00:00.000Z`))
+}
+
+function formatMonthShortLabel(monthValue: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "short",
+    year: "2-digit",
+    timeZone: "UTC",
+  }).format(new Date(`${monthValue}-01T00:00:00.000Z`))
+}
+
 function toTehranDateOnly(instant: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
@@ -118,14 +175,127 @@ function toTehranDateOnly(instant: Date): string {
   }).format(instant)
 }
 
-function previousMonthValue(monthValue: string): string {
-  const [yearPart, monthPart] = monthValue.split("-")
-  const year = Number(yearPart)
-  const month = Number(monthPart)
-  if (month === 1) {
-    return `${year - 1}-12`
+function toTehranHour(instant: Date): number {
+  const formatted = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Tehran",
+  }).format(instant)
+  return Number(formatted) % 24
+}
+
+type PeriodWindow = {
+  period: DashboardPeriod
+  days: number
+  currentFromStr: string
+  currentToStr: string
+  currentFromDate: Date
+  currentToDate: Date
+  currentStartInstant: Date
+  currentEndInstant: Date
+  prevFromDate: Date
+  prevToDate: Date
+  prevStartInstant: Date
+  prevEndInstant: Date
+  periodLabel: string
+  comparisonHint: string
+  cashflowRangeLabel: string
+  cashflowBadgeLabel: string
+}
+
+function resolvePeriodWindow(period: DashboardPeriod): PeriodWindow {
+  const todayStr = todayDateOnlyInTehran()
+  const todayDate = parseDateOnly(todayStr)
+  const tomorrowStr = formatDateOnly(addDays(todayDate, 1))
+
+  const configByPeriod: Record<
+    DashboardPeriod,
+    {
+      days: number
+      titlePrefix: string
+      comparisonHint: string
+      badgeLabel: string
+    }
+  > = {
+    today: {
+      days: 1,
+      titlePrefix: "Today",
+      comparisonHint: "vs yesterday",
+      badgeLabel: "Today",
+    },
+    weekly: {
+      days: 7,
+      titlePrefix: "Last 7 days",
+      comparisonHint: "vs previous 7 days",
+      badgeLabel: "Last 7 days",
+    },
+    monthly: {
+      days: 30,
+      titlePrefix: "Last 30 days",
+      comparisonHint: "vs previous 30 days",
+      badgeLabel: "Last 30 days",
+    },
+    "3m": {
+      days: 90,
+      titlePrefix: "Last 3 months",
+      comparisonHint: "vs previous 3 months",
+      badgeLabel: "Last 3 months",
+    },
+    "6m": {
+      days: 180,
+      titlePrefix: "Last 6 months",
+      comparisonHint: "vs previous 6 months",
+      badgeLabel: "Last 6 months",
+    },
+    annual: {
+      days: 365,
+      titlePrefix: "Annual (12 months)",
+      comparisonHint: "vs previous 12 months",
+      badgeLabel: "Last 12 months",
+    },
   }
-  return `${year}-${String(month - 1).padStart(2, "0")}`
+
+  const cfg = configByPeriod[period]
+  const currentFromDate = addDays(todayDate, -(cfg.days - 1))
+  const currentFromStr = formatDateOnly(currentFromDate)
+  const currentToDate = todayDate
+  const currentToStr = todayStr
+
+  const prevToDate = addDays(currentFromDate, -1)
+  const prevFromDate = addDays(prevToDate, -(cfg.days - 1))
+  const prevFromStr = formatDateOnly(prevFromDate)
+
+  const currentStartInstant = new Date(
+    `${currentFromStr}T00:00:00${TEHRAN_OFFSET}`
+  )
+  const currentEndInstant = new Date(`${tomorrowStr}T00:00:00${TEHRAN_OFFSET}`)
+
+  const prevStartInstant = new Date(`${prevFromStr}T00:00:00${TEHRAN_OFFSET}`)
+  const prevEndInstant = currentStartInstant
+
+  const rangeDisplay =
+    cfg.days === 1
+      ? formatDayWithYearLabel(todayStr)
+      : `${formatDayShortLabel(currentFromStr)} – ${formatDayWithYearLabel(currentToStr)}`
+
+  return {
+    period,
+    days: cfg.days,
+    currentFromStr,
+    currentToStr,
+    currentFromDate,
+    currentToDate,
+    currentStartInstant,
+    currentEndInstant,
+    prevFromDate,
+    prevToDate,
+    prevStartInstant,
+    prevEndInstant,
+    periodLabel: `${cfg.titlePrefix} · ${rangeDisplay}`,
+    comparisonHint: cfg.comparisonHint,
+    cashflowRangeLabel: rangeDisplay,
+    cashflowBadgeLabel: cfg.badgeLabel,
+  }
 }
 
 function formatPercentageChange(
@@ -141,7 +311,7 @@ function formatPercentageChange(
       return { label: "0%", tone: "neutral" }
     }
     return {
-      label: current > 0 ? "New this month" : "—",
+      label: current > 0 ? "New in period" : "—",
       tone: current > 0 ? (invertTone ? "negative" : "positive") : "neutral",
     }
   }
@@ -185,39 +355,253 @@ function mapPaymentStatus(
   }
 }
 
-export async function getDashboardDataForAdmin(): Promise<DashboardData> {
+function buildCashflowPoints(
+  window: PeriodWindow,
+  payments: Array<{ amount: Prisma.Decimal; completedAt: Date | null; createdAt: Date }>,
+  incomes: Array<{ amount: Prisma.Decimal; receivedOn: Date }>,
+  expenses: Array<{ amount: Prisma.Decimal; spentOn: Date }>,
+  fees: Array<{ amount: Prisma.Decimal; chargedAt: Date }>
+): DashboardCashflowPoint[] {
+  // 1) Today -> 8 three-hour buckets (00:00 .. 21:00)
+  if (window.period === "today") {
+    const buckets = Array.from({ length: 8 }, (_, idx) => {
+      const hour = idx * 3
+      return {
+        label: `${String(hour).padStart(2, "0")}:00`,
+        revenue: 0,
+        expenses: 0,
+      }
+    })
+
+    for (const payment of payments) {
+      const hour = toTehranHour(payment.completedAt ?? payment.createdAt)
+      const index = Math.min(7, Math.floor(hour / 3))
+      buckets[index]!.revenue += toNumber(payment.amount)
+    }
+
+    for (const fee of fees) {
+      const hour = toTehranHour(fee.chargedAt)
+      const index = Math.min(7, Math.floor(hour / 3))
+      buckets[index]!.expenses += toNumber(fee.amount)
+    }
+
+    // Date-only incomes and expenses on "today" are placed in the 09:00 bucket
+    for (const income of incomes) {
+      buckets[3]!.revenue += toNumber(income.amount)
+    }
+    for (const expense of expenses) {
+      buckets[3]!.expenses += toNumber(expense.amount)
+    }
+
+    return buckets
+  }
+
+  // 2) Weekly (7 days) or Monthly (30 days) -> daily buckets
+  if (window.period === "weekly" || window.period === "monthly") {
+    const byDate = new Map<string, { revenue: number; expenses: number }>()
+    const dateKeys: string[] = []
+
+    for (let offset = window.days - 1; offset >= 0; offset -= 1) {
+      const dayDate = addDays(window.currentToDate, -offset)
+      const key = formatDateOnly(dayDate)
+      dateKeys.push(key)
+      byDate.set(key, { revenue: 0, expenses: 0 })
+    }
+
+    for (const payment of payments) {
+      const key = toTehranDateOnly(payment.completedAt ?? payment.createdAt)
+      const bucket = byDate.get(key)
+      if (bucket) {
+        bucket.revenue += toNumber(payment.amount)
+      }
+    }
+
+    for (const income of incomes) {
+      const key = formatDateOnly(income.receivedOn)
+      const bucket = byDate.get(key)
+      if (bucket) {
+        bucket.revenue += toNumber(income.amount)
+      }
+    }
+
+    for (const expense of expenses) {
+      const key = formatDateOnly(expense.spentOn)
+      const bucket = byDate.get(key)
+      if (bucket) {
+        bucket.expenses += toNumber(expense.amount)
+      }
+    }
+
+    for (const fee of fees) {
+      const key = toTehranDateOnly(fee.chargedAt)
+      const bucket = byDate.get(key)
+      if (bucket) {
+        bucket.expenses += toNumber(fee.amount)
+      }
+    }
+
+    return dateKeys.map((key) => {
+      const bucket = byDate.get(key) ?? { revenue: 0, expenses: 0 }
+      return {
+        label: formatDayShortLabel(key),
+        revenue: bucket.revenue,
+        expenses: bucket.expenses,
+      }
+    })
+  }
+
+  // 3) 3 months (90 days) -> 13 weekly buckets
+  if (window.period === "3m") {
+    const bucketCount = 13
+    const buckets: Array<{
+      startKey: string
+      endKey: string
+      label: string
+      revenue: number
+      expenses: number
+    }> = []
+
+    for (let i = 0; i < bucketCount; i += 1) {
+      const startDate = addDays(window.currentFromDate, i * 7)
+      const endDate =
+        i === bucketCount - 1
+          ? window.currentToDate
+          : addDays(startDate, 6)
+      const startKey = formatDateOnly(startDate)
+      const endKey = formatDateOnly(endDate)
+      buckets.push({
+        startKey,
+        endKey,
+        label: formatDayShortLabel(startKey),
+        revenue: 0,
+        expenses: 0,
+      })
+    }
+
+    const addByKey = (dateKey: string, kind: "revenue" | "expenses", amount: number) => {
+      const target = buckets.find(
+        (b) => dateKey >= b.startKey && dateKey <= b.endKey
+      )
+      if (target) {
+        target[kind] += amount
+      }
+    }
+
+    for (const payment of payments) {
+      addByKey(
+        toTehranDateOnly(payment.completedAt ?? payment.createdAt),
+        "revenue",
+        toNumber(payment.amount)
+      )
+    }
+    for (const income of incomes) {
+      addByKey(
+        formatDateOnly(income.receivedOn),
+        "revenue",
+        toNumber(income.amount)
+      )
+    }
+    for (const expense of expenses) {
+      addByKey(
+        formatDateOnly(expense.spentOn),
+        "expenses",
+        toNumber(expense.amount)
+      )
+    }
+    for (const fee of fees) {
+      addByKey(
+        toTehranDateOnly(fee.chargedAt),
+        "expenses",
+        toNumber(fee.amount)
+      )
+    }
+
+    return buckets.map(({ label, revenue, expenses }) => ({
+      label,
+      revenue,
+      expenses,
+    }))
+  }
+
+  // 4) 6 months or Annual -> monthly buckets
+  const monthCount = window.period === "6m" ? 6 : 12
+  const monthKeys: string[] = []
+  const byMonth = new Map<string, { revenue: number; expenses: number }>()
+
+  const endYear = window.currentToDate.getUTCFullYear()
+  const endMonth = window.currentToDate.getUTCMonth()
+
+  for (let offset = monthCount - 1; offset >= 0; offset -= 1) {
+    const d = new Date(Date.UTC(endYear, endMonth - offset, 1))
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`
+    monthKeys.push(key)
+    byMonth.set(key, { revenue: 0, expenses: 0 })
+  }
+
+  for (const payment of payments) {
+    const key = toTehranDateOnly(payment.completedAt ?? payment.createdAt).slice(0, 7)
+    const bucket = byMonth.get(key)
+    if (bucket) {
+      bucket.revenue += toNumber(payment.amount)
+    }
+  }
+
+  for (const income of incomes) {
+    const key = formatDateOnly(income.receivedOn).slice(0, 7)
+    const bucket = byMonth.get(key)
+    if (bucket) {
+      bucket.revenue += toNumber(income.amount)
+    }
+  }
+
+  for (const expense of expenses) {
+    const key = formatDateOnly(expense.spentOn).slice(0, 7)
+    const bucket = byMonth.get(key)
+    if (bucket) {
+      bucket.expenses += toNumber(expense.amount)
+    }
+  }
+
+  for (const fee of fees) {
+    const key = toTehranDateOnly(fee.chargedAt).slice(0, 7)
+    const bucket = byMonth.get(key)
+    if (bucket) {
+      bucket.expenses += toNumber(fee.amount)
+    }
+  }
+
+  return monthKeys.map((key) => {
+    const bucket = byMonth.get(key) ?? { revenue: 0, expenses: 0 }
+    return {
+      label:
+        monthCount <= 6 ? formatMonthLabel(key).slice(0, 3) : formatMonthShortLabel(key),
+      revenue: bucket.revenue,
+      expenses: bucket.expenses,
+    }
+  })
+}
+
+export async function getDashboardDataForAdmin(
+  period: DashboardPeriod = "monthly"
+): Promise<DashboardData> {
   await ensureSadadGateway()
   const db = getDb()
 
-  const currentMonth = currentMonthValue()
-  const prevMonth = previousMonthValue(currentMonth)
-  const currentRange = monthRange(currentMonth)
-  const prevRange = monthRange(prevMonth)
-
-  const currentFromDate = parseDateOnly(currentRange.startsOn)
-  const currentToDate = parseDateOnly(currentRange.endsOn)
-  const prevFromDate = parseDateOnly(prevRange.startsOn)
-  const prevToDate = parseDateOnly(prevRange.endsOn)
-
-  const todayStr = todayDateOnlyInTehran()
-  const todayDate = parseDateOnly(todayStr)
-  const sevenDaysAgoDate = addDays(todayDate, -6)
-  const sevenDaysAgoStr = formatDateOnly(sevenDaysAgoDate)
-  const cashflowStartInstant = new Date(`${sevenDaysAgoStr}T00:00:00+03:30`)
+  const window = resolvePeriodWindow(period)
 
   const [
     providerAccountRows,
     businessAccountRows,
-    recentPayments,
+    periodPayments,
     connectedServices,
-    currentMonthCompletedPayments,
-    prevMonthCompletedPayments,
-    currentMonthIncome,
-    prevMonthIncome,
-    currentMonthPaidExpenses,
-    prevMonthPaidExpenses,
-    currentMonthSettledFees,
-    prevMonthSettledFees,
+    currentCompletedPayments,
+    prevCompletedPayments,
+    currentIncome,
+    prevIncome,
+    currentPaidExpenses,
+    prevPaidExpenses,
+    currentSettledFees,
+    prevSettledFees,
     cashflowPayments,
     cashflowIncomes,
     cashflowExpenses,
@@ -225,7 +609,7 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
     pendingPaymentsByAccount,
     pendingExpensesByAccount,
     unassignedPendingExpenses,
-    failedPaymentsLast7Days,
+    failedPaymentsInPeriod,
     failedWebhookDeliveries,
     dueRecurringExpenses,
   ] = await Promise.all([
@@ -251,6 +635,12 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
       },
     }),
     db.payment.findMany({
+      where: {
+        createdAt: {
+          gte: window.currentStartInstant,
+          lt: window.currentEndInstant,
+        },
+      },
       orderBy: { createdAt: "desc" },
       take: 100,
       include: {
@@ -266,8 +656,8 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
       where: {
         status: "COMPLETED",
         completedAt: {
-          gte: currentRange.startInstant,
-          lt: currentRange.endInstant,
+          gte: window.currentStartInstant,
+          lt: window.currentEndInstant,
         },
       },
       _sum: { amount: true },
@@ -277,45 +667,47 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
       where: {
         status: "COMPLETED",
         completedAt: {
-          gte: prevRange.startInstant,
-          lt: prevRange.endInstant,
+          gte: window.prevStartInstant,
+          lt: window.prevEndInstant,
         },
       },
       _sum: { amount: true },
     }),
     db.income.aggregate({
       where: {
-        receivedOn: { gte: currentFromDate, lte: currentToDate },
+        receivedOn: {
+          gte: window.currentFromDate,
+          lte: window.currentToDate,
+        },
       },
       _sum: { amount: true },
     }),
     db.income.aggregate({
       where: {
-        receivedOn: { gte: prevFromDate, lte: prevToDate },
+        receivedOn: {
+          gte: window.prevFromDate,
+          lte: window.prevToDate,
+        },
       },
       _sum: { amount: true },
     }),
     db.expense.aggregate({
       where: {
-        status: "PAID",
-        spentOn: { gte: currentFromDate, lte: currentToDate },
+        status: { not: "VOIDED" },
+        spentOn: {
+          gte: window.currentFromDate,
+          lte: window.currentToDate,
+        },
       },
       _sum: { amount: true },
       _count: { _all: true },
     }),
     db.expense.aggregate({
       where: {
-        status: "PAID",
-        spentOn: { gte: prevFromDate, lte: prevToDate },
-      },
-      _sum: { amount: true },
-    }),
-    db.providerFee.aggregate({
-      where: {
-        status: "SETTLED",
-        chargedAt: {
-          gte: currentRange.startInstant,
-          lt: currentRange.endInstant,
+        status: { not: "VOIDED" },
+        spentOn: {
+          gte: window.prevFromDate,
+          lte: window.prevToDate,
         },
       },
       _sum: { amount: true },
@@ -324,8 +716,18 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
       where: {
         status: "SETTLED",
         chargedAt: {
-          gte: prevRange.startInstant,
-          lt: prevRange.endInstant,
+          gte: window.currentStartInstant,
+          lt: window.currentEndInstant,
+        },
+      },
+      _sum: { amount: true },
+    }),
+    db.providerFee.aggregate({
+      where: {
+        status: "SETTLED",
+        chargedAt: {
+          gte: window.prevStartInstant,
+          lt: window.prevEndInstant,
         },
       },
       _sum: { amount: true },
@@ -333,27 +735,39 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
     db.payment.findMany({
       where: {
         status: "COMPLETED",
-        completedAt: { gte: cashflowStartInstant },
+        completedAt: {
+          gte: window.currentStartInstant,
+          lt: window.currentEndInstant,
+        },
       },
       select: { amount: true, completedAt: true, createdAt: true },
     }),
     db.income.findMany({
       where: {
-        receivedOn: { gte: sevenDaysAgoDate, lte: todayDate },
+        receivedOn: {
+          gte: window.currentFromDate,
+          lte: window.currentToDate,
+        },
       },
       select: { amount: true, receivedOn: true },
     }),
     db.expense.findMany({
       where: {
-        status: "PAID",
-        spentOn: { gte: sevenDaysAgoDate, lte: todayDate },
+        status: { not: "VOIDED" },
+        spentOn: {
+          gte: window.currentFromDate,
+          lte: window.currentToDate,
+        },
       },
       select: { amount: true, spentOn: true },
     }),
     db.providerFee.findMany({
       where: {
         status: "SETTLED",
-        chargedAt: { gte: cashflowStartInstant },
+        chargedAt: {
+          gte: window.currentStartInstant,
+          lt: window.currentEndInstant,
+        },
       },
       select: { amount: true, chargedAt: true },
     }),
@@ -382,7 +796,10 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
     db.payment.count({
       where: {
         status: "FAILED",
-        createdAt: { gte: cashflowStartInstant },
+        createdAt: {
+          gte: window.currentStartInstant,
+          lt: window.currentEndInstant,
+        },
       },
     }),
     db.webhookDelivery.count({
@@ -393,7 +810,7 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
     db.recurringExpense.count({
       where: {
         status: "ACTIVE",
-        nextDueOn: { lte: todayDate },
+        nextDueOn: { lte: window.currentToDate },
       },
     }),
   ])
@@ -427,8 +844,22 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
     providerBalances.map((balance) => [balance.account.id, balance])
   )
 
+  const [unassignedIncomeAgg, unassignedExpenseAgg] = await Promise.all([
+    db.income.aggregate({
+      where: { accountId: null },
+      _sum: { amount: true },
+    }),
+    db.expense.aggregate({
+      where: { accountId: null, status: { not: "VOIDED" } },
+      _sum: { amount: true },
+    }),
+  ])
+  const unassignedNetDecimal = (
+    unassignedIncomeAgg._sum.amount ?? new Prisma.Decimal(0)
+  ).minus(unassignedExpenseAgg._sum.amount ?? new Prisma.Decimal(0))
+
   const businessAccountsCalculated = await Promise.all(
-    businessAccountRows.map(async (account) => {
+    businessAccountRows.map(async (account, index) => {
       const [
         incomes,
         contributions,
@@ -456,7 +887,7 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
         db.expense.aggregate({
           where: {
             accountId: account.id,
-            status: "PAID",
+            status: { not: "VOIDED" },
             currency: account.currency,
           },
           _sum: { amount: true },
@@ -487,6 +918,7 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
         .minus(paidExpenses._sum.amount ?? zero)
         .minus(payouts._sum.amount ?? zero)
         .minus(transfersOut._sum.amount ?? zero)
+        .plus(index === 0 ? unassignedNetDecimal : zero)
 
       return { accountId: account.id, calculated }
     })
@@ -494,6 +926,9 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
   const businessBalanceMap = new Map(
     businessAccountsCalculated.map((row) => [row.accountId, row.calculated])
   )
+
+  const unassignedNetNumber =
+    businessAccountRows.length === 0 ? toNumber(unassignedNetDecimal) : 0
 
   const accounts: DashboardAccount[] = [
     ...providerAccountRows.map((account) => {
@@ -517,9 +952,7 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
         actualBalance,
         calculatedBalance,
         pendingAmount: pendingPayments + pendingFees,
-        reconciledAt: latestRec
-          ? formatDateOnly(latestRec.asOf)
-          : null,
+        reconciledAt: latestRec ? formatDateOnly(latestRec.asOf) : null,
       }
     }),
     ...businessAccountRows.map((account) => {
@@ -539,11 +972,23 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
         actualBalance,
         calculatedBalance,
         pendingAmount: pendingExpenses,
-        reconciledAt: latestRec
-          ? formatDateOnly(latestRec.asOf)
-          : null,
+        reconciledAt: latestRec ? formatDateOnly(latestRec.asOf) : null,
       }
     }),
+    ...(businessAccountRows.length === 0 && unassignedNetNumber !== 0
+      ? [
+          {
+            id: "unassigned-business-ledger",
+            name: "General Business Balance",
+            kind: "Business account" as const,
+            environment: "Bank" as const,
+            actualBalance: unassignedNetNumber,
+            calculatedBalance: unassignedNetNumber,
+            pendingAmount: 0,
+            reconciledAt: null,
+          },
+        ]
+      : []),
   ]
 
   const totalBalance = accounts.reduce(
@@ -552,18 +997,18 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
   )
 
   const currentRevenue =
-    toNumber(currentMonthCompletedPayments._sum.amount) +
-    toNumber(currentMonthIncome._sum.amount)
+    toNumber(currentCompletedPayments._sum.amount) +
+    toNumber(currentIncome._sum.amount)
   const prevRevenue =
-    toNumber(prevMonthCompletedPayments._sum.amount) +
-    toNumber(prevMonthIncome._sum.amount)
+    toNumber(prevCompletedPayments._sum.amount) +
+    toNumber(prevIncome._sum.amount)
 
   const currentExpenses =
-    toNumber(currentMonthPaidExpenses._sum.amount) +
-    toNumber(currentMonthSettledFees._sum.amount)
+    toNumber(currentPaidExpenses._sum.amount) +
+    toNumber(currentSettledFees._sum.amount)
   const prevExpenses =
-    toNumber(prevMonthPaidExpenses._sum.amount) +
-    toNumber(prevMonthSettledFees._sum.amount)
+    toNumber(prevPaidExpenses._sum.amount) +
+    toNumber(prevSettledFees._sum.amount)
 
   const currentNetProfit = currentRevenue - currentExpenses
   const prevNetProfit = prevRevenue - prevExpenses
@@ -576,60 +1021,14 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
   )
   const profitChange = formatPercentageChange(currentNetProfit, prevNetProfit)
 
-  // Build 7-day daily cashflow buckets
-  const cashflowByDate = new Map<string, { revenue: number; expenses: number }>()
-  const dateKeys: string[] = []
-  for (let offset = 6; offset >= 0; offset -= 1) {
-    const dayDate = addDays(todayDate, -offset)
-    const key = formatDateOnly(dayDate)
-    dateKeys.push(key)
-    cashflowByDate.set(key, { revenue: 0, expenses: 0 })
-  }
+  const cashflow = buildCashflowPoints(
+    window,
+    cashflowPayments,
+    cashflowIncomes,
+    cashflowExpenses,
+    cashflowFees
+  )
 
-  for (const payment of cashflowPayments) {
-    const key = toTehranDateOnly(payment.completedAt ?? payment.createdAt)
-    const bucket = cashflowByDate.get(key)
-    if (bucket) {
-      bucket.revenue += toNumber(payment.amount)
-    }
-  }
-
-  for (const income of cashflowIncomes) {
-    const key = formatDateOnly(income.receivedOn)
-    const bucket = cashflowByDate.get(key)
-    if (bucket) {
-      bucket.revenue += toNumber(income.amount)
-    }
-  }
-
-  for (const expense of cashflowExpenses) {
-    const key = formatDateOnly(expense.spentOn)
-    const bucket = cashflowByDate.get(key)
-    if (bucket) {
-      bucket.expenses += toNumber(expense.amount)
-    }
-  }
-
-  for (const fee of cashflowFees) {
-    const key = toTehranDateOnly(fee.chargedAt)
-    const bucket = cashflowByDate.get(key)
-    if (bucket) {
-      bucket.expenses += toNumber(fee.amount)
-    }
-  }
-
-  const cashflow: DashboardCashflowPoint[] = dateKeys.map((key) => {
-    const bucket = cashflowByDate.get(key) ?? { revenue: 0, expenses: 0 }
-    return {
-      label: formatDayShortLabel(key),
-      revenue: bucket.revenue,
-      expenses: bucket.expenses,
-    }
-  })
-
-  const cashflowRangeLabel = `${formatDayShortLabel(dateKeys[0] ?? todayStr)} – ${formatDayShortLabel(dateKeys[dateKeys.length - 1] ?? todayStr)}`
-
-  // Build actionable alerts from real database state
   const alerts: DashboardAlert[] = []
   const sadadConfig = getSadadConfigStatus()
 
@@ -664,11 +1063,11 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
     })
   }
 
-  if (failedPaymentsLast7Days > 0) {
+  if (failedPaymentsInPeriod > 0) {
     alerts.push({
       id: "alert-failed-payments",
-      title: "Failed payment attempts (last 7 days)",
-      description: `${failedPaymentsLast7Days} payment${failedPaymentsLast7Days === 1 ? " attempt" : " attempts"} failed during gateway request or verification in the past 7 days.`,
+      title: `Failed payment attempts (${window.cashflowBadgeLabel.toLowerCase()})`,
+      description: `${failedPaymentsInPeriod} payment${failedPaymentsInPeriod === 1 ? " attempt" : " attempts"} failed during gateway request or verification in the selected period.`,
       severity: "warning",
     })
   }
@@ -712,25 +1111,27 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
     })
   }
 
-  const transactions: DashboardTransaction[] = recentPayments.map((payment) => ({
-    id: payment.id,
-    reference: payment.reference,
-    gatewayOrderId: String(payment.gatewayOrderId),
-    service: payment.service?.name ?? "Unassigned",
-    description: payment.description,
-    provider: payment.provider?.name ?? SADAD_PROVIDER_NAME,
-    environment: payment.environment,
-    amount: toNumber(payment.amount),
-    currency: payment.currency,
-    status: mapPaymentStatus(payment.status),
-    occurredAt: (payment.completedAt ?? payment.createdAt).toISOString(),
-    externalOrderId: payment.externalOrderId ?? "—",
-    verifiedAt: payment.verifiedAt?.toISOString() ?? null,
-    traceNumber: payment.traceNumber,
-    providerReference: payment.providerReference,
-    maskedCardNumber: payment.maskedCardNumber,
-    gatewayResultText: payment.gatewayResultText,
-  }))
+  const transactions: DashboardTransaction[] = periodPayments.map(
+    (payment) => ({
+      id: payment.id,
+      reference: payment.reference,
+      gatewayOrderId: String(payment.gatewayOrderId),
+      service: payment.service?.name ?? "Unassigned",
+      description: payment.description,
+      provider: payment.provider?.name ?? SADAD_PROVIDER_NAME,
+      environment: payment.environment,
+      amount: toNumber(payment.amount),
+      currency: payment.currency,
+      status: mapPaymentStatus(payment.status),
+      occurredAt: (payment.completedAt ?? payment.createdAt).toISOString(),
+      externalOrderId: payment.externalOrderId ?? "—",
+      verifiedAt: payment.verifiedAt?.toISOString() ?? null,
+      traceNumber: payment.traceNumber,
+      providerReference: payment.providerReference,
+      maskedCardNumber: payment.maskedCardNumber,
+      gatewayResultText: payment.gatewayResultText,
+    })
+  )
 
   const serviceNameSet = new Set<string>(
     connectedServices.map((service) => service.name)
@@ -742,15 +1143,17 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
   }
 
   return {
+    period: window.period,
     summary: {
       totalBalance,
       revenue: currentRevenue,
       expenses: currentExpenses,
       netProfit: currentNetProfit,
-      periodLabel: formatMonthLabel(currentMonth),
+      periodLabel: window.periodLabel,
+      comparisonHint: window.comparisonHint,
       accountCount: accounts.length,
-      completedPaymentCount: currentMonthCompletedPayments._count._all,
-      paidExpenseCount: currentMonthPaidExpenses._count._all,
+      completedPaymentCount: currentCompletedPayments._count._all,
+      paidExpenseCount: currentPaidExpenses._count._all,
       revenueChangeLabel: revenueChange.label,
       revenueChangeTone: revenueChange.tone,
       expensesChangeLabel: expensesChange.label,
@@ -758,7 +1161,8 @@ export async function getDashboardDataForAdmin(): Promise<DashboardData> {
       profitChangeLabel: profitChange.label,
       profitChangeTone: profitChange.tone,
     },
-    cashflowRangeLabel,
+    cashflowRangeLabel: window.cashflowRangeLabel,
+    cashflowBadgeLabel: window.cashflowBadgeLabel,
     cashflow,
     accounts,
     transactions,

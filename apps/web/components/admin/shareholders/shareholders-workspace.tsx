@@ -3,11 +3,13 @@
 import {
   CalendarOff,
   History,
+  Loader2,
   Pencil,
   Percent,
   Plus,
   Power,
   ShieldCheck,
+  Trash2,
   UserPlus,
   Users,
 } from "lucide-react"
@@ -22,7 +24,11 @@ import { AdminEmptyState } from "@/components/admin/empty-state"
 import { EndOwnershipDialog } from "@/components/admin/shareholders/end-ownership-dialog"
 import { OwnershipDialog } from "@/components/admin/shareholders/ownership-dialog"
 import { ShareholderDialog } from "@/components/admin/shareholders/shareholder-dialog"
-import { toggleShareholderAction } from "@/app/admin/shareholders/actions"
+import {
+  deleteOwnershipRecordAction,
+  deleteShareholderAction,
+  toggleShareholderAction,
+} from "@/app/admin/shareholders/actions"
 import type {
   AdminOwnershipRecord,
   AdminShareholder,
@@ -65,6 +71,56 @@ function ShareholdersWorkspace({ data }: { data: ShareholderWorkspace }) {
 
     if (!result.ok) {
       setError(result.error ?? "The shareholder status could not be changed.")
+    } else {
+      refresh()
+    }
+
+    setPendingId(null)
+  }
+
+  const removeShareholder = async (shareholder: AdminShareholder) => {
+    if (
+      !window.confirm(
+        `Remove shareholder "${shareholder.name}"? Their ownership records and allocations will also be removed.`
+      )
+    ) {
+      return
+    }
+
+    setPendingId(`delete-shareholder:${shareholder.id}`)
+    setError(null)
+
+    const result = await deleteShareholderAction({
+      shareholderId: shareholder.id,
+    })
+
+    if (!result.ok) {
+      setError(result.error ?? "The shareholder could not be removed.")
+    } else {
+      refresh()
+    }
+
+    setPendingId(null)
+  }
+
+  const removeOwnershipRecord = async (record: AdminOwnershipRecord) => {
+    if (
+      !window.confirm(
+        `Remove the ${record.percentage}% ownership record for ${record.shareholderName}?`
+      )
+    ) {
+      return
+    }
+
+    setPendingId(`delete-record:${record.id}`)
+    setError(null)
+
+    const result = await deleteOwnershipRecordAction({
+      ownershipRecordId: record.id,
+    })
+
+    if (!result.ok) {
+      setError(result.error ?? "The ownership record could not be removed.")
     } else {
       refresh()
     }
@@ -220,6 +276,26 @@ function ShareholdersWorkspace({ data }: { data: ShareholderWorkspace }) {
                     <Power aria-hidden="true" className="size-3.5" />
                     {shareholder.isActive ? "Deactivate" : "Activate"}
                   </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeShareholder(shareholder)}
+                    disabled={
+                      pendingId === `delete-shareholder:${shareholder.id}`
+                    }
+                    className="text-danger hover:bg-danger/10 hover:text-danger"
+                  >
+                    {pendingId === `delete-shareholder:${shareholder.id}` ? (
+                      <Loader2
+                        aria-hidden="true"
+                        className="size-3.5 animate-spin"
+                      />
+                    ) : (
+                      <Trash2 aria-hidden="true" className="size-3.5" />
+                    )}
+                    Remove
+                  </Button>
                 </div>
               </div>
 
@@ -279,20 +355,45 @@ function ShareholdersWorkspace({ data }: { data: ShareholderWorkspace }) {
                               </p>
                             ) : null}
                           </div>
-                          {!record.effectiveTo ? (
+                          <div className="flex items-center gap-1">
+                            {!record.effectiveTo ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="xs"
+                                onClick={() => setEndingRecord(record)}
+                              >
+                                <CalendarOff
+                                  aria-hidden="true"
+                                  className="size-3"
+                                />
+                                End record
+                              </Button>
+                            ) : null}
                             <Button
                               type="button"
                               variant="ghost"
-                              size="xs"
-                              onClick={() => setEndingRecord(record)}
+                              size="icon-xs"
+                              aria-label={`Remove ${record.percentage}% ownership record`}
+                              onClick={() => removeOwnershipRecord(record)}
+                              disabled={
+                                pendingId === `delete-record:${record.id}`
+                              }
+                              className="text-danger hover:bg-danger/10 hover:text-danger"
                             >
-                              <CalendarOff
-                                aria-hidden="true"
-                                className="size-3"
-                              />
-                              End record
+                              {pendingId === `delete-record:${record.id}` ? (
+                                <Loader2
+                                  aria-hidden="true"
+                                  className="size-3.5 animate-spin"
+                                />
+                              ) : (
+                                <Trash2
+                                  aria-hidden="true"
+                                  className="size-3.5"
+                                />
+                              )}
                             </Button>
-                          ) : null}
+                          </div>
                         </div>
                       )
                     })}

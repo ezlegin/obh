@@ -3,8 +3,12 @@
 import {
   CircleDollarSign,
   Landmark,
+  Loader2,
+  Pencil,
   Plus,
   Search,
+  Trash2,
+  Wallet,
   WalletCards,
 } from "lucide-react"
 import Link from "next/link"
@@ -18,13 +22,40 @@ import { AccountingStat } from "@/components/admin/accounting/accounting-stat"
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table"
 import { AdminEmptyState } from "@/components/admin/empty-state"
 import { CreateIncomeDialog } from "@/components/admin/income/create-income-dialog"
+import { deleteIncomeAction } from "@/app/admin/income/actions"
 import type { AdminIncome, IncomeWorkspace } from "@/server/accounting/queries"
 import { formatAccountingDate, formatIrrDecimal } from "@/lib/admin/format"
 
 function IncomeWorkspace({ data }: { data: IncomeWorkspace }) {
   const router = useRouter()
   const [createOpen, setCreateOpen] = useState(false)
+  const [editingIncome, setEditingIncome] = useState<AdminIncome | null>(null)
   const [search, setSearch] = useState("")
+  const [pendingId, setPendingId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const removeIncome = async (income: AdminIncome) => {
+    if (
+      !window.confirm(
+        `Remove income "${income.description}"? This will also deduct it from the business balance.`
+      )
+    ) {
+      return
+    }
+
+    setPendingId(income.id)
+    setError(null)
+
+    const result = await deleteIncomeAction({ incomeId: income.id })
+
+    if (!result.ok) {
+      setError(result.error ?? "The income record could not be removed.")
+    } else {
+      router.refresh()
+    }
+
+    setPendingId(null)
+  }
 
   const filteredIncomes = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -91,9 +122,42 @@ function IncomeWorkspace({ data }: { data: IncomeWorkspace }) {
       align: "right",
       sortValue: (income) => Number(income.amount),
       cell: (income) => (
-        <span className="text-xs font-medium tabular-nums">
-          {formatIrrDecimal(income.amount)}
+        <span className="text-xs font-medium text-success tabular-nums">
+          +{formatIrrDecimal(income.amount)}
         </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      align: "right",
+      cell: (income) => (
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Edit ${income.description}`}
+            onClick={() => setEditingIncome(income)}
+          >
+            <Pencil aria-hidden="true" className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Remove ${income.description}`}
+            onClick={() => removeIncome(income)}
+            disabled={pendingId === income.id}
+            className="text-danger hover:bg-danger/10 hover:text-danger"
+          >
+            {pendingId === income.id ? (
+              <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+            ) : (
+              <Trash2 aria-hidden="true" className="size-3.5" />
+            )}
+          </Button>
+        </div>
       ),
     },
   ]
@@ -101,6 +165,12 @@ function IncomeWorkspace({ data }: { data: IncomeWorkspace }) {
   return (
     <>
       <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <AccountingStat
+          label="Business balance"
+          value={formatIrrDecimal(data.summary.totalBusinessBalance)}
+          hint={`Includes ${formatIrrDecimal(data.summary.completedPaymentsAllTime)} from completed payments plus recorded income, minus expenses.`}
+          icon={Wallet}
+        />
         <AccountingStat
           label="Received this month"
           value={formatIrrDecimal(data.summary.receivedThisMonth)}
@@ -110,22 +180,25 @@ function IncomeWorkspace({ data }: { data: IncomeWorkspace }) {
         <AccountingStat
           label="Received all time"
           value={formatIrrDecimal(data.summary.receivedAllTime)}
-          hint="All recorded additional income, excluding payment transactions."
+          hint="All recorded additional income added to the business balance."
           icon={WalletCards}
         />
         <AccountingStat
           label="Income records"
           value={String(data.summary.incomeCount)}
-          hint="Every manual income record in the ledger."
+          hint={`${data.summary.thisMonthCount} recorded this month.`}
           icon={Landmark}
         />
-        <AccountingStat
-          label="This month"
-          value={String(data.summary.thisMonthCount)}
-          hint="Number of income records received this month."
-          icon={CircleDollarSign}
-        />
       </div>
+
+      {error ? (
+        <div
+          role="alert"
+          className="mt-4 rounded-xl border border-danger/20 bg-danger/10 px-4 py-3 text-xs leading-5 text-danger"
+        >
+          {error}
+        </div>
+      ) : null}
 
       {data.accounts.length === 0 ? (
         <p className="mt-4 text-[11px] leading-5 text-muted-foreground">
@@ -222,15 +295,25 @@ function IncomeWorkspace({ data }: { data: IncomeWorkspace }) {
       </div>
 
       <p className="mt-4 text-[10px] leading-5 text-muted-foreground/55">
-        Income is a separate accounting record. It does not create a payment
-        transaction, alter gateway balances, or represent shareholder capital.
+        Both completed gateway payments and recorded income directly increase
+        the business balance.
       </p>
 
       <CreateIncomeDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
+        open={createOpen || Boolean(editingIncome)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateOpen(false)
+            setEditingIncome(null)
+          }
+        }}
         accounts={data.accounts}
-        onCreated={() => router.refresh()}
+        income={editingIncome}
+        onCreated={() => {
+          setCreateOpen(false)
+          setEditingIncome(null)
+          router.refresh()
+        }}
       />
     </>
   )

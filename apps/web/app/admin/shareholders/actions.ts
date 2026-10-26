@@ -6,6 +6,8 @@ import { requireAdmin } from "@/lib/auth/guards"
 import {
   createOwnershipRecordSchema,
   createShareholderSchema,
+  deleteOwnershipRecordSchema,
+  deleteShareholderSchema,
   endOwnershipRecordSchema,
   toggleShareholderSchema,
   updateShareholderSchema,
@@ -14,6 +16,8 @@ import { DomainError } from "@/server/errors"
 import {
   createOwnershipRecord,
   createShareholder,
+  deleteOwnershipRecord,
+  deleteShareholder,
   endOwnershipRecord,
   setShareholderActive,
   updateShareholder,
@@ -152,6 +156,46 @@ export async function endOwnershipRecordAction(
       parsed.data.ownershipRecordId,
       parsed.data.effectiveTo
     )
+    revalidatePath("/admin/shareholders")
+    revalidatePath("/admin/distributions")
+    return { ok: true }
+  } catch (error) {
+    return actionError(error)
+  }
+}
+
+export async function deleteShareholderAction(
+  input: unknown
+): Promise<ShareholderActionResult> {
+  const admin = await requireAdmin()
+  const parsed = deleteShareholderSchema.safeParse(input)
+
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid shareholder." }
+  }
+
+  try {
+    await deleteShareholder(admin.id, parsed.data.shareholderId)
+    revalidatePath("/admin/shareholders")
+    revalidatePath("/admin/distributions")
+    return { ok: true }
+  } catch (error) {
+    return actionError(error)
+  }
+}
+
+export async function deleteOwnershipRecordAction(
+  input: unknown
+): Promise<ShareholderActionResult> {
+  const admin = await requireAdmin()
+  const parsed = deleteOwnershipRecordSchema.safeParse(input)
+
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid ownership record." }
+  }
+
+  try {
+    await deleteOwnershipRecord(admin.id, parsed.data.ownershipRecordId)
     revalidatePath("/admin/shareholders")
     revalidatePath("/admin/distributions")
     return { ok: true }

@@ -39,6 +39,7 @@ function CreateRecurringDialog({
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const firstCategory = categories[0]
+  const firstAccount = accounts[0]
 
   const {
     register,
@@ -50,7 +51,7 @@ function CreateRecurringDialog({
     resolver: zodResolver(createRecurringExpenseSchema),
     defaultValues: {
       categoryId: firstCategory?.id ?? "",
-      accountId: "",
+      accountId: firstAccount?.id ?? "",
       amount: "",
       description: "",
       frequency: "MONTHLY",
@@ -66,7 +67,7 @@ function CreateRecurringDialog({
       setServerError(null)
       reset({
         categoryId: firstCategory?.id ?? "",
-        accountId: "",
+        accountId: firstAccount?.id ?? "",
         amount: "",
         description: "",
         frequency: "MONTHLY",
@@ -76,7 +77,7 @@ function CreateRecurringDialog({
         notes: "",
       })
     }
-  }, [open, firstCategory?.id, reset])
+  }, [open, firstCategory?.id, firstAccount?.id, reset])
 
   const onSubmit = (values: CreateRecurringExpenseInput) => {
     setServerError(null)
@@ -104,21 +105,13 @@ function CreateRecurringDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Create a recurring expense rule"
-      description="New rules start as drafts. A manager must approve a rule before it can generate any expense."
+      description="Recurring rules are active immediately and generate paid expenses when due."
       className="max-w-2xl"
     >
-      <div className="rounded-xl border border-warning/20 bg-warning/[0.045] p-4">
-        <p className="text-xs leading-5 text-muted-foreground">
-          Approval is explicit and recorded. Approved rules generate pending
-          expenses only when a manager chooses to generate a due occurrence. No
-          charge happens automatically.
-        </p>
-      </div>
-
       <form
         onSubmit={handleSubmit(onSubmit)}
         noValidate
-        className="mt-5 space-y-5"
+        className="space-y-5"
       >
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
@@ -267,10 +260,10 @@ function CreateRecurringDialog({
             {isPending ? (
               <>
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                Creating draft…
+                Creating…
               </>
             ) : (
-              "Create draft rule"
+              "Create recurring rule"
             )}
           </Button>
         </div>

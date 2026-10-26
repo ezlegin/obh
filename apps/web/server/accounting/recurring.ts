@@ -43,15 +43,25 @@ export async function createRecurringExpense(
     }
   }
 
+  const defaultAccount = !values.accountId
+    ? await db.financialAccount.findFirst({
+        where: { kind: "BUSINESS", isActive: true },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      })
+    : null
+  const resolvedAccountId = values.accountId || defaultAccount?.id || null
+
   const startOn = parseDateOnly(values.startOn)
   const endOn = values.endOn ? parseDateOnly(values.endOn) : null
   const amount = new Prisma.Decimal(values.amount)
+  const now = new Date()
 
   return db.$transaction(async (tx) => {
     const rule = await tx.recurringExpense.create({
       data: {
         categoryId: category.id,
-        accountId: values.accountId || null,
+        accountId: resolvedAccountId,
         amount,
         currency: "IRR",
         description: values.description,
@@ -60,7 +70,9 @@ export async function createRecurringExpense(
         startOn,
         nextDueOn: startOn,
         endOn,
-        status: "DRAFT",
+        status: "ACTIVE",
+        approvedAt: now,
+        approvedById: actorId,
         notes: values.notes || null,
       },
     })
@@ -137,13 +149,15 @@ export async function changeRecurringExpenseStatus(
       if (rule.status === "ACTIVE") {
         return rule
       }
-      if (rule.status !== "PAUSED" || !rule.approvedAt) {
+      if (rule.status !== "PAUSED") {
         throw new DomainError(
           "RECURRING_STATE_INVALID",
-          "Only a previously approved paused recurring expense can resume."
+          "Only a paused recurring expense can resume."
         )
       }
       nextStatus = "ACTIVE"
+      approvedAt = approvedAt ?? now
+      approvedById = approvedById ?? actorId
       break
     case "end":
       if (rule.status === "ENDED") {
@@ -198,10 +212,10 @@ export async function generateRecurringExpense(
     )
   }
 
-  if (rule.status !== "ACTIVE") {
+  if (rule.status !== "ACTIVE" && rule.status !== "DRAFT") {
     throw new DomainError(
       "RECURRING_NOT_ACTIVE",
-      "Only an approved active recurring expense can generate an expense."
+      "Only an active recurring expense can generate an expense."
     )
   }
 
@@ -245,6 +259,7 @@ export async function generateRecurringExpense(
     rule.intervalCount
   )
   const shouldEnd = Boolean(rule.endOn && nextDueOn > rule.endOn)
+  const now = new Date()
 
   return db.$transaction(async (tx) => {
     const expense = await tx.expense.create({
@@ -256,8 +271,9 @@ export async function generateRecurringExpense(
         currency: rule.currency,
         spentOn,
         description: rule.description,
-        notes: "Generated from an approved recurring expense rule.",
-        status: "PENDING",
+        notes: "Generated from a recurring expense rule.",
+        status: "PAID",
+        paidAt: now,
       },
     })
 
@@ -265,7 +281,9 @@ export async function generateRecurringExpense(
       where: { id: rule.id },
       data: {
         nextDueOn,
-        status: shouldEnd ? "ENDED" : rule.status,
+        status: shouldEnd ? "ENDED" : "ACTIVE",
+        approvedAt: rule.approvedAt ?? now,
+        approvedById: rule.approvedById ?? actorId,
       },
     })
 
@@ -290,5 +308,44 @@ export async function generateRecurringExpense(
       nextDueOn: formatDateOnly(updatedRule.nextDueOn),
       status: updatedRule.status,
     }
+  })
+}
+
+export async function deleteRecurringExpense(
+  actorId: string,
+  recurringExpenseId: string
+) {
+  const db = getDb()
+  const rule = await db.recurringExpense.findUnique({
+    where: { id: recurringExpenseId },
+  })
+
+  if (!rule) {
+    throw new DomainError(
+      "RECURRING_EXPENSE_NOT_FOUND",
+      "Recurring expense was not found."
+    )
+  }
+
+  return db.$transaction(async (tx) => {
+    await tx.expense.updateMany({
+      where: { recurringExpenseId: rule.id },
+      data: { recurringExpenseId: null },
+    })
+    await tx.recurringExpense.delete({ where: { id: rule.id } })
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "recurring_expense.deleted",
+        entityType: "RecurringExpense",
+        entityId: rule.id,
+        before: {
+          description: rule.description,
+          amount: rule.amount.toFixed(2),
+          frequency: rule.frequency,
+        },
+      },
+    })
   })
 }

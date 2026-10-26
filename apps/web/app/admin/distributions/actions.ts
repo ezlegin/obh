@@ -6,13 +6,17 @@ import { requireAdmin } from "@/lib/auth/guards"
 import {
   approveProfitPeriodSchema,
   calculateProfitPeriodSchema,
+  deleteProfitPeriodSchema,
   recordShareholderPayoutSchema,
+  updateRetentionPolicySchema,
 } from "@/lib/validation/equity"
 import { DomainError } from "@/server/errors"
 import {
   approveProfitPeriod,
   calculateProfitPeriod,
+  deleteProfitPeriod,
   recordShareholderPayout,
+  updateRetentionPolicy,
 } from "@/server/equity/profit"
 
 export type DistributionActionResult = {
@@ -97,6 +101,52 @@ export async function recordShareholderPayoutAction(
     await recordShareholderPayout(admin.id, parsed.data)
     revalidatePath("/admin/distributions")
     revalidatePath("/admin/reports")
+    revalidatePath("/admin/accounts")
+    revalidatePath("/admin")
+    return { ok: true }
+  } catch (error) {
+    return actionError(error)
+  }
+}
+
+export async function deleteProfitPeriodAction(
+  input: unknown
+): Promise<DistributionActionResult> {
+  const admin = await requireAdmin()
+  const parsed = deleteProfitPeriodSchema.safeParse(input)
+
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid profit period." }
+  }
+
+  try {
+    await deleteProfitPeriod(admin.id, parsed.data.profitPeriodId)
+    revalidatePath("/admin/distributions")
+    revalidatePath("/admin/reports")
+    revalidatePath("/admin/accounts")
+    revalidatePath("/admin")
+    return { ok: true }
+  } catch (error) {
+    return actionError(error)
+  }
+}
+
+export async function updateRetentionPolicyAction(
+  input: unknown
+): Promise<DistributionActionResult> {
+  const admin = await requireAdmin()
+  const parsed = updateRetentionPolicySchema.safeParse(input)
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid retention percentage.",
+    }
+  }
+
+  try {
+    await updateRetentionPolicy(admin.id, parsed.data.retentionPercentage)
+    revalidatePath("/admin/distributions")
     return { ok: true }
   } catch (error) {
     return actionError(error)

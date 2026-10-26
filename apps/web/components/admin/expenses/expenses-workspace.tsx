@@ -5,10 +5,12 @@ import {
   CheckCircle2,
   FileCheck2,
   Loader2,
+  Pencil,
   Plus,
   Receipt,
   Repeat2,
   Search,
+  Trash2,
   Wallet,
 } from "lucide-react"
 import Link from "next/link"
@@ -33,6 +35,9 @@ import { CreateRecurringDialog } from "@/components/admin/expenses/create-recurr
 import { ExpenseDetailDialog } from "@/components/admin/expenses/expense-detail-dialog"
 import {
   changeRecurringExpenseStatusAction,
+  deleteExpenseAction,
+  deleteExpenseCategoryAction,
+  deleteRecurringExpenseAction,
   generateRecurringExpenseAction,
   toggleExpenseCategoryAction,
 } from "@/app/admin/expenses/actions"
@@ -62,6 +67,7 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>("expenses")
   const [createExpenseOpen, setCreateExpenseOpen] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<AdminExpense | null>(null)
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false)
   const [createRecurringOpen, setCreateRecurringOpen] = useState(false)
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
@@ -192,6 +198,80 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
     setPendingKey(null)
   }
 
+  const removeExpense = async (expense: AdminExpense) => {
+    if (
+      !window.confirm(
+        `Remove expense "${expense.description}"? This cannot be undone.`
+      )
+    ) {
+      return
+    }
+
+    setPendingKey(`delete-expense:${expense.id}`)
+    setError(null)
+
+    const result = await deleteExpenseAction({ expenseId: expense.id })
+
+    if (!result.ok) {
+      setError(result.error ?? "The expense could not be removed.")
+    } else {
+      if (selectedExpenseId === expense.id) {
+        setSelectedExpenseId(null)
+      }
+      router.refresh()
+    }
+
+    setPendingKey(null)
+  }
+
+  const removeRecurringRule = async (rule: AdminRecurringExpense) => {
+    if (
+      !window.confirm(
+        `Remove recurring rule "${rule.description}"? This cannot be undone.`
+      )
+    ) {
+      return
+    }
+
+    setPendingKey(`delete-recurring:${rule.id}`)
+    setError(null)
+
+    const result = await deleteRecurringExpenseAction({
+      recurringExpenseId: rule.id,
+    })
+
+    if (!result.ok) {
+      setError(result.error ?? "The recurring rule could not be removed.")
+    } else {
+      router.refresh()
+    }
+
+    setPendingKey(null)
+  }
+
+  const removeCategory = async (categoryId: string, name: string) => {
+    if (
+      !window.confirm(
+        `Remove category "${name}"? Any expenses or recurring rules in this category will also be removed.`
+      )
+    ) {
+      return
+    }
+
+    setPendingKey(`delete-category:${categoryId}`)
+    setError(null)
+
+    const result = await deleteExpenseCategoryAction({ categoryId })
+
+    if (!result.ok) {
+      setError(result.error ?? "The category could not be removed.")
+    } else {
+      router.refresh()
+    }
+
+    setPendingKey(null)
+  }
+
   const expenseColumns: DataTableColumn<AdminExpense>[] = [
     {
       id: "expense",
@@ -273,14 +353,43 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
       header: "",
       align: "right",
       cell: (expense) => (
-        <Button
-          type="button"
-          variant="outline"
-          size="xs"
-          onClick={() => setSelectedExpenseId(expense.id)}
+        <div
+          className="flex items-center justify-end gap-1.5"
+          onClick={(event) => event.stopPropagation()}
         >
-          View
-        </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => setSelectedExpenseId(expense.id)}
+          >
+            View
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Edit ${expense.description}`}
+            onClick={() => setEditingExpense(expense)}
+          >
+            <Pencil aria-hidden="true" className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Remove ${expense.description}`}
+            onClick={() => removeExpense(expense)}
+            disabled={pendingKey === `delete-expense:${expense.id}`}
+            className="text-danger hover:bg-danger/10 hover:text-danger"
+          >
+            {pendingKey === `delete-expense:${expense.id}` ? (
+              <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+            ) : (
+              <Trash2 aria-hidden="true" className="size-3.5" />
+            )}
+          </Button>
+        </div>
       ),
     },
   ]
@@ -289,15 +398,15 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
     <>
       <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AccountingStat
-          label="Paid this month"
+          label="Spent this month"
           value={formatIrrDecimal(data.summary.paidThisMonth)}
-          hint="Expenses marked paid with an expense date in the current month."
+          hint="Expenses recorded with an expense date in the current month."
           icon={Wallet}
         />
         <AccountingStat
-          label="Pending expenses"
-          value={formatIrrDecimal(data.summary.pendingTotal)}
-          hint="Recorded but not yet paid; excluded from paid totals."
+          label="Total records"
+          value={String(data.summary.expenseCount)}
+          hint="Recorded operating expenses."
           icon={Receipt}
         />
         <AccountingStat
@@ -307,9 +416,9 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
           icon={FileCheck2}
         />
         <AccountingStat
-          label="Approved recurring rules"
+          label="Active recurring rules"
           value={String(data.summary.activeRecurring)}
-          hint="Active rules that can generate pending occurrences when due."
+          hint="Active rules that generate paid expenses when due."
           icon={Repeat2}
         />
       </div>
@@ -530,13 +639,11 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
       {tab === "recurring" ? (
         <div className="mt-4">
           <div className="rounded-2xl border border-info/20 bg-info/[0.035] p-4">
-            <p className="text-xs font-medium">
-              Approval-gated recurring costs
-            </p>
+            <p className="text-xs font-medium">Recurring operating costs</p>
             <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-              A rule starts as a draft. Approving it records the approver and
-              time. Generating a due occurrence creates a pending expense only;
-              it does not charge an account or mark the expense paid.
+              Recurring rules are active immediately upon creation. Generating a
+              due occurrence records a paid expense and deducts it from the
+              business balance.
             </p>
           </div>
 
@@ -545,7 +652,7 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
               <AdminEmptyState
                 icon={CalendarClock}
                 title="No recurring rules yet"
-                description="Draft a rule for a repeating operating cost. It cannot generate anything until a manager approves it."
+                description="Create a rule for a repeating operating cost."
                 action={
                   <Button
                     type="button"
@@ -554,7 +661,7 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
                     disabled={activeCategories.length === 0}
                   >
                     <Plus aria-hidden="true" className="size-3.5" />
-                    Create draft rule
+                    Create recurring rule
                   </Button>
                 }
               />
@@ -586,9 +693,6 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
                         {rule.endOn
                           ? ` · ends ${formatAccountingDate(rule.endOn)}`
                           : ""}
-                        {rule.approvedByName
-                          ? ` · approved by ${rule.approvedByName}`
-                          : " · not approved"}
                         {` · ${rule.expenseCount} generated`}
                       </p>
                       {rule.notes ? (
@@ -621,7 +725,7 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
                                 className="size-3.5"
                               />
                             )}
-                            Approve rule
+                            Activate rule
                           </Button>
                         ) : null}
 
@@ -637,7 +741,7 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
                               }
                               title={
                                 rule.isDue
-                                  ? "Generate the due pending expense"
+                                  ? "Generate the due expense"
                                   : `Not due until ${formatAccountingDate(rule.nextDueOn)}`
                               }
                             >
@@ -687,6 +791,25 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
                             End
                           </Button>
                         ) : null}
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeRecurringRule(rule)}
+                          disabled={pendingKey === `delete-recurring:${rule.id}`}
+                          className="text-danger hover:bg-danger/10 hover:text-danger"
+                        >
+                          {pendingKey === `delete-recurring:${rule.id}` ? (
+                            <Loader2
+                              aria-hidden="true"
+                              className="size-3.5 animate-spin"
+                            />
+                          ) : (
+                            <Trash2 aria-hidden="true" className="size-3.5" />
+                          )}
+                          Remove
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -751,21 +874,45 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
                           : "recurring rules"}
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="xs"
-                      onClick={() =>
-                        toggleCategory(
-                          category.id,
-                          category.isActive,
-                          category.name
-                        )
-                      }
-                      disabled={pendingKey === `category:${category.id}`}
-                    >
-                      {category.isActive ? "Deactivate" : "Activate"}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        onClick={() =>
+                          toggleCategory(
+                            category.id,
+                            category.isActive,
+                            category.name
+                          )
+                        }
+                        disabled={pendingKey === `category:${category.id}`}
+                      >
+                        {category.isActive ? "Deactivate" : "Activate"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label={`Remove ${category.name}`}
+                        onClick={() =>
+                          removeCategory(category.id, category.name)
+                        }
+                        disabled={
+                          pendingKey === `delete-category:${category.id}`
+                        }
+                        className="text-danger hover:bg-danger/10 hover:text-danger"
+                      >
+                        {pendingKey === `delete-category:${category.id}` ? (
+                          <Loader2
+                            aria-hidden="true"
+                            className="size-3.5 animate-spin"
+                          />
+                        ) : (
+                          <Trash2 aria-hidden="true" className="size-3.5" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </article>
               ))}
@@ -775,11 +922,19 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
       ) : null}
 
       <CreateExpenseDialog
-        open={createExpenseOpen}
-        onOpenChange={setCreateExpenseOpen}
+        open={createExpenseOpen || Boolean(editingExpense)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateExpenseOpen(false)
+            setEditingExpense(null)
+          }
+        }}
         categories={activeCategories}
         accounts={data.accounts}
+        expense={editingExpense}
         onCreated={(expenseId) => {
+          setCreateExpenseOpen(false)
+          setEditingExpense(null)
           setSelectedExpenseId(expenseId)
           router.refresh()
         }}

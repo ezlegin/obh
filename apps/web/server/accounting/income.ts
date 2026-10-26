@@ -22,12 +22,21 @@ export async function createIncome(actorId: string, values: CreateIncomeInput) {
     }
   }
 
+  const defaultAccount = !values.accountId
+    ? await db.financialAccount.findFirst({
+        where: { kind: "BUSINESS", isActive: true },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      })
+    : null
+  const resolvedAccountId = values.accountId || defaultAccount?.id || null
+
   const amount = new Prisma.Decimal(values.amount)
 
   return db.$transaction(async (tx) => {
     const income = await tx.income.create({
       data: {
-        accountId: values.accountId || null,
+        accountId: resolvedAccountId,
         amount,
         currency: "IRR",
         receivedOn: parseDateOnly(values.receivedOn),
@@ -48,10 +57,40 @@ export async function createIncome(actorId: string, values: CreateIncomeInput) {
           amount: amount.toFixed(2),
           source: income.source,
           receivedOn: values.receivedOn,
+          accountId: resolvedAccountId,
         },
       },
     })
 
     return income
+  })
+}
+
+export async function deleteIncome(actorId: string, incomeId: string) {
+  const db = getDb()
+  const income = await db.income.findUnique({
+    where: { id: incomeId },
+  })
+
+  if (!income) {
+    throw new DomainError("INCOME_NOT_FOUND", "Income record was not found.")
+  }
+
+  return db.$transaction(async (tx) => {
+    await tx.income.delete({ where: { id: income.id } })
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "income.deleted",
+        entityType: "Income",
+        entityId: income.id,
+        before: {
+          description: income.description,
+          amount: income.amount.toFixed(2),
+          accountId: income.accountId,
+        },
+      },
+    })
   })
 }

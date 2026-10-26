@@ -34,6 +34,8 @@ function CreateIncomeDialog({
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
+  const firstAccount = accounts[0]
+
   const {
     register,
     control,
@@ -43,7 +45,7 @@ function CreateIncomeDialog({
   } = useForm<CreateIncomeInput>({
     resolver: zodResolver(createIncomeSchema),
     defaultValues: {
-      accountId: "",
+      accountId: firstAccount?.id ?? "",
       amount: "",
       receivedOn: todayInputValue(),
       description: "",
@@ -57,7 +59,7 @@ function CreateIncomeDialog({
     if (open) {
       setServerError(null)
       reset({
-        accountId: "",
+        accountId: firstAccount?.id ?? "",
         amount: "",
         receivedOn: todayInputValue(),
         description: "",
@@ -66,7 +68,7 @@ function CreateIncomeDialog({
         notes: "",
       })
     }
-  }, [open, reset])
+  }, [open, firstAccount?.id, reset])
 
   const onSubmit = (values: CreateIncomeInput) => {
     setServerError(null)
@@ -91,7 +93,7 @@ function CreateIncomeDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Record additional income"
-      description="Use this for business income that is not an incoming payment transaction or shareholder capital."
+      description="Recorded income directly increases the business balance alongside completed gateway payments."
       className="max-w-2xl"
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
@@ -201,8 +203,10 @@ function CreateIncomeDialog({
             {isPending ? (
               <>
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                Recording…
+                {isEditing ? "Saving…" : "Recording…"}
               </>
+            ) : isEditing ? (
+              "Save changes"
             ) : (
               "Record income"
             )}

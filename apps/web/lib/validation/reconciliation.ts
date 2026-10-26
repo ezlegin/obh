@@ -52,6 +52,18 @@ export const recordReconciliationSchema = z.object({
   note: z.string().trim().max(1000).optional().or(z.literal("")),
 })
 
+export const deleteProviderFeeSchema = z.object({
+  feeId: uuidSchema,
+})
+
+export const deleteSettlementSchema = z.object({
+  transferId: uuidSchema,
+})
+
+export const deleteReconciliationSchema = z.object({
+  reconciliationId: uuidSchema,
+})
+
 export type RecordProviderFeeInput = z.infer<typeof recordProviderFeeSchema>
 export type RecordSettlementInput = z.infer<typeof recordSettlementSchema>
 export type RecordReconciliationInput = z.infer<

@@ -111,6 +111,26 @@ export const deleteExpenseDocumentSchema = z.object({
   documentId: uuidSchema,
 })
 
+export const deleteExpenseSchema = z.object({
+  expenseId: uuidSchema,
+})
+
+export const deleteExpenseCategorySchema = z.object({
+  categoryId: uuidSchema,
+})
+
+export const deleteRecurringExpenseSchema = z.object({
+  recurringExpenseId: uuidSchema,
+})
+
+export const deleteIncomeSchema = z.object({
+  incomeId: uuidSchema,
+})
+
+export const deleteBusinessAccountSchema = z.object({
+  accountId: uuidSchema,
+})
+
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>
 export type MarkExpensePaidInput = z.infer<typeof markExpensePaidSchema>
 export type CreateExpenseCategoryInput = z.infer<

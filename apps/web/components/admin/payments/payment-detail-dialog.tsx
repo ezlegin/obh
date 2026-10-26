@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Copy, ExternalLink } from "lucide-react"
+import { Check, Copy, ExternalLink, Loader2, Trash2 } from "lucide-react"
 import { useState, type ReactNode } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
@@ -18,6 +18,8 @@ type PaymentDetailDialogProps = {
   payment: AdminPayment | null
   onOpenChange: (open: boolean) => void
   onSimulate?: (payment: AdminPayment) => void
+  onDelete?: (payment: AdminPayment) => void
+  deleting?: boolean
 }
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
@@ -37,6 +39,8 @@ function PaymentDetailDialog({
   payment,
   onOpenChange,
   onSimulate,
+  onDelete,
+  deleting,
 }: PaymentDetailDialogProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
@@ -368,7 +372,7 @@ function PaymentDetailDialog({
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-5">
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
           {payment.status === "PENDING" &&
           payment.environment === "TEST" &&
           onSimulate ? (
@@ -381,6 +385,23 @@ function PaymentDetailDialog({
               }}
             >
               Simulate result
+            </Button>
+          ) : null}
+          {onDelete ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(payment)}
+              disabled={deleting}
+              className="text-danger hover:bg-danger/10 hover:text-danger"
+            >
+              {deleting ? (
+                <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+              ) : (
+                <Trash2 aria-hidden="true" className="size-3.5" />
+              )}
+              Remove payment
             </Button>
           ) : null}
         </div>

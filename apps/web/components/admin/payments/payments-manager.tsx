@@ -4,10 +4,12 @@ import {
   ArrowUpRight,
   CreditCard,
   Eye,
+  Loader2,
   Plus,
   Search,
   SearchX,
   ShieldCheck,
+  Trash2,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -24,6 +26,7 @@ import { CreatePaymentDialog } from "@/components/admin/payments/create-payment-
 import { PaymentDetailDialog } from "@/components/admin/payments/payment-detail-dialog"
 import { PaymentStatusBadge } from "@/components/admin/payments/payment-status-badge"
 import { SimulateResultDialog } from "@/components/admin/payments/simulate-result-dialog"
+import { deletePaymentAction } from "@/app/admin/payments/actions"
 import { formatDevelopmentDate, formatIrrDecimal } from "@/lib/admin/format"
 import type { AdminPayment } from "@/server/payments/queries"
 
@@ -50,8 +53,36 @@ function PaymentsManager({ payments, services }: PaymentsManagerProps) {
   const [simulatePayment, setSimulatePayment] = useState<AdminPayment | null>(
     null
   )
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const canCreate = services.length > 0
+
+  const removePayment = async (payment: AdminPayment) => {
+    if (
+      !window.confirm(
+        `Remove payment ${payment.reference}? This cannot be undone.`
+      )
+    ) {
+      return
+    }
+
+    setDeletingId(payment.id)
+    setError(null)
+
+    const result = await deletePaymentAction({ paymentId: payment.id })
+
+    if (!result.ok) {
+      setError(result.error ?? "The payment could not be removed.")
+    } else {
+      if (detailPayment?.id === payment.id) {
+        setDetailPayment(null)
+      }
+      router.refresh()
+    }
+
+    setDeletingId(null)
+  }
 
   const counts = useMemo(() => {
     let live = 0
@@ -194,6 +225,21 @@ function PaymentsManager({ payments, services }: PaymentsManagerProps) {
           >
             <Eye aria-hidden="true" className="size-3.5" />
           </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Remove payment ${payment.reference}`}
+            onClick={() => removePayment(payment)}
+            disabled={deletingId === payment.id}
+            className="text-danger hover:bg-danger/10 hover:text-danger"
+          >
+            {deletingId === payment.id ? (
+              <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+            ) : (
+              <Trash2 aria-hidden="true" className="size-3.5" />
+            )}
+          </Button>
         </div>
       ),
     },
@@ -201,6 +247,14 @@ function PaymentsManager({ payments, services }: PaymentsManagerProps) {
 
   return (
     <>
+      {error ? (
+        <div
+          role="alert"
+          className="mt-4 rounded-xl border border-danger/20 bg-danger/10 px-4 py-3 text-xs leading-5 text-danger"
+        >
+          {error}
+        </div>
+      ) : null}
       {!canCreate ? (
         <div className="mt-8 grid gap-3 rounded-2xl border border-border bg-card/40 p-5 md:grid-cols-2">
           <div>
@@ -392,6 +446,8 @@ function PaymentsManager({ payments, services }: PaymentsManagerProps) {
           }
         }}
         onSimulate={(payment) => setSimulatePayment(payment)}
+        onDelete={(payment) => removePayment(payment)}
+        deleting={Boolean(detailPayment && deletingId === detailPayment.id)}
       />
 
       <SimulateResultDialog

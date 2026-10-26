@@ -11,6 +11,7 @@ import {
 } from "@/server/accounting/dates"
 import {
   allocateWholeIrr,
+  applyCompanyRetention,
   applyLossCarryforward,
   calculateNetProfit,
   type OwnershipAllocation,
@@ -35,43 +36,21 @@ export async function calculateProfitPeriod(
 
   const existing = await db.profitPeriod.findUnique({
     where: { startsOn_endsOn: { startsOn, endsOn } },
-    include: { distributions: { select: { id: true } } },
+    include: {
+      distributions: {
+        select: { id: true, status: true },
+      },
+    },
   })
 
-  if (existing?.status === "APPROVED" || existing?.status === "CLOSED") {
+  const hasPaidDistributions = existing?.distributions.some(
+    (d) => d.status === "PAID"
+  )
+
+  if (hasPaidDistributions) {
     throw new DomainError(
       "PERIOD_LOCKED",
-      "This profit period is already approved and cannot be recalculated."
-    )
-  }
-
-  const laterApproved = await db.profitPeriod.findFirst({
-    where: {
-      startsOn: { gt: startsOn },
-      status: { in: ["DRAFT", "APPROVED", "CLOSED"] },
-    },
-    select: { id: true },
-  })
-
-  if (laterApproved) {
-    throw new DomainError(
-      "PERIOD_OUT_OF_ORDER",
-      "A later profit period already exists. Calculate and approve periods in chronological order."
-    )
-  }
-
-  const earlierDraft = await db.profitPeriod.findFirst({
-    where: {
-      startsOn: { lt: startsOn },
-      status: "DRAFT",
-    },
-    select: { id: true },
-  })
-
-  if (earlierDraft) {
-    throw new DomainError(
-      "PERIOD_OUT_OF_ORDER",
-      "An earlier draft profit period exists. Calculate and approve periods in chronological order."
+      "This profit period already has completed shareholder payouts. Remove the period first if you need to recalculate it."
     )
   }
 
@@ -147,17 +126,26 @@ export async function calculateProfitPeriod(
   )
   const expenses = paidExpenses._sum.amount ?? new Prisma.Decimal(0)
   const fees = providerFees._sum.amount ?? new Prisma.Decimal(0)
-  const reserveAmount = new Prisma.Decimal(values.reserveAmount)
+  const retentionPercentage = new Prisma.Decimal(values.retentionPercentage)
+  const additionalReserve = values.reserveAmount
+    ? new Prisma.Decimal(values.reserveAmount)
+    : new Prisma.Decimal(0)
   const taxAmount = new Prisma.Decimal(values.taxAmount)
   const netProfit = calculateNetProfit({
     revenue,
     expenses,
     providerFees: fees,
-    reserveAmount,
     taxAmount,
   })
   const priorLoss = priorLossPeriod?.lossBalanceAfter ?? new Prisma.Decimal(0)
   const loss = applyLossCarryforward({ netProfit, priorLossBalance: priorLoss })
+  const retention = applyCompanyRetention({
+    profitAfterLoss: loss.distributable,
+    retentionPercentage,
+    additionalReserveAmount: additionalReserve,
+  })
+  const reserveAmount = retention.totalRetained
+  const distributableAfterRetention = retention.distributable
 
   const ownershipByShareholder = new Map<
     string,
@@ -195,9 +183,12 @@ export async function calculateProfitPeriod(
     new Prisma.Decimal(0)
   )
 
-  if (loss.distributable.gt(0)) {
+  if (distributableAfterRetention.gt(0)) {
     try {
-      allocation = allocateWholeIrr(loss.distributable, ownershipEntries)
+      allocation = allocateWholeIrr(
+        distributableAfterRetention,
+        ownershipEntries
+      )
     } catch (error) {
       throw new DomainError(
         "OWNERSHIP_TOTAL_INVALID",
@@ -218,6 +209,13 @@ export async function calculateProfitPeriod(
     item.amount.gt(0)
   )
 
+  const now = new Date()
+  const closesImmediately =
+    !distributableAfterRetention.gt(0) || payableAllocations.length === 0
+  const periodStatus = closesImmediately
+    ? ("CLOSED" as const)
+    : ("APPROVED" as const)
+
   return db.$transaction(async (tx) => {
     if (existing) {
       await tx.profitDistribution.deleteMany({
@@ -229,20 +227,21 @@ export async function calculateProfitPeriod(
       totalRevenue: revenue,
       totalExpenses: expenses,
       providerFees: fees,
+      retentionPercentage,
       reserveAmount,
       taxAmount,
       netProfit,
       lossBalanceBefore: priorLoss,
       lossApplied: loss.applied,
       lossBalanceAfter: loss.lossAfter,
-      distributableAmount: loss.distributable,
+      distributableAmount: distributableAfterRetention,
       unallocatedResidual: allocation.unallocatedResidual,
       ownershipTotal: allocation.ownershipTotal,
-      calculatedAt: new Date(),
-      approvedAt: null,
-      approvedById: null,
-      closedAt: null,
-      status: "DRAFT" as const,
+      calculatedAt: now,
+      approvedAt: now,
+      approvedById: actorId,
+      closedAt: closesImmediately ? now : null,
+      status: periodStatus,
       adjustmentNote: values.adjustmentNote || null,
     }
 
@@ -269,6 +268,7 @@ export async function calculateProfitPeriod(
           allocatedAmount: item.amount,
           currency: "IRR",
           status: "PENDING" as const,
+          approvedAt: now,
         })),
       })
     }
@@ -284,11 +284,12 @@ export async function calculateProfitPeriod(
           revenue: revenue.toFixed(2),
           expenses: expenses.toFixed(2),
           providerFees: fees.toFixed(2),
-          reserveAmount: reserveAmount.toFixed(2),
+          retentionPercentage: retentionPercentage.toFixed(4),
+          retainedEarnings: reserveAmount.toFixed(2),
           taxAmount: taxAmount.toFixed(2),
           netProfit: netProfit.toFixed(2),
           lossApplied: loss.applied.toFixed(2),
-          distributable: loss.distributable.toFixed(2),
+          distributable: distributableAfterRetention.toFixed(2),
           residual: allocation.unallocatedResidual.toFixed(2),
           ownershipTotal: allocation.ownershipTotal.toFixed(4),
         },
@@ -297,6 +298,28 @@ export async function calculateProfitPeriod(
 
     return period
   })
+}
+
+export async function updateRetentionPolicy(
+  actorId: string,
+  retentionPercentageValue: string
+) {
+  const db = getDb()
+  const pct = new Prisma.Decimal(retentionPercentageValue)
+
+  await db.auditLog.create({
+    data: {
+      actorId,
+      action: "retention_policy.updated",
+      entityType: "RetentionPolicy",
+      entityId: "default",
+      after: {
+        retentionPercentage: pct.toFixed(4),
+      },
+    },
+  })
+
+  return { retentionPercentage: pct.toFixed(2) }
 }
 
 export async function approveProfitPeriod(
@@ -531,5 +554,51 @@ export async function recordShareholderPayout(
     })
 
     return { payout, periodClosed }
+  })
+}
+
+export async function deleteProfitPeriod(
+  actorId: string,
+  profitPeriodId: string
+) {
+  const db = getDb()
+  const period = await db.profitPeriod.findUnique({
+    where: { id: profitPeriodId },
+    include: {
+      distributions: { select: { id: true } },
+    },
+  })
+
+  if (!period) {
+    throw new DomainError("PERIOD_NOT_FOUND", "Profit period was not found.")
+  }
+
+  return db.$transaction(async (tx) => {
+    const distributionIds = period.distributions.map((d) => d.id)
+    if (distributionIds.length > 0) {
+      await tx.shareholderPayout.deleteMany({
+        where: { profitDistributionId: { in: distributionIds } },
+      })
+      await tx.profitDistribution.deleteMany({
+        where: { profitPeriodId: period.id },
+      })
+    }
+    await tx.profitPeriod.delete({
+      where: { id: period.id },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "profit_period.deleted",
+        entityType: "ProfitPeriod",
+        entityId: period.id,
+        before: {
+          startsOn: period.startsOn.toISOString(),
+          endsOn: period.endsOn.toISOString(),
+          status: period.status,
+        },
+      },
+    })
   })
 }

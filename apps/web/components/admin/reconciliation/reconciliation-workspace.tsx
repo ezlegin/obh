@@ -5,8 +5,10 @@ import {
   ArrowRightLeft,
   CheckCircle2,
   Landmark,
+  Loader2,
   Receipt,
   Scale,
+  Trash2,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -20,6 +22,11 @@ import { AdminEmptyState } from "@/components/admin/empty-state"
 import { RecordFeeDialog } from "@/components/admin/reconciliation/record-fee-dialog"
 import { RecordReconciliationDialog } from "@/components/admin/reconciliation/record-reconciliation-dialog"
 import { RecordSettlementDialog } from "@/components/admin/reconciliation/record-settlement-dialog"
+import {
+  deleteProviderFeeAction,
+  deleteReconciliationAction,
+  deleteSettlementAction,
+} from "@/app/admin/reconciliation/actions"
 import type {
   ProviderAccountBalanceView,
   ProviderFeeView,
@@ -38,8 +45,57 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
     useState<ProviderAccountBalanceView | null>(null)
   const [reconciliationTarget, setReconciliationTarget] =
     useState<ProviderAccountBalanceView | null>(null)
+  const [pendingKey, setPendingKey] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const refresh = () => router.refresh()
+
+  const removeFee = async (fee: ProviderFeeView) => {
+    if (!window.confirm("Remove this provider fee?")) {
+      return
+    }
+    setPendingKey(`fee:${fee.id}`)
+    setError(null)
+    const result = await deleteProviderFeeAction({ feeId: fee.id })
+    if (!result.ok) {
+      setError(result.error ?? "The fee could not be removed.")
+    } else {
+      refresh()
+    }
+    setPendingKey(null)
+  }
+
+  const removeSettlement = async (settlement: SettlementView) => {
+    if (!window.confirm(`Remove settlement ${settlement.reference}?`)) {
+      return
+    }
+    setPendingKey(`settlement:${settlement.id}`)
+    setError(null)
+    const result = await deleteSettlementAction({ transferId: settlement.id })
+    if (!result.ok) {
+      setError(result.error ?? "The settlement could not be removed.")
+    } else {
+      refresh()
+    }
+    setPendingKey(null)
+  }
+
+  const removeReconciliation = async (reconciliation: ReconciliationView) => {
+    if (!window.confirm("Remove this reconciliation snapshot?")) {
+      return
+    }
+    setPendingKey(`reconciliation:${reconciliation.id}`)
+    setError(null)
+    const result = await deleteReconciliationAction({
+      reconciliationId: reconciliation.id,
+    })
+    if (!result.ok) {
+      setError(result.error ?? "The reconciliation could not be removed.")
+    } else {
+      refresh()
+    }
+    setPendingKey(null)
+  }
 
   const feeColumns: DataTableColumn<ProviderFeeView>[] = [
     {
@@ -93,6 +149,28 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
         </span>
       ),
     },
+    {
+      id: "actions",
+      header: "",
+      align: "right",
+      cell: (fee) => (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Remove provider fee"
+          onClick={() => removeFee(fee)}
+          disabled={pendingKey === `fee:${fee.id}`}
+          className="text-danger hover:bg-danger/10 hover:text-danger"
+        >
+          {pendingKey === `fee:${fee.id}` ? (
+            <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+          ) : (
+            <Trash2 aria-hidden="true" className="size-3.5" />
+          )}
+        </Button>
+      ),
+    },
   ]
 
   const settlementColumns: DataTableColumn<SettlementView>[] = [
@@ -140,6 +218,28 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
         <span className="text-xs font-medium tabular-nums">
           {formatIrrDecimal(settlement.amount)}
         </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      align: "right",
+      cell: (settlement) => (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label={`Remove settlement ${settlement.reference}`}
+          onClick={() => removeSettlement(settlement)}
+          disabled={pendingKey === `settlement:${settlement.id}`}
+          className="text-danger hover:bg-danger/10 hover:text-danger"
+        >
+          {pendingKey === `settlement:${settlement.id}` ? (
+            <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+          ) : (
+            <Trash2 aria-hidden="true" className="size-3.5" />
+          )}
+        </Button>
       ),
     },
   ]
@@ -198,6 +298,28 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
         </span>
       ),
     },
+    {
+      id: "actions",
+      header: "",
+      align: "right",
+      cell: (reconciliation) => (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Remove reconciliation"
+          onClick={() => removeReconciliation(reconciliation)}
+          disabled={pendingKey === `reconciliation:${reconciliation.id}`}
+          className="text-danger hover:bg-danger/10 hover:text-danger"
+        >
+          {pendingKey === `reconciliation:${reconciliation.id}` ? (
+            <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+          ) : (
+            <Trash2 aria-hidden="true" className="size-3.5" />
+          )}
+        </Button>
+      ),
+    },
   ]
 
   return (
@@ -228,6 +350,15 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
           icon={ArrowRightLeft}
         />
       </div>
+
+      {error ? (
+        <div
+          role="alert"
+          className="mt-4 rounded-xl border border-danger/20 bg-danger/10 px-4 py-3 text-xs leading-5 text-danger"
+        >
+          {error}
+        </div>
+      ) : null}
 
       <div className="mt-4 rounded-xl border border-info/20 bg-info/[0.035] p-4">
         <p className="text-xs font-medium">

@@ -89,3 +89,36 @@ export async function setExpenseCategoryActive(
     return updated
   })
 }
+
+export async function deleteExpenseCategory(
+  actorId: string,
+  categoryId: string
+) {
+  const db = getDb()
+  const category = await db.expenseCategory.findUnique({
+    where: { id: categoryId },
+  })
+
+  if (!category) {
+    throw new DomainError(
+      "CATEGORY_NOT_FOUND",
+      "Expense category was not found."
+    )
+  }
+
+  return db.$transaction(async (tx) => {
+    await tx.expense.deleteMany({ where: { categoryId: category.id } })
+    await tx.recurringExpense.deleteMany({ where: { categoryId: category.id } })
+    await tx.expenseCategory.delete({ where: { id: category.id } })
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "expense_category.deleted",
+        entityType: "ExpenseCategory",
+        entityId: category.id,
+        before: { name: category.name },
+      },
+    })
+  })
+}

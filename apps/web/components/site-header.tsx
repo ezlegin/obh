@@ -117,17 +117,38 @@ function SiteHeader({ locale, labels, navigation }: SiteHeaderProps) {
           </nav>
         </div>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="flex items-center gap-2 md:gap-3">
+          <a
+            referrerPolicy="origin"
+            target="_blank"
+            href="https://trustseal.enamad.ir/?id=8383174&Code=R9A1KcVtQdwX9rxZBMu3ptClg9VT2wan"
+            className="flex h-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-white/[0.03] px-1.5 transition-colors hover:bg-white/[0.06]"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              referrerPolicy="origin"
+              src="https://trustseal.enamad.ir/logo.aspx?id=8383174&Code=R9A1KcVtQdwX9rxZBMu3ptClg9VT2wan"
+              alt=""
+              style={{ cursor: "pointer" }}
+              className="h-7 w-auto object-contain"
+              {...({ code: "R9A1KcVtQdwX9rxZBMu3ptClg9VT2wan" } as Record<
+                string,
+                string
+              >)}
+            />
+          </a>
+
           <LanguageSwitch
             locale={locale}
             labels={languageLabels}
             className="shrink-0"
           />
+
           <Link
             href={localizeHref(locale, "/contact-us")}
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
-              "pe-3.5"
+              "hidden pe-3.5 md:inline-flex"
             )}
           >
             {t.startConversation}
@@ -136,10 +157,7 @@ function SiteHeader({ locale, labels, navigation }: SiteHeaderProps) {
               className="size-3.5 rtl:-scale-x-100"
             />
           </Link>
-        </div>
 
-        <div className="flex items-center gap-2 md:hidden">
-          <LanguageSwitch locale={locale} labels={languageLabels} />
           <button
             type="button"
             aria-label={t.openMenu}
@@ -147,7 +165,7 @@ function SiteHeader({ locale, labels, navigation }: SiteHeaderProps) {
             aria-expanded={isMenuOpen}
             aria-controls="mobile-navigation"
             onClick={() => setIsMenuOpen(true)}
-            className="flex size-11 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-white/[0.055] focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+            className="flex size-11 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-white/[0.055] focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none md:hidden"
           >
             <Menu aria-hidden="true" className="size-4.5" />
           </button>

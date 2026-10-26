@@ -23,9 +23,14 @@ type CashflowPoint = {
 type CashflowChartProps = {
   data: readonly CashflowPoint[]
   rangeLabel: string
+  badgeLabel?: string
 }
 
-function CashflowChart({ data, rangeLabel }: CashflowChartProps) {
+function CashflowChart({
+  data,
+  rangeLabel,
+  badgeLabel = "Last 30 days",
+}: CashflowChartProps) {
   return (
     <div className="min-w-0 rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -37,11 +42,11 @@ function CashflowChart({ data, rangeLabel }: CashflowChartProps) {
             Revenue and expenses
           </h2>
           <p className="mt-2 text-xs text-muted-foreground">
-            Recorded daily movement for {rangeLabel}, in R.
+            Recorded movement for {rangeLabel}, in R.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
-          <Badge variant="outline">Last 7 days</Badge>
+          <Badge variant="outline">{badgeLabel}</Badge>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.06em] text-muted-foreground/70 uppercase">
               <span

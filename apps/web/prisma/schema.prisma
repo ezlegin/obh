@@ -648,6 +648,7 @@ model ProfitPeriod {
   totalRevenue        Decimal?           @db.Decimal(24, 2)
   totalExpenses       Decimal?           @db.Decimal(24, 2)
   providerFees        Decimal?           @db.Decimal(24, 2)
+  retentionPercentage Decimal?           @default(0) @db.Decimal(7, 4)
   reserveAmount       Decimal?           @db.Decimal(24, 2)
   taxAmount           Decimal?           @db.Decimal(24, 2)
   netProfit           Decimal?           @db.Decimal(24, 2)
