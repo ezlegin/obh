@@ -34,6 +34,12 @@ export type AdminExpenseDocument = {
   createdAt: string
 }
 
+export type AdminServiceOption = {
+  id: string
+  name: string
+  domain: string
+}
+
 export type AdminExpense = {
   id: string
   categoryId: string
@@ -41,6 +47,8 @@ export type AdminExpense = {
   categoryRequiresDocument: boolean
   accountId: string | null
   accountName: string | null
+  serviceId: string | null
+  serviceName: string | null
   amount: string
   currency: string
   spentOn: string
@@ -71,6 +79,8 @@ export type AdminRecurringExpense = {
   categoryName: string
   accountId: string | null
   accountName: string | null
+  serviceId: string | null
+  serviceName: string | null
   amount: string
   currency: string
   description: string
@@ -91,6 +101,7 @@ export type AdminRecurringExpense = {
 export type ExpenseWorkspace = {
   accounts: AdminBusinessAccount[]
   categories: AdminExpenseCategory[]
+  services: AdminServiceOption[]
   expenses: AdminExpense[]
   recurringExpenses: AdminRecurringExpense[]
   summary: {
@@ -106,6 +117,8 @@ export type AdminIncome = {
   id: string
   accountId: string | null
   accountName: string | null
+  serviceId: string | null
+  serviceName: string | null
   amount: string
   currency: string
   receivedOn: string
@@ -118,6 +131,7 @@ export type AdminIncome = {
 
 export type IncomeWorkspace = {
   accounts: AdminBusinessAccount[]
+  services: AdminServiceOption[]
   incomes: AdminIncome[]
   summary: {
     totalBusinessBalance: string
@@ -156,6 +170,14 @@ function mapBusinessAccount(
     incomeCount: account._count.income,
     createdAt: account.createdAt.toISOString(),
   }
+}
+
+async function listServiceOptions(): Promise<AdminServiceOption[]> {
+  return getDb().connectedService.findMany({
+    where: { isActive: true },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, domain: true },
+  })
 }
 
 async function listBusinessAccounts(options?: { activeOnly?: boolean }) {
@@ -268,6 +290,7 @@ export async function getExpenseWorkspace(): Promise<ExpenseWorkspace> {
   const [
     accounts,
     categories,
+    services,
     expenseRows,
     recurringRows,
     paidMonth,
@@ -281,6 +304,7 @@ export async function getExpenseWorkspace(): Promise<ExpenseWorkspace> {
         _count: { select: { expenses: true, recurringExpenses: true } },
       },
     }),
+    listServiceOptions(),
     db.expense.findMany({
       orderBy: [{ spentOn: "desc" }, { createdAt: "desc" }],
       take: 250,
@@ -292,6 +316,7 @@ export async function getExpenseWorkspace(): Promise<ExpenseWorkspace> {
           },
         },
         account: { select: { name: true } },
+        service: { select: { name: true } },
         documents: {
           orderBy: { createdAt: "desc" },
           select: {
@@ -309,6 +334,7 @@ export async function getExpenseWorkspace(): Promise<ExpenseWorkspace> {
       include: {
         category: { select: { name: true } },
         account: { select: { name: true } },
+        service: { select: { name: true } },
         approvedBy: { select: { name: true } },
         _count: { select: { expenses: true } },
       },
@@ -339,6 +365,7 @@ export async function getExpenseWorkspace(): Promise<ExpenseWorkspace> {
       expenseCount: category._count.expenses,
       recurringCount: category._count.recurringExpenses,
     })),
+    services,
     expenses: expenseRows.map((expense) => ({
       id: expense.id,
       categoryId: expense.categoryId,
@@ -346,6 +373,8 @@ export async function getExpenseWorkspace(): Promise<ExpenseWorkspace> {
       categoryRequiresDocument: expense.category.requiresDocument,
       accountId: expense.accountId,
       accountName: expense.account?.name ?? null,
+      serviceId: expense.serviceId,
+      serviceName: expense.service?.name ?? null,
       amount: expense.amount.toFixed(2),
       currency: expense.currency,
       spentOn: formatDateOnly(expense.spentOn),
@@ -370,6 +399,8 @@ export async function getExpenseWorkspace(): Promise<ExpenseWorkspace> {
       categoryName: rule.category.name,
       accountId: rule.accountId,
       accountName: rule.account?.name ?? null,
+      serviceId: rule.serviceId,
+      serviceName: rule.service?.name ?? null,
       amount: rule.amount.toFixed(2),
       currency: rule.currency,
       description: rule.description,
@@ -405,6 +436,7 @@ export async function getIncomeWorkspace(): Promise<IncomeWorkspace> {
   const [
     accounts,
     providerAccounts,
+    services,
     incomes,
     monthTotal,
     allTime,
@@ -417,10 +449,14 @@ export async function getIncomeWorkspace(): Promise<IncomeWorkspace> {
       where: { kind: "PROVIDER", isActive: true },
       select: { id: true },
     }),
+    listServiceOptions(),
     db.income.findMany({
       orderBy: [{ receivedOn: "desc" }, { createdAt: "desc" }],
       take: 250,
-      include: { account: { select: { name: true } } },
+      include: {
+        account: { select: { name: true } },
+        service: { select: { name: true } },
+      },
     }),
     db.income.aggregate({
       where: {
@@ -470,10 +506,13 @@ export async function getIncomeWorkspace(): Promise<IncomeWorkspace> {
 
   return {
     accounts,
+    services,
     incomes: incomes.map((income) => ({
       id: income.id,
       accountId: income.accountId,
       accountName: income.account?.name ?? null,
+      serviceId: income.serviceId,
+      serviceName: income.service?.name ?? null,
       amount: income.amount.toFixed(2),
       currency: income.currency,
       receivedOn: formatDateOnly(income.receivedOn),

@@ -12,6 +12,22 @@ reconciliation are documented in [`REPORTS.md`](REPORTS.md).
 - `Payment` remains the authoritative record of a customer payment. Recording a
   payment does not automatically create an income or accounting entry.
 - Shareholder capital and payouts remain separate from both income and expenses.
+- Income and expenses can optionally be attributed to a connected service. They
+  remain corporation-wide records and are included in service-level profit only
+  when assigned.
+
+## Service attribution
+
+Each income and expense form includes an optional **Service** selector.
+
+- Assigned records feed that service's detail page and monthly service
+  distribution calculation.
+- Unassigned records remain corporate-only and are excluded from service
+  profits.
+- Recurring expense rules carry the assignment to every generated occurrence.
+- Service financials use completed LIVE gateway payments for the service plus
+  assigned income, less assigned paid expenses and settled provider fees tied to
+  the service's payments.
 
 ## Payment sources
 

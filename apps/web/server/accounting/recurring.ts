@@ -13,6 +13,7 @@ import {
   isDateOnlyDue,
   parseDateOnly,
 } from "@/server/accounting/dates"
+import { resolveServiceId } from "@/server/services/resolve-service"
 
 export async function createRecurringExpense(
   actorId: string,
@@ -51,6 +52,7 @@ export async function createRecurringExpense(
       })
     : null
   const resolvedAccountId = values.accountId || defaultAccount?.id || null
+  const resolvedServiceId = await resolveServiceId(values.serviceId)
 
   const startOn = parseDateOnly(values.startOn)
   const endOn = values.endOn ? parseDateOnly(values.endOn) : null
@@ -62,6 +64,7 @@ export async function createRecurringExpense(
       data: {
         categoryId: category.id,
         accountId: resolvedAccountId,
+        serviceId: resolvedServiceId,
         amount,
         currency: "IRR",
         description: values.description,
@@ -89,6 +92,7 @@ export async function createRecurringExpense(
           frequency: rule.frequency,
           nextDueOn: formatDateOnly(rule.nextDueOn),
           status: rule.status,
+          serviceId: resolvedServiceId,
         },
       },
     })
@@ -266,6 +270,7 @@ export async function generateRecurringExpense(
       data: {
         categoryId: rule.categoryId,
         accountId: rule.accountId,
+        serviceId: rule.serviceId,
         recurringExpenseId: rule.id,
         amount: rule.amount,
         currency: rule.currency,

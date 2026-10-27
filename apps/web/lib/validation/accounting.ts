@@ -28,6 +28,7 @@ const balanceAmountSchema = z
 export const createExpenseSchema = z.object({
   categoryId: uuidSchema,
   accountId: z.union([uuidSchema, z.literal("")]).optional(),
+  serviceId: z.union([uuidSchema, z.literal("")]).optional(),
   amount: positiveAmountSchema,
   spentOn: dateOnlySchema,
   description: z.string().trim().min(2).max(500),
@@ -56,6 +57,7 @@ export const createRecurringExpenseSchema = z
   .object({
     categoryId: uuidSchema,
     accountId: z.union([uuidSchema, z.literal("")]).optional(),
+    serviceId: z.union([uuidSchema, z.literal("")]).optional(),
     amount: positiveAmountSchema,
     description: z.string().trim().min(2).max(500),
     frequency: z.enum(["WEEKLY", "MONTHLY", "QUARTERLY", "YEARLY"]),
@@ -85,6 +87,7 @@ export const generateRecurringExpenseSchema = z.object({
 
 export const createIncomeSchema = z.object({
   accountId: z.union([uuidSchema, z.literal("")]).optional(),
+  serviceId: z.union([uuidSchema, z.literal("")]).optional(),
   amount: positiveAmountSchema,
   receivedOn: dateOnlySchema,
   description: z.string().trim().min(2).max(500),

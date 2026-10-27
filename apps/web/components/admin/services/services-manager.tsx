@@ -17,11 +17,12 @@ import {
   Trash2,
   Webhook,
 } from "lucide-react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
-import { Button } from "@workspace/ui/components/button"
+import { Button, buttonVariants } from "@workspace/ui/components/button"
 
 import { AdminEmptyState } from "@/components/admin/empty-state"
 import { CredentialSecretDialog } from "@/components/admin/services/credential-secret-dialog"
@@ -263,6 +264,15 @@ function ServicesManager({ services }: ServicesManagerProps) {
                   </div>
 
                   <div className="flex shrink-0 flex-wrap gap-2">
+                    <Link
+                      href={`/admin/services/${service.id}`}
+                      className={buttonVariants({
+                        variant: "outline",
+                        size: "sm",
+                      })}
+                    >
+                      Open
+                    </Link>
                     <Button
                       type="button"
                       variant="ghost"

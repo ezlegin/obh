@@ -13,6 +13,7 @@ import type {
 import { DomainError } from "@/server/errors"
 import { parseDateOnly } from "@/server/accounting/dates"
 import { calculateProviderBalance } from "@/server/reconciliation/service"
+import { resolveServiceId } from "@/server/services/resolve-service"
 
 async function getActiveBusinessAccount(accountId: string) {
   const account = await getDb().financialAccount.findUnique({
@@ -64,6 +65,7 @@ export async function updateExpense(
   const account = values.accountId
     ? await getActiveBusinessAccount(values.accountId)
     : null
+  const serviceId = await resolveServiceId(values.serviceId)
   const amount = new Prisma.Decimal(values.amount)
 
   return db.$transaction(async (tx) => {
@@ -72,6 +74,7 @@ export async function updateExpense(
       data: {
         categoryId: category.id,
         accountId: account?.id ?? null,
+        serviceId,
         amount,
         spentOn: parseDateOnly(values.spentOn),
         description: values.description,
@@ -89,6 +92,7 @@ export async function updateExpense(
         before: {
           categoryId: expense.categoryId,
           accountId: expense.accountId,
+          serviceId: expense.serviceId,
           amount: expense.amount.toFixed(2),
           spentOn: expense.spentOn.toISOString().slice(0, 10),
           description: expense.description,
@@ -98,6 +102,7 @@ export async function updateExpense(
         after: {
           categoryId: updated.categoryId,
           accountId: updated.accountId,
+          serviceId: updated.serviceId,
           amount: updated.amount.toFixed(2),
           spentOn: updated.spentOn.toISOString().slice(0, 10),
           description: updated.description,
@@ -124,6 +129,7 @@ export async function updateIncome(actorId: string, values: UpdateIncomeInput) {
   const account = values.accountId
     ? await getActiveBusinessAccount(values.accountId)
     : null
+  const serviceId = await resolveServiceId(values.serviceId)
   const amount = new Prisma.Decimal(values.amount)
 
   return db.$transaction(async (tx) => {
@@ -131,6 +137,7 @@ export async function updateIncome(actorId: string, values: UpdateIncomeInput) {
       where: { id: income.id },
       data: {
         accountId: account?.id ?? null,
+        serviceId,
         amount,
         receivedOn: parseDateOnly(values.receivedOn),
         description: values.description,
@@ -148,6 +155,7 @@ export async function updateIncome(actorId: string, values: UpdateIncomeInput) {
         entityId: income.id,
         before: {
           accountId: income.accountId,
+          serviceId: income.serviceId,
           amount: income.amount.toFixed(2),
           receivedOn: income.receivedOn.toISOString().slice(0, 10),
           description: income.description,
@@ -157,6 +165,7 @@ export async function updateIncome(actorId: string, values: UpdateIncomeInput) {
         },
         after: {
           accountId: updated.accountId,
+          serviceId: updated.serviceId,
           amount: updated.amount.toFixed(2),
           receivedOn: updated.receivedOn.toISOString().slice(0, 10),
           description: updated.description,

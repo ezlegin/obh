@@ -9,6 +9,7 @@ import type {
 import { DomainError } from "@/server/errors"
 import { parseDateOnly } from "@/server/accounting/dates"
 import { deleteExpenseDocument } from "@/server/accounting/documents"
+import { resolveServiceId } from "@/server/services/resolve-service"
 
 async function getActiveBusinessAccount(accountId: string) {
   const account = await getDb().financialAccount.findUnique({
@@ -59,6 +60,7 @@ export async function createExpense(
   const resolvedAccountId = await resolveDefaultBusinessAccountId(
     values.accountId
   )
+  const resolvedServiceId = await resolveServiceId(values.serviceId)
   const amount = new Prisma.Decimal(values.amount)
   const now = new Date()
 
@@ -67,6 +69,7 @@ export async function createExpense(
       data: {
         categoryId: category.id,
         accountId: resolvedAccountId,
+        serviceId: resolvedServiceId,
         amount,
         currency: "IRR",
         spentOn: parseDateOnly(values.spentOn),
@@ -90,6 +93,7 @@ export async function createExpense(
           status: expense.status,
           spentOn: values.spentOn,
           accountId: resolvedAccountId,
+          serviceId: resolvedServiceId,
         },
       },
     })

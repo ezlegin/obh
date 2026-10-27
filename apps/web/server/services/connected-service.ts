@@ -399,6 +399,17 @@ export async function deleteConnectedService(
     throw new DomainError("SERVICE_NOT_FOUND", "Service was not found.")
   }
 
+  const profitPeriodCount = await db.serviceProfitPeriod.count({
+    where: { serviceId: service.id },
+  })
+
+  if (profitPeriodCount > 0) {
+    throw new DomainError(
+      "SERVICE_HAS_DISTRIBUTIONS",
+      "This service has calculated profit distributions. Delete them from the service page before deleting the service."
+    )
+  }
+
   await db.$transaction(async (tx) => {
     await tx.payment.updateMany({
       where: { serviceId: service.id },

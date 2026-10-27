@@ -15,7 +15,10 @@ import { AdminDialog } from "@/components/admin/admin-dialog"
 import { AmountInput } from "@/components/admin/amount-input"
 import { createIncomeAction } from "@/app/admin/income/actions"
 import { updateIncomeAction } from "@/app/admin/income/edit-actions"
-import type { AdminIncome } from "@/server/accounting/queries"
+import type {
+  AdminIncome,
+  AdminServiceOption,
+} from "@/server/accounting/queries"
 import {
   createIncomeSchema,
   type CreateIncomeInput,
@@ -29,6 +32,7 @@ function getIncomeDefaults(
   if (income) {
     return {
       accountId: income.accountId ?? "",
+      serviceId: income.serviceId ?? "",
       amount: income.amount.replace(/\.00$/, ""),
       receivedOn: income.receivedOn,
       description: income.description,
@@ -40,6 +44,7 @@ function getIncomeDefaults(
 
   return {
     accountId: firstAccount?.id ?? "",
+    serviceId: "",
     amount: "",
     receivedOn: todayInputValue(),
     description: "",
@@ -53,12 +58,14 @@ function CreateIncomeDialog({
   open,
   onOpenChange,
   accounts,
+  services,
   income,
   onCreated,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   accounts: Array<{ id: string; name: string }>
+  services: AdminServiceOption[]
   income?: AdminIncome | null
   onCreated: () => void
 }) {
@@ -162,6 +169,28 @@ function CreateIncomeDialog({
               <p className="text-xs text-danger">{errors.receivedOn.message}</p>
             ) : null}
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="income-service">Service (optional)</Label>
+          <div className="relative">
+            <NativeSelect id="income-service" {...register("serviceId")}>
+              <option value="">No service · corporation-wide</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name} · {service.domain}
+                </option>
+              ))}
+            </NativeSelect>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-3.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+            />
+          </div>
+          <p className="text-[10px] leading-4 text-muted-foreground/60">
+            Attribute this income to a service for service-level profit reports.
+            Leave empty for corporation-wide income.
+          </p>
         </div>
 
         <div className="space-y-2">

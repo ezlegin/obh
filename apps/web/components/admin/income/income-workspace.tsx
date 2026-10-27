@@ -69,6 +69,7 @@ function IncomeWorkspace({ data }: { data: IncomeWorkspace }) {
         income.description,
         income.source,
         income.accountName,
+        income.serviceName,
         income.externalReference,
       ]
         .filter(Boolean)
@@ -113,6 +114,15 @@ function IncomeWorkspace({ data }: { data: IncomeWorkspace }) {
       cell: (income) => (
         <span className="text-[11px] text-muted-foreground">
           {income.accountName ?? "Not assigned"}
+        </span>
+      ),
+    },
+    {
+      id: "service",
+      header: "Service",
+      cell: (income) => (
+        <span className="text-[11px] text-muted-foreground">
+          {income.serviceName ?? "Corporate"}
         </span>
       ),
     },
@@ -308,6 +318,7 @@ function IncomeWorkspace({ data }: { data: IncomeWorkspace }) {
           }
         }}
         accounts={data.accounts}
+        services={data.services}
         income={editingIncome}
         onCreated={() => {
           setCreateOpen(false)

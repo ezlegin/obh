@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db/client"
 import type { CreateIncomeInput } from "@/lib/validation/accounting"
 import { DomainError } from "@/server/errors"
 import { parseDateOnly } from "@/server/accounting/dates"
+import { resolveServiceId } from "@/server/services/resolve-service"
 
 export async function createIncome(actorId: string, values: CreateIncomeInput) {
   const db = getDb()
@@ -30,6 +31,7 @@ export async function createIncome(actorId: string, values: CreateIncomeInput) {
       })
     : null
   const resolvedAccountId = values.accountId || defaultAccount?.id || null
+  const resolvedServiceId = await resolveServiceId(values.serviceId)
 
   const amount = new Prisma.Decimal(values.amount)
 
@@ -37,6 +39,7 @@ export async function createIncome(actorId: string, values: CreateIncomeInput) {
     const income = await tx.income.create({
       data: {
         accountId: resolvedAccountId,
+        serviceId: resolvedServiceId,
         amount,
         currency: "IRR",
         receivedOn: parseDateOnly(values.receivedOn),
@@ -58,6 +61,7 @@ export async function createIncome(actorId: string, values: CreateIncomeInput) {
           source: income.source,
           receivedOn: values.receivedOn,
           accountId: resolvedAccountId,
+          serviceId: resolvedServiceId,
         },
       },
     })

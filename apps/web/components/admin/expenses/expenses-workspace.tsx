@@ -67,7 +67,9 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>("expenses")
   const [createExpenseOpen, setCreateExpenseOpen] = useState(false)
-  const [editingExpense, setEditingExpense] = useState<AdminExpense | null>(null)
+  const [editingExpense, setEditingExpense] = useState<AdminExpense | null>(
+    null
+  )
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false)
   const [createRecurringOpen, setCreateRecurringOpen] = useState(false)
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
@@ -105,6 +107,7 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
         expense.description,
         expense.categoryName,
         expense.accountName,
+        expense.serviceName,
         expense.externalReference,
       ]
         .filter(Boolean)
@@ -307,6 +310,15 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
       cell: (expense) => (
         <span className="text-[11px] text-muted-foreground">
           {expense.accountName ?? "Not assigned"}
+        </span>
+      ),
+    },
+    {
+      id: "service",
+      header: "Service",
+      cell: (expense) => (
+        <span className="text-[11px] text-muted-foreground">
+          {expense.serviceName ?? "Corporate"}
         </span>
       ),
     },
@@ -797,7 +809,9 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
                           variant="ghost"
                           size="sm"
                           onClick={() => removeRecurringRule(rule)}
-                          disabled={pendingKey === `delete-recurring:${rule.id}`}
+                          disabled={
+                            pendingKey === `delete-recurring:${rule.id}`
+                          }
                           className="text-danger hover:bg-danger/10 hover:text-danger"
                         >
                           {pendingKey === `delete-recurring:${rule.id}` ? (
@@ -931,6 +945,7 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
         }}
         categories={activeCategories}
         accounts={data.accounts}
+        services={data.services}
         expense={editingExpense}
         onCreated={(expenseId) => {
           setCreateExpenseOpen(false)
@@ -949,6 +964,7 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
         onOpenChange={setCreateRecurringOpen}
         categories={activeCategories}
         accounts={data.accounts}
+        services={data.services}
         onCreated={() => router.refresh()}
       />
       <ExpenseDetailDialog

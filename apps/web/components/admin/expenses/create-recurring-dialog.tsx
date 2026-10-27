@@ -14,6 +14,7 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { AmountInput } from "@/components/admin/amount-input"
 import { createRecurringExpenseAction } from "@/app/admin/expenses/actions"
+import type { AdminServiceOption } from "@/server/accounting/queries"
 import {
   createRecurringExpenseSchema,
   type CreateRecurringExpenseInput,
@@ -28,12 +29,14 @@ function CreateRecurringDialog({
   onOpenChange,
   categories,
   accounts,
+  services,
   onCreated,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   categories: CategoryOption[]
   accounts: AccountOption[]
+  services: AdminServiceOption[]
   onCreated: () => void
 }) {
   const [serverError, setServerError] = useState<string | null>(null)
@@ -52,6 +55,7 @@ function CreateRecurringDialog({
     defaultValues: {
       categoryId: firstCategory?.id ?? "",
       accountId: firstAccount?.id ?? "",
+      serviceId: "",
       amount: "",
       description: "",
       frequency: "MONTHLY",
@@ -68,6 +72,7 @@ function CreateRecurringDialog({
       reset({
         categoryId: firstCategory?.id ?? "",
         accountId: firstAccount?.id ?? "",
+        serviceId: "",
         amount: "",
         description: "",
         frequency: "MONTHLY",
@@ -108,11 +113,7 @@ function CreateRecurringDialog({
       description="Recurring rules are active immediately and generate paid expenses when due."
       className="max-w-2xl"
     >
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        noValidate
-        className="space-y-5"
-      >
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="recurring-category">Category</Label>
@@ -144,6 +145,27 @@ function CreateRecurringDialog({
               <p className="text-xs text-danger">{errors.amount.message}</p>
             ) : null}
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="recurring-service">Service (optional)</Label>
+          <div className="relative">
+            <NativeSelect id="recurring-service" {...register("serviceId")}>
+              <option value="">No service · corporation-wide</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name} · {service.domain}
+                </option>
+              ))}
+            </NativeSelect>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-3.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+            />
+          </div>
+          <p className="text-[10px] leading-4 text-muted-foreground/60">
+            Generated expenses inherit this service assignment.
+          </p>
         </div>
 
         <div className="space-y-2">

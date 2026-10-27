@@ -158,8 +158,31 @@ model ConnectedService {
   payments           Payment[]
   idempotencyRecords PaymentIdempotencyRecord[]
   webhookDeliveries  WebhookDelivery[]
+  income             Income[]
+  expenses           Expense[]
+  recurringExpenses  RecurringExpense[]
+  ownershipShares    ServiceOwnershipShare[]
+  profitPeriods      ServiceProfitPeriod[]
 
   @@index([isActive])
+}
+
+/// Service-specific shareholder percentages. When a service has rows here,
+/// they replace corporation-level ownership for that service's distributions.
+/// A service with no rows falls back to OwnershipRecord.
+model ServiceOwnershipShare {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  serviceId     String   @db.Uuid
+  shareholderId String   @db.Uuid
+  percentage    Decimal  @db.Decimal(7, 4)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  service     ConnectedService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  shareholder Shareholder      @relation(fields: [shareholderId], references: [id], onDelete: Restrict)
+
+  @@unique([serviceId, shareholderId])
+  @@index([shareholderId])
 }
 
 /// Service API credentials. Both a SHA-256 hash (for fast request
@@ -488,6 +511,7 @@ model Expense {
   id                 String        @id @default(uuid(7)) @db.Uuid
   categoryId         String        @db.Uuid
   accountId          String?       @db.Uuid
+  serviceId          String?       @db.Uuid
   recurringExpenseId String?       @db.Uuid
   amount             Decimal       @db.Decimal(24, 2)
   currency           String        @default("IRR") @db.VarChar(3)
@@ -502,6 +526,7 @@ model Expense {
 
   category         ExpenseCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   account          FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  service          ConnectedService? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   recurringExpense RecurringExpense? @relation(fields: [recurringExpenseId], references: [id], onDelete: Restrict)
   documents        ExpenseDocument[]
 
@@ -509,6 +534,7 @@ model Expense {
   @@index([spentOn])
   @@index([categoryId, spentOn])
   @@index([accountId, spentOn])
+  @@index([serviceId, spentOn])
   @@index([status])
   @@index([recurringExpenseId])
 }
@@ -537,6 +563,7 @@ model RecurringExpense {
   id            String                 @id @default(uuid(7)) @db.Uuid
   categoryId    String                 @db.Uuid
   accountId     String?                @db.Uuid
+  serviceId     String?                @db.Uuid
   amount        Decimal                @db.Decimal(24, 2)
   currency      String                 @default("IRR") @db.VarChar(3)
   description   String                 @db.Text
@@ -554,16 +581,19 @@ model RecurringExpense {
 
   category   ExpenseCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   account    FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  service    ConnectedService? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   approvedBy User?             @relation("RecurringExpenseApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
   expenses   Expense[]
 
   @@index([status, nextDueOn])
   @@index([categoryId])
+  @@index([serviceId])
 }
 
 model Income {
   id                String   @id @default(uuid(7)) @db.Uuid
   accountId         String?  @db.Uuid
+  serviceId         String?  @db.Uuid
   amount            Decimal  @db.Decimal(24, 2)
   currency          String   @default("IRR") @db.VarChar(3)
   receivedOn        DateTime @db.Date
@@ -575,9 +605,11 @@ model Income {
   updatedAt         DateTime @updatedAt @db.Timestamptz(3)
 
   account FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  service ConnectedService? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 
   @@index([receivedOn])
   @@index([accountId, receivedOn])
+  @@index([serviceId, receivedOn])
 }
 
 model Shareholder {
@@ -593,6 +625,8 @@ model Shareholder {
   ownershipRecords     OwnershipRecord[]
   capitalContributions CapitalContribution[]
   distributions        ProfitDistribution[]
+  serviceOwnershipShares ServiceOwnershipShare[]
+  serviceDistributions   ServiceProfitDistribution[]
 
   @@index([isActive])
 }
@@ -696,6 +730,54 @@ model ProfitDistribution {
   @@unique([profitPeriodId, shareholderId])
   @@index([shareholderId, createdAt])
   @@index([status])
+}
+
+/// Service-scoped profit calculation. Revenue is the LIVE payments completed
+/// for the service plus income assigned to it, less assigned paid expenses and
+/// settled provider fees tied to the service's payments. Allocation uses
+/// ServiceOwnershipShare when present, otherwise corporation ownership.
+model ServiceProfitPeriod {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  serviceId           String   @db.Uuid
+  startsOn            DateTime @db.Date
+  endsOn              DateTime @db.Date
+  currency            String   @default("IRR") @db.VarChar(3)
+  grossPayments       Decimal  @db.Decimal(24, 2)
+  manualIncome        Decimal  @db.Decimal(24, 2)
+  totalExpenses       Decimal  @db.Decimal(24, 2)
+  providerFees        Decimal  @db.Decimal(24, 2)
+  netProfit           Decimal  @db.Decimal(24, 2)
+  distributableAmount Decimal  @db.Decimal(24, 2)
+  unallocatedResidual Decimal  @db.Decimal(24, 2)
+  ownershipTotal      Decimal  @db.Decimal(7, 4)
+  ownershipSource     String   @db.VarChar(20)
+  calculatedAt        DateTime @default(now()) @db.Timestamptz(3)
+  notes               String?  @db.Text
+  createdAt           DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime @updatedAt @db.Timestamptz(3)
+
+  service       ConnectedService           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  distributions ServiceProfitDistribution[]
+
+  @@unique([serviceId, startsOn, endsOn])
+  @@index([serviceId, endsOn])
+}
+
+model ServiceProfitDistribution {
+  id                    String   @id @default(uuid(7)) @db.Uuid
+  serviceProfitPeriodId String   @db.Uuid
+  shareholderId         String   @db.Uuid
+  percentageSnapshot    Decimal  @db.Decimal(7, 4)
+  allocatedAmount       Decimal  @db.Decimal(24, 2)
+  currency              String   @default("IRR") @db.VarChar(3)
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+
+  period      ServiceProfitPeriod @relation(fields: [serviceProfitPeriodId], references: [id], onDelete: Cascade)
+  shareholder Shareholder         @relation(fields: [shareholderId], references: [id], onDelete: Restrict)
+
+  @@unique([serviceProfitPeriodId, shareholderId])
+  @@index([shareholderId])
 }
 
 /// Payments against a distribution. Multiple rows support partial payment.

@@ -15,7 +15,10 @@ import { AdminDialog } from "@/components/admin/admin-dialog"
 import { AmountInput } from "@/components/admin/amount-input"
 import { createExpenseAction } from "@/app/admin/expenses/actions"
 import { updateExpenseAction } from "@/app/admin/expenses/edit-actions"
-import type { AdminExpense } from "@/server/accounting/queries"
+import type {
+  AdminExpense,
+  AdminServiceOption,
+} from "@/server/accounting/queries"
 import {
   createExpenseSchema,
   type CreateExpenseInput,
@@ -34,6 +37,7 @@ function getDefaultValues(
     return {
       categoryId: expense.categoryId,
       accountId: expense.accountId ?? "",
+      serviceId: expense.serviceId ?? "",
       amount: expense.amount.replace(/\.00$/, ""),
       spentOn: expense.spentOn,
       description: expense.description,
@@ -45,6 +49,7 @@ function getDefaultValues(
   return {
     categoryId: firstCategory?.id ?? "",
     accountId: firstAccount?.id ?? "",
+    serviceId: "",
     amount: "",
     spentOn: todayInputValue(),
     description: "",
@@ -58,6 +63,7 @@ function CreateExpenseDialog({
   onOpenChange,
   categories,
   accounts,
+  services,
   expense,
   onCreated,
 }: {
@@ -65,6 +71,7 @@ function CreateExpenseDialog({
   onOpenChange: (open: boolean) => void
   categories: CategoryOption[]
   accounts: AccountOption[]
+  services: AdminServiceOption[]
   expense?: AdminExpense | null
   onCreated: (expenseId: string) => void
 }) {
@@ -205,6 +212,28 @@ function CreateExpenseDialog({
               />
             </div>
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="expense-service">Service (optional)</Label>
+          <div className="relative">
+            <NativeSelect id="expense-service" {...register("serviceId")}>
+              <option value="">No service · corporation-wide</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name} · {service.domain}
+                </option>
+              ))}
+            </NativeSelect>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-3.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+            />
+          </div>
+          <p className="text-[10px] leading-4 text-muted-foreground/60">
+            Attribute this expense to a service for service-level profit
+            reports. Leave empty for corporation-wide costs.
+          </p>
         </div>
 
         <div className="space-y-2">

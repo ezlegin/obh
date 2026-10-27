@@ -82,11 +82,35 @@ period instead.
   provider/account balance is automatically mutated by this step.
 - A loss or zero-profit period has no payout rows.
 
+## Service-level ownership and distributions
+
+Connected services can override corporation ownership with their own
+shareholder percentages.
+
+- Ownership is edited from `/admin/services/[id]` → **Ownership**. Percentages
+  must total exactly `100.0000%` when any service-specific share is set.
+- Leaving every service shareholder at `0%` clears the overrides and falls back
+  to the corporation `OwnershipRecord` effective on the calculation end date.
+- Each service page shows gateway revenue, assigned income, assigned expenses,
+  settled provider fees, balance, recent activity, and distribution periods.
+- A monthly service distribution uses completed **LIVE** payments for that
+  service plus assigned income, minus assigned paid expenses and settled LIVE
+  provider fees attached to the service's payments.
+- Service periods do not apply corporate reserve, tax, or loss carryforward;
+  they are a separate service-level view. Percentages are snapshotted in
+  `ServiceProfitDistribution`.
+- Service distributions currently have no payout workflow; they are calculated
+  allocations that can be deleted and recalculated.
+- Income and expenses can be assigned to a service; unassigned records stay
+  corporate-only.
+
 ## UI
 
 - `/admin/shareholders` — profiles, ownership history, ending records.
 - `/admin/distributions` — monthly calculation, allocations, approval, payout
   tracking, loss carryforward, and historical periods.
+- `/admin/services/[id]` — service ownership, financial summary, recent
+  activity, and service-level monthly distributions.
 
 ## Limitations
 
