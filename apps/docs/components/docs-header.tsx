@@ -14,7 +14,7 @@ export function DocsHeader() {
           className="flex shrink-0 items-center gap-3 rounded-lg focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
         >
           <Image
-            src="/obh-logo.svg"
+            src="/docs/obh-logo.svg"
             alt="OBH"
             width={235}
             height={87}

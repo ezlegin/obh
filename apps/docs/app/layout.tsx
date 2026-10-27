@@ -7,6 +7,7 @@ import "./docs.css"
 import { DocsFooter } from "@/components/docs-footer"
 import { DocsHeader } from "@/components/docs-header"
 import { DocsSidebar } from "@/components/docs-sidebar"
+import { docsBasePath, docsSiteUrl } from "@/lib/site"
 
 // Self-hosted so the documentation builds and renders offline.
 const inter = localFont({
@@ -17,8 +18,7 @@ const inter = localFont({
   fallback: ["system-ui", "Segoe UI", "sans-serif"],
 })
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_DOCS_URL ?? "http://localhost:3200"
+const siteUrl = docsSiteUrl
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     "webhooks",
   ],
   icons: {
-    icon: [{ url: "/obh-logo.svg", type: "image/svg+xml" }],
+    icon: [{ url: `${docsBasePath}/obh-logo.svg`, type: "image/svg+xml" }],
   },
   openGraph: {
     title: "OBH Payments SDK — Documentation",

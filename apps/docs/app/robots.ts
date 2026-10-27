@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next"
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_DOCS_URL ?? "http://localhost:3200"
+import { docsSiteUrl } from "@/lib/site"
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -9,6 +8,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: new URL("/sitemap.xml", siteUrl).toString(),
+    sitemap: `${docsSiteUrl}/sitemap.xml`,
   }
 }

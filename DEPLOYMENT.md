@@ -1,7 +1,9 @@
 # OBH deployment and operations
 
-Status: **no production deployment has been performed.** This document describes
-the required setup, controls, and known gaps for review.
+Status: **the production stack for `https://obhco.ir` is defined in
+[`deploy/`](deploy/README.md)** — GitHub Actions builds the image, the server
+pulls it and runs it with Docker Compose behind the shared nginx proxy. Payments
+remain in TEST/disabled mode until real provider credentials are supplied.
 
 ## Runtime requirements
 
@@ -71,6 +73,24 @@ pnpm --filter web start
 The build runs `prisma generate` and Next.js. The default application port should
 be placed behind a TLS reverse proxy. Do not expose the Next.js development
 server publicly.
+
+## Container deployment
+
+Production uses one image containing both apps (`Dockerfile`):
+
+- `.github/workflows/deploy-image.yml` builds it on every push to `master` and
+  pushes `ghcr.io/ezlegin/obh:latest` and `:<commit sha>` to GHCR;
+- `.github/workflows/deploy.yml` connects to the server as `obh-deploy`
+  (restricted key + forced command), applies the schema with `prisma db push`,
+  and restarts the changed containers;
+- `deploy/compose.yml` runs `obh-db` (PostgreSQL 18), `obh-web` (port 3000,
+  public) and `obh-docs` (port 3200, served at `/docs` through the web app's
+  rewrite);
+- `deploy/backup.sh` and `deploy/crontab` keep nightly dumps and run the webhook
+  worker every minute.
+
+See [`deploy/README.md`](deploy/README.md) for DNS, secrets, rollback and the
+server layout.
 
 Next.js sets baseline security headers from `next.config.ts`:
 
@@ -184,7 +204,6 @@ See [`packages/payments/RELEASING.md`](packages/payments/RELEASING.md).
 - No formal revenue-recognition/tax policy.
 - Reports load the selected range in memory and are not paginated/streamed.
 - The admin dashboard still uses clearly labeled development data.
-- No container image, cloud IaC, or deployment pipeline is included.
 - No production backup/restore run has been performed in this environment.
 
 ## Rollback

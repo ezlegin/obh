@@ -1,0 +1,99 @@
+# Production stack for https://obhco.ir, in /opt/obh (see deploy/README.md).
+#
+# The server already runs jwilder/nginx-proxy + the Let's Encrypt companion on
+# 80/443 for other apps. Only `web` joins its `app_network` with VIRTUAL_HOST /
+# LETSENCRYPT_HOST, so the shared proxy routes and certifies the domain without
+# any change to its own configuration. The docs app stays on the private network
+# and is reached through the web app's /docs rewrite.
+#
+# Images are built on GitHub and pulled here by deploy.sh. Postgres is private
+# to the compose network (no host port).
+name: obh
+
+x-app: &app
+  restart: unless-stopped
+  env_file: .env.production
+
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: obh-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: obh
+      POSTGRES_USER: obh
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in /opt/obh/.env}
+    # Postgres 18 keeps PGDATA at /var/lib/postgresql/18/docker.
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U obh -d obh"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    shm_size: 256mb
+    mem_limit: 512m
+    networks: [internal]
+
+  web:
+    <<: *app
+    container_name: obh-web
+    image: ghcr.io/ezlegin/obh:${WEB_TAG:-latest}
+    command: ["pnpm", "--filter", "web", "start"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      VIRTUAL_HOST: obhco.ir
+      VIRTUAL_PORT: "3000"
+      LETSENCRYPT_HOST: obhco.ir
+      NODE_OPTIONS: --max-old-space-size=768
+      EXPENSE_DOCUMENT_DIR: /app/storage/expense-documents
+    volumes:
+      # Private expense documents; never served statically.
+      - documents:/app/storage/expense-documents
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    mem_limit: 1024m
+    networks: [internal, app_network]
+
+  docs:
+    <<: *app
+    container_name: obh-docs
+    image: ghcr.io/ezlegin/obh:${DOCS_TAG:-latest}
+    command: ["pnpm", "--filter", "docs", "start"]
+    environment:
+      NODE_OPTIONS: --max-old-space-size=320
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3200/docs').then((r) => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    mem_limit: 512m
+    networks: [internal]
+
+volumes:
+  pgdata:
+  documents:
+
+networks:
+  internal:
+  app_network:
+    external: true

@@ -1,0 +1,75 @@
+# Deploys a built image to the server (schema push, then restart). It runs
+# automatically after "Build production image" succeeds on master, and can be
+# started by hand from the Actions tab to deploy or roll back a commit.
+#
+# It connects as `obh-deploy`, whose key can only run
+# /opt/obh/deploy.sh-wrapper with a commit sha (or "latest") and which apps to
+# restart.
+#
+# Repository secrets:
+#   DEPLOY_SSH_KEY      private key of the server's obh-deploy user
+#   DEPLOY_KNOWN_HOSTS  `ssh-keyscan -t ed25519 91.107.179.58` output
+name: Deploy to production
+
+on:
+  workflow_run:
+    workflows: ["Build production image"]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Full 40-character commit sha to deploy (empty = latest built image)
+        required: false
+        default: ""
+      target:
+        description: Apps to restart
+        type: choice
+        options: [both, web, docs]
+        default: both
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check the target
+        env:
+          EVENT: ${{ github.event_name }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          INPUT_SHA: ${{ inputs.sha }}
+          INPUT_TARGET: ${{ inputs.target }}
+        run: |
+          set -eu
+          if [ "$EVENT" = "workflow_run" ]; then
+            printf '%s' "$RUN_SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "run has no valid commit sha"; exit 1; }
+            echo "TARGET=$RUN_SHA" >> "$GITHUB_ENV"
+            echo "TARGET_APPS=both" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          sha=$(printf '%s' "${INPUT_SHA:-}" | tr 'A-Z' 'a-z')
+          if [ -n "$sha" ]; then
+            printf '%s' "$sha" | grep -Eqx '[0-9a-f]{40}' || { echo "not a full 40-character commit sha"; exit 1; }
+            echo "TARGET=$sha" >> "$GITHUB_ENV"
+          else
+            echo "TARGET=latest" >> "$GITHUB_ENV"
+          fi
+          echo "TARGET_APPS=${INPUT_TARGET:-both}" >> "$GITHUB_ENV"
+
+      - name: Deploy over SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy -o BatchMode=yes obh-deploy@91.107.179.58 "$TARGET ${TARGET_APPS:-both}"

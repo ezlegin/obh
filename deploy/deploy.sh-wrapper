@@ -1,0 +1,22 @@
+#!/bin/sh
+# The only command the `obh-deploy` SSH key may run (forced by its
+# authorized_keys entry: restrict,command="/opt/obh/deploy.sh-wrapper").
+# GitHub's deploy.yml connects with
+#   ssh obh-deploy@server "<sha|latest> <web|docs|both>"
+# the arguments arrive in SSH_ORIGINAL_COMMAND and are validated here before
+# deploy.sh runs as root through a sudoers rule for exactly that script.
+set -euf  # -f: no filename expansion of the SSH arguments
+# shellcheck disable=SC2086
+set -- ${SSH_ORIGINAL_COMMAND:-latest}
+[ "$#" -le 2 ] || { echo "refused: too many arguments" >&2; exit 2; }
+tag="${1:-latest}"
+target="${2:-both}"
+if [ "$tag" != latest ] && ! printf '%s' "$tag" | grep -Eqx '[0-9a-f]{40}'; then
+  echo "refused: expected a full 40-character commit sha or \"latest\"" >&2
+  exit 2
+fi
+case "$target" in
+  web | docs | both) ;;
+  *) echo "refused: target must be web, docs or both" >&2; exit 2 ;;
+esac
+exec sudo -n /opt/obh/deploy.sh "$tag" "$target"

@@ -1,0 +1,8 @@
+# Installed as /etc/cron.d/obh. Webhook retries live in the database and are
+# processed by a short-lived container of the running image; the database is
+# dumped nightly to /opt/obh/backups.
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+* * * * * root cd /opt/obh && docker compose run --rm -T --no-deps web pnpm --silent --filter web webhooks:process >> /var/log/obh.log 2>&1
+30 0 * * * root /opt/obh/backup.sh >> /var/log/obh.log 2>&1

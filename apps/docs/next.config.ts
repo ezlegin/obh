@@ -1,6 +1,9 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
+  // The docs app is published under https://obhco.ir/docs (the web app
+  // rewrites /docs to this server). Kept in sync with lib/site.ts.
+  basePath: "/docs",
   transpilePackages: ["@workspace/ui"],
   devIndicators: false,
   poweredByHeader: false,

@@ -38,6 +38,7 @@ yarn-error.log*
 .env*
 !.env.example
 !**/.env.example
+!**/.env.production.example
 
 # generated Prisma client
 /apps/web/lib/generated/

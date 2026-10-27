@@ -1,0 +1,55 @@
+# Builds the production image on GitHub (the VPS is shared with other live
+# apps and has no RAM to spare for Next builds) and pushes it to GHCR. The
+# server pulls it in deploy.yml / deploy/deploy.sh.
+#
+# The build needs no database: prisma generate only needs a well-formed URL and
+# the schema is pushed at deploy time (deploy/deploy.sh).
+name: Build production image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths-ignore:
+      - "deploy/**"
+      - "**/*.md"
+      - ".github/workflows/deploy.yml"
+
+concurrency:
+  group: build-image
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record build time
+        run: echo "BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            APP_VERSION=${{ github.sha }}
+            APP_BUILT_AT=${{ env.BUILT_AT }}
+          tags: |
+            ghcr.io/ezlegin/obh:latest
+            ghcr.io/ezlegin/obh:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
