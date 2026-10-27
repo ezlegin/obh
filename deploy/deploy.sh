@@ -73,6 +73,9 @@ docker compose ps
 # /docs subpath (the latter exercises the web -> docs rewrite). Give Next a
 # moment to bind.
 smoke_ok=0
+# Through the local proxy over HTTPS (plain HTTP only redirects); before the
+# certificate exists the proxy serves a self-signed one, hence -k.
+smoke_target="-k --resolve obhco.ir:443:127.0.0.1"
 code_web=""; code_docs=""
 for _ in $(seq 1 30); do
   code_web=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: obhco.ir' \
