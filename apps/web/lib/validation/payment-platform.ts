@@ -98,6 +98,20 @@ export const rotateWebhookSecretSchema = z.object({
 export const createDevelopmentPaymentSchema = z.object({
   serviceId: z.string().uuid(),
   environment: z.enum(["TEST", "LIVE"]).optional(),
+  gateway: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9_-]{1,40}$/, "Select a payment gateway.")
+    .optional(),
+  customerMobile: z
+    .string()
+    .trim()
+    .regex(
+      /^(\+98|0098|98|0)?9\d{9}$/,
+      "Enter an Iranian mobile number such as 09121234567."
+    )
+    .optional()
+    .or(z.literal("")),
   amount: z
     .string()
     .trim()

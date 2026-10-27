@@ -8,6 +8,7 @@ import {
   getActiveServicesForPayment,
   getPaymentsForAdmin,
 } from "@/server/payments/queries"
+import { listPaymentGatewaysForAdmin } from "@/server/payments/providers/registry"
 
 export const metadata: Metadata = {
   title: "Payments",
@@ -24,10 +25,14 @@ export default async function AdminPaymentsPage() {
       <AdminPageHeader
         eyebrow="Admin / Operations"
         title="Payments"
-        description="Authoritative Sadad (Bank Melli) payment records, lifecycle status, originating service, and gateway receipt numbers (OrderId, SystemTraceNo, RetrivalRefNo)."
+        description="Authoritative payment records across Sadad and Digipay: lifecycle status, originating service, gateway, and receipt numbers."
         actions={<Badge variant="outline">{payments.length} records</Badge>}
       />
-      <PaymentsManager payments={payments} services={services} />
+      <PaymentsManager
+        payments={payments}
+        services={services}
+        gateways={listPaymentGatewaysForAdmin()}
+      />
     </>
   )
 }

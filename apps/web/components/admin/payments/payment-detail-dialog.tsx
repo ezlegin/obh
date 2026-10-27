@@ -8,10 +8,7 @@ import { Button, buttonVariants } from "@workspace/ui/components/button"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { PaymentStatusBadge } from "@/components/admin/payments/payment-status-badge"
-import {
-  formatDevelopmentDateTime,
-  formatIrrDecimal,
-} from "@/lib/admin/format"
+import { formatDevelopmentDateTime, formatIrrDecimal } from "@/lib/admin/format"
 import type { AdminPayment } from "@/server/payments/queries"
 
 type PaymentDetailDialogProps = {
@@ -28,7 +25,7 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
       <dt className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground/60 uppercase">
         {label}
       </dt>
-      <dd className="min-w-0 break-all text-xs text-foreground sm:text-right">
+      <dd className="min-w-0 text-xs break-all text-foreground sm:text-right">
         {value}
       </dd>
     </div>
@@ -158,7 +155,10 @@ function PaymentDetailDialog({
                     <span className="max-w-xs truncate">
                       {payment.checkoutUrl}
                     </span>
-                    <ExternalLink aria-hidden="true" className="size-3 shrink-0" />
+                    <ExternalLink
+                      aria-hidden="true"
+                      className="size-3 shrink-0"
+                    />
                   </a>
                 }
               />
@@ -252,9 +252,7 @@ function PaymentDetailDialog({
             <DetailRow
               label="Completed"
               value={
-                payment.paidAt
-                  ? formatDevelopmentDateTime(payment.paidAt)
-                  : "—"
+                payment.paidAt ? formatDevelopmentDateTime(payment.paidAt) : "—"
               }
             />
             <DetailRow

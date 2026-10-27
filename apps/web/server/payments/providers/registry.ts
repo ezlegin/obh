@@ -76,6 +76,20 @@ export function listAvailablePaymentGateways(
     }))
 }
 
+export type AdminPaymentGatewayOption = PaymentGatewayDescriptor & {
+  isDefault: boolean
+  liveConfigured: boolean
+}
+
+/** Every registered gateway with its LIVE availability, for admin forms. */
+export function listPaymentGatewaysForAdmin(): AdminPaymentGatewayOption[] {
+  return [...adapters.values()].map((adapter) => ({
+    ...adapter.descriptor,
+    isDefault: adapter.code === DEFAULT_PROVIDER_CODE,
+    liveConfigured: adapter.isLiveConfigured(),
+  }))
+}
+
 export {
   DIGIPAY_PROVIDER_CODE,
   DIGIPAY_PROVIDER_NAME,

@@ -28,6 +28,7 @@ import {
   createDevelopmentPaymentSchema,
   type CreateDevelopmentPaymentInputForm,
 } from "@/lib/validation/payment-platform"
+import type { AdminPaymentGatewayOption } from "@/server/payments/providers/registry"
 
 type PaymentServiceOption = {
   id: string
@@ -45,6 +46,7 @@ type CreatePaymentDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   services: PaymentServiceOption[]
+  gateways: AdminPaymentGatewayOption[]
   onCreated: () => void
 }
 
@@ -52,8 +54,13 @@ function CreatePaymentDialog({
   open,
   onOpenChange,
   services,
+  gateways,
   onCreated,
 }: CreatePaymentDialogProps) {
+  const defaultGateway =
+    gateways.find((gateway) => gateway.isDefault)?.code ??
+    gateways[0]?.code ??
+    "sadad"
   const [serverError, setServerError] = useState<string | null>(null)
   const [createdSession, setCreatedSession] =
     useState<CreatedSessionResult | null>(null)
@@ -73,6 +80,8 @@ function CreatePaymentDialog({
     defaultValues: {
       serviceId: services[0]?.id ?? "",
       environment: "TEST",
+      gateway: defaultGateway,
+      customerMobile: "",
       amount: "",
       description: "",
       externalOrderId: "",
@@ -80,6 +89,22 @@ function CreatePaymentDialog({
   })
 
   const selectedEnv = watch("environment") ?? "TEST"
+  const selectedGatewayCode = watch("gateway") ?? defaultGateway
+  const selectedGateway =
+    gateways.find((gateway) => gateway.code === selectedGatewayCode) ??
+    gateways[0]
+  const gatewayName = selectedGateway?.name ?? "Sadad"
+  const liveAvailable = selectedGateway?.liveConfigured ?? false
+
+  const selectGateway = (gateway: AdminPaymentGatewayOption) => {
+    setValue("gateway", gateway.code, { shouldValidate: true })
+    if (!gateway.liveConfigured) {
+      setValue("environment", "TEST", { shouldValidate: true })
+    }
+    if (!gateway.requiresCustomerMobile) {
+      setValue("customerMobile", "")
+    }
+  }
 
   useEffect(() => {
     if (open) {
@@ -89,12 +114,14 @@ function CreatePaymentDialog({
       reset({
         serviceId: services[0]?.id ?? "",
         environment: "TEST",
+        gateway: defaultGateway,
+        customerMobile: "",
         amount: "",
         description: "",
         externalOrderId: "",
       })
     }
-  }, [open, services, reset])
+  }, [open, services, reset, defaultGateway])
 
   const copyCheckoutUrl = async (url: string) => {
     try {
@@ -121,7 +148,7 @@ function CreatePaymentDialog({
       setCreatedSession({
         reference: result.reference ?? "",
         checkoutUrl: result.checkoutUrl ?? null,
-        environment: result.environment ?? (values.environment ?? "TEST"),
+        environment: result.environment ?? values.environment ?? "TEST",
       })
     })
   }
@@ -134,17 +161,17 @@ function CreatePaymentDialog({
         createdSession
           ? `Payment ${createdSession.reference} ready`
           : selectedEnv === "LIVE"
-            ? "Create a LIVE Sadad payment"
-            : "Create a Sadad test payment"
+            ? `Create a LIVE ${gatewayName} payment`
+            : `Create a ${gatewayName} test payment`
       }
       description={
         createdSession
           ? createdSession.environment === "LIVE"
-            ? "Sadad issued a real Shaparak checkout token. Open the checkout link below to pay with a real Iranian bank card and test the live callback."
-            : "Simulated Sadad session token created. Open the simulator checkout or simulate the result from the payments table."
+            ? `${gatewayName} issued a real checkout link. Open it to pay for real and test the live callback.`
+            : `Simulated ${gatewayName} checkout created. Open the simulator checkout or simulate the result from the payments table.`
           : selectedEnv === "LIVE"
-            ? "Creates a real LIVE payment on Bank Melli Sadad (Shaparak) and generates a live checkout link."
-            : "Creates a TEST payment record on the auto-provisioned Sadad simulator account."
+            ? `Creates a real LIVE payment on ${gatewayName} and generates a live checkout link.`
+            : `Creates a TEST payment on the auto-provisioned ${gatewayName} simulator account.`
       }
       className="max-w-2xl"
     >
@@ -166,7 +193,7 @@ function CreatePaymentDialog({
             {createdSession.checkoutUrl ? (
               <div className="mt-3 space-y-2">
                 <p className="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-                  Sadad Checkout URL
+                  {gatewayName} checkout URL
                 </p>
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-black/30 px-3 py-2">
                   <span className="truncate font-mono text-xs text-foreground">
@@ -207,7 +234,7 @@ function CreatePaymentDialog({
                 rel="noreferrer"
                 className={cn(buttonVariants({ variant: "default" }))}
               >
-                Open Sadad Checkout
+                Open {gatewayName} checkout
                 <ExternalLink aria-hidden="true" className="size-4" />
               </a>
             ) : null}
@@ -215,6 +242,54 @@ function CreatePaymentDialog({
         </div>
       ) : (
         <>
+          <fieldset className="mb-4">
+            <legend className="mb-2 text-xs font-medium text-muted-foreground">
+              Payment gateway
+            </legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {gateways.map((gateway) => {
+                const active = gateway.code === selectedGatewayCode
+                return (
+                  <button
+                    key={gateway.code}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => selectGateway(gateway)}
+                    className={cn(
+                      "rounded-xl border p-3 text-left transition-colors",
+                      active
+                        ? "border-foreground/40 bg-white/[0.06]"
+                        : "border-border hover:border-foreground/20"
+                    )}
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium">
+                        {gateway.name}
+                      </span>
+                      <Badge
+                        variant={
+                          gateway.kind === "installment" ? "info" : "outline"
+                        }
+                      >
+                        {gateway.kind === "installment"
+                          ? "Installments"
+                          : "Card"}
+                      </Badge>
+                    </span>
+                    <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">
+                      {gateway.displayName}
+                    </span>
+                    <span className="mt-1 block text-[10px] text-muted-foreground/70">
+                      {gateway.liveConfigured
+                        ? "LIVE and TEST available"
+                        : "TEST only (LIVE credentials not set)"}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </fieldset>
+
           <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-white/[0.02] p-2">
             <span className="pl-2 text-xs font-medium text-muted-foreground">
               Gateway mode
@@ -227,7 +302,7 @@ function CreatePaymentDialog({
               {(
                 [
                   { id: "TEST" as const, label: "TEST (Simulator)" },
-                  { id: "LIVE" as const, label: "LIVE (Real Sadad)" },
+                  { id: "LIVE" as const, label: "LIVE (Real gateway)" },
                 ] as const
               ).map((option) => {
                 const active = selectedEnv === option.id
@@ -235,13 +310,19 @@ function CreatePaymentDialog({
                   <button
                     key={option.id}
                     type="button"
+                    disabled={option.id === "LIVE" && !liveAvailable}
+                    title={
+                      option.id === "LIVE" && !liveAvailable
+                        ? `LIVE ${gatewayName} credentials are not configured on the server.`
+                        : undefined
+                    }
                     onClick={() =>
                       setValue("environment", option.id, {
                         shouldValidate: true,
                       })
                     }
                     className={cn(
-                      "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                      "rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
                       active
                         ? option.id === "LIVE"
                           ? "bg-success text-white"
@@ -265,12 +346,14 @@ function CreatePaymentDialog({
                 />
                 <p className="text-xs leading-5 text-muted-foreground">
                   <strong className="font-medium text-foreground">
-                    Real Sadad Gateway (LIVE):
+                    Real {gatewayName} (LIVE):
                   </strong>{" "}
-                  Calls <span className="font-mono">sadad.shaparak.ir</span>{" "}
-                  using your server&apos;s LIVE credentials and returns a real
-                  Shaparak checkout link. Completed payments will verify via the
-                  live callback and increase the business balance.
+                  Uses your server&apos;s LIVE credentials and returns a real
+                  checkout link. Completed payments verify via the live callback
+                  and increase the business balance
+                  {selectedGateway?.kind === "installment"
+                    ? " as each installment is deposited."
+                    : "."}
                 </p>
               </div>
             </div>
@@ -282,8 +365,11 @@ function CreatePaymentDialog({
                   className="mt-0.5 size-4 shrink-0 text-warning"
                 />
                 <p className="text-xs leading-5 text-muted-foreground">
-                  Sadad simulator (TEST environment). Amounts must be positive
-                  whole Rial integers without decimals.
+                  {gatewayName} simulator (TEST environment). Amounts must be
+                  positive whole Rial integers without decimals.
+                  {selectedGateway?.kind === "installment"
+                    ? " Simulating a BNPL or credit result creates a four-part installment schedule."
+                    : ""}
                 </p>
               </div>
             </div>
@@ -345,6 +431,29 @@ function CreatePaymentDialog({
               </div>
             </div>
 
+            {selectedGateway?.requiresCustomerMobile ? (
+              <div className="space-y-2">
+                <Label htmlFor="payment-mobile">Customer mobile number</Label>
+                <Input
+                  id="payment-mobile"
+                  inputMode="tel"
+                  dir="ltr"
+                  placeholder="09121234567"
+                  aria-invalid={Boolean(errors.customerMobile)}
+                  {...register("customerMobile")}
+                />
+                {errors.customerMobile ? (
+                  <p className="text-xs text-danger">
+                    {errors.customerMobile.message}
+                  </p>
+                ) : (
+                  <p className="text-[10px] leading-4 text-muted-foreground/60">
+                    Required by {gatewayName}.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
             <div className="space-y-2">
               <Label htmlFor="payment-description">Description</Label>
               <Textarea
@@ -385,11 +494,11 @@ function CreatePaymentDialog({
                       className="size-4 animate-spin"
                     />
                     {selectedEnv === "LIVE"
-                      ? "Requesting Sadad token…"
+                      ? `Requesting ${gatewayName} checkout…`
                       : "Creating test payment…"}
                   </>
                 ) : selectedEnv === "LIVE" ? (
-                  "Create LIVE Sadad payment"
+                  `Create LIVE ${gatewayName} payment`
                 ) : (
                   "Create test payment"
                 )}

@@ -10,8 +10,8 @@ import type {
   SimulateDevelopmentResultInput,
 } from "@/lib/validation/payment-platform"
 import { DomainError } from "@/server/errors"
-import { getSadadAccountForEnvironment } from "@/server/gateways/gateway-service"
-import { getSadadCallbackUrl } from "@/server/payments/api-payment-service"
+import { getGatewayAccountForEnvironment } from "@/server/gateways/gateway-service"
+import { getGatewayCallbackUrl } from "@/server/payments/api-payment-service"
 import {
   createInstallmentPlanInTx,
   installmentPurchaseType,
@@ -21,9 +21,12 @@ import {
   PAYMENT_EVENT_TYPES,
   type PaymentLifecycleStatus,
 } from "@/server/payments/lifecycle"
+import { normalizeIranianMobile } from "@/server/payments/providers/digipay"
 import {
+  DEFAULT_PROVIDER_CODE,
   getPaymentProviderAdapter,
-  getSadadConfigStatus,
+  isKnownPaymentProvider,
+  providerSupportsEnvironment,
   SADAD_PROVIDER_CODE,
 } from "@/server/payments/providers/registry"
 import { queuePaymentWebhook } from "@/server/payments/webhook-service"
@@ -92,11 +95,33 @@ export async function createDevelopmentPayment(
   const environment: "TEST" | "LIVE" =
     values.environment === "LIVE" ? "LIVE" : "TEST"
   const isSimulated = environment === "TEST"
+  const gateway = values.gateway || DEFAULT_PROVIDER_CODE
 
-  if (environment === "LIVE" && !getSadadConfigStatus().liveConfigured) {
+  if (!isKnownPaymentProvider(gateway)) {
+    throw new DomainError(
+      "GATEWAY_NOT_SUPPORTED",
+      "Select a payment gateway that OBH offers."
+    )
+  }
+
+  const adapter = getPaymentProviderAdapter(gateway)
+  const gatewayName = adapter.descriptor.name
+
+  if (!providerSupportsEnvironment(gateway, environment)) {
     throw new DomainError(
       "LIVE_NOT_AVAILABLE",
-      "LIVE Sadad gateway credentials (SADAD_MERCHANT_ID, SADAD_TERMINAL_ID, SADAD_TERMINAL_KEY) are not configured on the server."
+      `LIVE ${gatewayName} credentials are not configured on the server.`
+    )
+  }
+
+  const customerMobile = values.customerMobile
+    ? normalizeIranianMobile(values.customerMobile)
+    : null
+
+  if (adapter.descriptor.requiresCustomerMobile && !customerMobile) {
+    throw new DomainError(
+      "CUSTOMER_MOBILE_REQUIRED",
+      `${gatewayName} requires the customer's mobile number.`
     )
   }
 
@@ -117,7 +142,7 @@ export async function createDevelopmentPayment(
   }
 
   const { provider, account: providerAccount } =
-    await getSadadAccountForEnvironment(environment)
+    await getGatewayAccountForEnvironment(gateway, environment)
 
   const existingOrder = await db.payment.findFirst({
     where: {
@@ -157,6 +182,7 @@ export async function createDevelopmentPayment(
           metadata: {
             simulated: isSimulated,
             createdBy: "admin",
+            gateway,
           },
           providerId: provider.id,
           providerAccountId: providerAccount.id,
@@ -171,8 +197,8 @@ export async function createDevelopmentPayment(
           newStatus: "PENDING",
           message:
             environment === "LIVE"
-              ? "Sadad LIVE payment created from admin console."
-              : "Sadad test payment created from admin console.",
+              ? `${gatewayName} LIVE payment created from admin console.`
+              : `${gatewayName} test payment created from admin console.`,
           metadata: {
             simulated: isSimulated,
             gatewayOrderId: String(created.gatewayOrderId),
@@ -185,8 +211,8 @@ export async function createDevelopmentPayment(
           actorId: input.actorId,
           action:
             environment === "LIVE"
-              ? "payment.sadad_live_created"
-              : "payment.sadad_test_created",
+              ? `payment.${gateway}_live_created`
+              : `payment.${gateway}_test_created`,
           entityType: "Payment",
           entityId: created.id,
           after: {
@@ -218,7 +244,6 @@ export async function createDevelopmentPayment(
   }
 
   try {
-    const adapter = getPaymentProviderAdapter(SADAD_PROVIDER_CODE)
     const session = await adapter.createCheckoutSession({
       paymentReference: payment.reference,
       gatewayOrderId: String(payment.gatewayOrderId),
@@ -227,9 +252,10 @@ export async function createDevelopmentPayment(
       currency: "IRR",
       description: payment.description,
       returnUrl,
-      callbackUrl: getSadadCallbackUrl(),
+      callbackUrl: getGatewayCallbackUrl(gateway),
       environment,
       metadata: { simulated: isSimulated },
+      customerMobile,
     })
 
     const updated = await db.$transaction(async (tx) => {
@@ -257,8 +283,8 @@ export async function createDevelopmentPayment(
           newStatus: "PENDING",
           message:
             environment === "LIVE"
-              ? "Sadad LIVE session token created."
-              : "Sadad test session token created.",
+              ? `${gatewayName} LIVE checkout session created.`
+              : `${gatewayName} test checkout session created.`,
           metadata: {
             simulated: session.simulated,
             providerSessionId: session.providerSessionId,
@@ -291,8 +317,8 @@ export async function createDevelopmentPayment(
           newStatus: "FAILED",
           message:
             environment === "LIVE"
-              ? "Sadad LIVE session could not be created."
-              : "Sadad test session could not be created.",
+              ? `${gatewayName} LIVE session could not be created.`
+              : `${gatewayName} test session could not be created.`,
           metadata: { simulated: isSimulated },
         },
       })
@@ -309,7 +335,7 @@ export async function createDevelopmentPayment(
       "PROVIDER_SESSION_FAILED",
       error instanceof Error
         ? error.message
-        : "The Sadad session could not be created."
+        : `The ${gatewayName} session could not be created.`
     )
   }
 
@@ -495,6 +521,49 @@ export async function simulateDevelopmentPaymentResult(
   return updated
 }
 
+/**
+ * Deletes every TEST (simulator) payment and its dependent records. LIVE
+ * payments are never touched.
+ */
+export async function deleteAllTestPayments(actorId: string) {
+  const db = getDb()
+
+  return db.$transaction(async (tx) => {
+    const payments = await tx.payment.findMany({
+      where: { environment: "TEST" },
+      select: { id: true },
+    })
+    const paymentIds = payments.map((payment) => payment.id)
+
+    if (paymentIds.length === 0) {
+      return { deleted: 0 }
+    }
+
+    const byPayment = { paymentId: { in: paymentIds } }
+    await tx.providerFee.deleteMany({ where: byPayment })
+    await tx.paymentIdempotencyRecord.deleteMany({ where: byPayment })
+    await tx.webhookDelivery.deleteMany({ where: byPayment })
+    await tx.paymentVerification.deleteMany({ where: byPayment })
+    await tx.paymentEvent.deleteMany({ where: byPayment })
+    await tx.installmentPlan.deleteMany({ where: byPayment })
+    const deleted = await tx.payment.deleteMany({
+      where: { id: { in: paymentIds }, environment: "TEST" },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "payment.test_payments_deleted",
+        entityType: "Payment",
+        entityId: "TEST",
+        after: { deleted: deleted.count, environment: "TEST" },
+      },
+    })
+
+    return { deleted: deleted.count }
+  })
+}
+
 export async function deletePayment(actorId: string, paymentId: string) {
   const db = getDb()
   const payment = await db.payment.findUnique({
@@ -515,6 +584,8 @@ export async function deletePayment(actorId: string, paymentId: string) {
       where: { paymentId: payment.id },
     })
     await tx.paymentEvent.deleteMany({ where: { paymentId: payment.id } })
+    // Installments cascade from their plan.
+    await tx.installmentPlan.deleteMany({ where: { paymentId: payment.id } })
     await tx.payment.delete({ where: { id: payment.id } })
 
     await tx.auditLog.create({

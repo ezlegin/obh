@@ -11,6 +11,7 @@ import {
 import { DomainError } from "@/server/errors"
 import {
   createDevelopmentPayment,
+  deleteAllTestPayments,
   deletePayment,
   simulateDevelopmentPaymentResult,
 } from "@/server/payments/payment-service"
@@ -97,6 +98,23 @@ export async function simulateDevelopmentPaymentResultAction(
       paymentId: payment.id,
       reference: payment.reference,
     }
+  } catch (error) {
+    return actionError(error)
+  }
+}
+
+export async function deleteAllTestPaymentsAction(): Promise<
+  PaymentActionResult & { deleted?: number }
+> {
+  const admin = await requireAdmin()
+
+  try {
+    const { deleted } = await deleteAllTestPayments(admin.id)
+    revalidatePath("/admin/payments")
+    revalidatePath("/admin/installments")
+    revalidatePath("/admin/reconciliation")
+    revalidatePath("/admin")
+    return { ok: true, deleted }
   } catch (error) {
     return actionError(error)
   }

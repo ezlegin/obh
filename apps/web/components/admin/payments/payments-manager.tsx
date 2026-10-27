@@ -26,9 +26,13 @@ import { CreatePaymentDialog } from "@/components/admin/payments/create-payment-
 import { PaymentDetailDialog } from "@/components/admin/payments/payment-detail-dialog"
 import { PaymentStatusBadge } from "@/components/admin/payments/payment-status-badge"
 import { SimulateResultDialog } from "@/components/admin/payments/simulate-result-dialog"
-import { deletePaymentAction } from "@/app/admin/payments/actions"
+import {
+  deleteAllTestPaymentsAction,
+  deletePaymentAction,
+} from "@/app/admin/payments/actions"
 import { formatDevelopmentDate, formatIrrDecimal } from "@/lib/admin/format"
 import type { AdminPayment } from "@/server/payments/queries"
+import type { AdminPaymentGatewayOption } from "@/server/payments/providers/registry"
 
 type PaymentServiceOption = {
   id: string
@@ -41,9 +45,14 @@ type EnvironmentFilter = "LIVE" | "TEST" | "ALL"
 type PaymentsManagerProps = {
   payments: AdminPayment[]
   services: PaymentServiceOption[]
+  gateways: AdminPaymentGatewayOption[]
 }
 
-function PaymentsManager({ payments, services }: PaymentsManagerProps) {
+function PaymentsManager({
+  payments,
+  services,
+  gateways,
+}: PaymentsManagerProps) {
   const router = useRouter()
   const [search, setSearch] = useState("")
   const [environmentFilter, setEnvironmentFilter] =
@@ -54,6 +63,7 @@ function PaymentsManager({ payments, services }: PaymentsManagerProps) {
     null
   )
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [clearingTest, setClearingTest] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const canCreate = services.length > 0
@@ -82,6 +92,32 @@ function PaymentsManager({ payments, services }: PaymentsManagerProps) {
     }
 
     setDeletingId(null)
+  }
+
+  const removeAllTestPayments = async () => {
+    if (
+      !window.confirm(
+        `Remove all ${counts.test} TEST payment${counts.test === 1 ? "" : "s"}, including their events, verifications and installment schedules? LIVE payments are not affected. This cannot be undone.`
+      )
+    ) {
+      return
+    }
+
+    setClearingTest(true)
+    setError(null)
+
+    const result = await deleteAllTestPaymentsAction()
+
+    if (!result.ok) {
+      setError(result.error ?? "The test payments could not be removed.")
+    } else {
+      if (detailPayment?.environment === "TEST") {
+        setDetailPayment(null)
+      }
+      router.refresh()
+    }
+
+    setClearingTest(false)
   }
 
   const counts = useMemo(() => {
@@ -335,7 +371,9 @@ function PaymentsManager({ payments, services }: PaymentsManagerProps) {
                     <span
                       className={cn(
                         "font-mono text-[10px] tabular-nums",
-                        active ? "text-background/75" : "text-muted-foreground/60"
+                        active
+                          ? "text-background/75"
+                          : "text-muted-foreground/60"
                       )}
                     >
                       {option.count}
@@ -344,6 +382,22 @@ function PaymentsManager({ payments, services }: PaymentsManagerProps) {
                 )
               })}
             </div>
+
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={removeAllTestPayments}
+              disabled={clearingTest || counts.test === 0}
+              className="text-danger hover:bg-danger/10 hover:text-danger"
+            >
+              {clearingTest ? (
+                <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+              ) : (
+                <Trash2 aria-hidden="true" className="size-3.5" />
+              )}
+              Remove test payments
+            </Button>
 
             <Button
               type="button"
@@ -445,6 +499,7 @@ function PaymentsManager({ payments, services }: PaymentsManagerProps) {
           open={createOpen}
           onOpenChange={setCreateOpen}
           services={services}
+          gateways={gateways}
           onCreated={() => router.refresh()}
         />
       ) : null}
