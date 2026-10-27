@@ -1,8 +1,14 @@
-import NextAuth from "next-auth"
+import NextAuth, { CredentialsSignin } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 
 import { getDb } from "@/lib/db/client"
 import { verifyPassword } from "@/lib/auth/password"
+import {
+  clientIpFrom,
+  loginRetryAfterSeconds,
+  recordLoginFailure,
+  recordLoginSuccess,
+} from "@/lib/auth/rate-limit"
 import { loginSchema } from "@/lib/validation/auth"
 
 // A valid bcrypt hash used only to equalize failed-login timing when the email
@@ -11,6 +17,10 @@ const DUMMY_PASSWORD_HASH =
   "$2b$12$FZVaFBTVP1X1yMXutkMKWODcmOtfga.35OH5KoKzilH8pNLNP2tzi"
 
 const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60
+
+export class LoginRateLimited extends CredentialsSignin {
+  code = "rate_limited"
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -29,11 +39,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(rawCredentials) {
+      async authorize(rawCredentials, request) {
         const parsed = loginSchema.safeParse(rawCredentials)
 
         if (!parsed.success) {
           return null
+        }
+
+        const { email } = parsed.data
+        const ip = clientIpFrom(request?.headers)
+
+        if (loginRetryAfterSeconds(email, ip) > 0) {
+          throw new LoginRateLimited()
         }
 
         try {
@@ -55,8 +72,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           )
 
           if (!user?.isActive || !user.passwordHash || !passwordMatches) {
+            recordLoginFailure(email, ip)
             return null
           }
+
+          recordLoginSuccess(email)
 
           try {
             await db.user.update({

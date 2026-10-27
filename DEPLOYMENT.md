@@ -195,7 +195,9 @@ See [`packages/payments/RELEASING.md`](packages/payments/RELEASING.md).
 
 ## Known production gaps
 
-- No login/API rate limiting in the application.
+- Login is rate limited in-process (5 failures per email, 20 per IP, per 15
+  minutes); it needs a shared store before running more than one web
+  instance. The `/api/v1/*` API is not rate limited.
 - No MFA or self-service password reset.
 - No antivirus scanning or object-storage adapter for documents.
 - No automatic provider statement import.
