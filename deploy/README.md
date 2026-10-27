@@ -65,8 +65,12 @@ Workflows:
   backups/                  database dumps (last 14)
   deploys.log               commit + target per deploy
 /etc/cron.d/obh             webhook worker (every minute) + nightly backup
+/etc/logrotate.d/obh        weekly rotation of /var/log/obh.log
 /var/log/obh.log            cron output
 ```
+
+Container logs are capped at 10 MB × 3 files per service (`compose.yml`), and
+the cron log rotates weekly.
 
 `obh-deploy` is a system user with a key restricted to
 `command="/opt/obh/deploy.sh-wrapper"`; its sudoers entry allows only

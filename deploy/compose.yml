@@ -10,9 +10,17 @@
 # to the compose network (no host port).
 name: obh
 
+# The host disk is shared with other apps; cap what these containers can log.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 x-app: &app
   restart: unless-stopped
   env_file: .env.production
+  logging: *logging
 
 services:
   db:

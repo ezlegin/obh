@@ -1,0 +1,11 @@
+# Installed as /etc/logrotate.d/obh (see deploy/README.md). Keeps the cron log
+# (webhook worker + backups) from growing without bound.
+/var/log/obh.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
