@@ -46,7 +46,10 @@ services:
     environment:
       VIRTUAL_HOST: obhco.ir
       VIRTUAL_PORT: "3000"
-      LETSENCRYPT_HOST: obhco.ir
+      # Set LETSENCRYPT_HOST= (empty) in .env to pause certificate attempts
+      # while DNS does not point here; set it back to obhco.ir and
+      # `docker compose up -d web` to resume.
+      LETSENCRYPT_HOST: ${LETSENCRYPT_HOST-obhco.ir}
       NODE_OPTIONS: --max-old-space-size=768
       EXPENSE_DOCUMENT_DIR: /app/storage/expense-documents
     volumes:

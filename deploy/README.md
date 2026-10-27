@@ -26,6 +26,12 @@ Use **DNS-only** (no ArvanCloud proxy / grey cloud). The Let's Encrypt
 companion issues the certificate over the HTTP-01 challenge on port 80; an
 intercepting CDN proxy prevents that. No `www` record is needed.
 
+Certificate attempts are controlled by `LETSENCRYPT_HOST` in `.env`. Leave it
+**empty** while the record does not resolve: the companion otherwise retries
+against the rate limit every minute. Once DNS answers, set
+`LETSENCRYPT_HOST=obhco.ir` and run `docker compose up -d web`; the certificate
+is usually issued within a minute (after any rate-limit cooldown).
+
 ## GitHub configuration
 
 Repository secrets (`Settings → Secrets and variables → Actions`):
