@@ -78,10 +78,12 @@ smoke_ok=0
 smoke_target="-k --resolve obhco.ir:443:127.0.0.1"
 code_web=""; code_docs=""
 for _ in $(seq 1 30); do
-  code_web=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: obhco.ir' \
-    http://127.0.0.1/ 2>/dev/null || true)
-  code_docs=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: obhco.ir' \
-    http://127.0.0.1/docs 2>/dev/null || true)
+  # shellcheck disable=SC2086
+  code_web=$(curl -s -o /dev/null -w '%{http_code}' $smoke_target \
+    https://obhco.ir/ 2>/dev/null || true)
+  # shellcheck disable=SC2086
+  code_docs=$(curl -s -o /dev/null -w '%{http_code}' $smoke_target \
+    https://obhco.ir/docs 2>/dev/null || true)
   if [ "$code_web" = 200 ] && [ "$code_docs" = 200 ]; then
     smoke_ok=1
     break
