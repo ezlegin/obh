@@ -4,7 +4,7 @@ import { Check, Copy, ExternalLink, Loader2, Trash2 } from "lucide-react"
 import { useState, type ReactNode } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
-import { Button } from "@workspace/ui/components/button"
+import { Button, buttonVariants } from "@workspace/ui/components/button"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { PaymentStatusBadge } from "@/components/admin/payments/payment-status-badge"
@@ -373,6 +373,17 @@ function PaymentDetailDialog({
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-5">
         <div className="flex flex-wrap items-center gap-2">
+          {payment.status === "PENDING" && payment.checkoutUrl ? (
+            <a
+              href={payment.checkoutUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonVariants({ variant: "default" })}
+            >
+              Open Sadad Checkout
+              <ExternalLink aria-hidden="true" className="size-3.5" />
+            </a>
+          ) : null}
           {payment.status === "PENDING" &&
           payment.environment === "TEST" &&
           onSimulate ? (

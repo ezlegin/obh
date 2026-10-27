@@ -206,6 +206,17 @@ function PaymentsManager({ payments, services }: PaymentsManagerProps) {
           className="flex items-center justify-end gap-2"
           onClick={(event) => event.stopPropagation()}
         >
+          {payment.status === "PENDING" && payment.checkoutUrl ? (
+            <a
+              href={payment.checkoutUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonVariants({ variant: "outline", size: "xs" })}
+            >
+              Checkout
+              <ArrowUpRight aria-hidden="true" className="size-3" />
+            </a>
+          ) : null}
           {payment.status === "PENDING" && payment.environment === "TEST" ? (
             <Button
               type="button"
@@ -341,7 +352,7 @@ function PaymentsManager({ payments, services }: PaymentsManagerProps) {
               disabled={!canCreate}
             >
               <Plus aria-hidden="true" className="size-3.5" />
-              New test payment
+              New payment
             </Button>
           </div>
         </div>

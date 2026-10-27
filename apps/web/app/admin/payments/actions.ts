@@ -20,6 +20,8 @@ export type PaymentActionResult = {
   error?: string
   paymentId?: string
   reference?: string
+  checkoutUrl?: string | null
+  environment?: "TEST" | "LIVE"
 }
 
 function actionError(error: unknown): PaymentActionResult {
@@ -63,6 +65,8 @@ export async function createDevelopmentPaymentAction(
       ok: true,
       paymentId: result.paymentId,
       reference: result.reference,
+      checkoutUrl: result.checkoutUrl,
+      environment: result.environment,
     }
   } catch (error) {
     return actionError(error)

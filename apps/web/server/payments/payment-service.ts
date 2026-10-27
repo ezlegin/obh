@@ -19,6 +19,7 @@ import {
 } from "@/server/payments/lifecycle"
 import {
   getPaymentProviderAdapter,
+  getSadadConfigStatus,
   SADAD_PROVIDER_CODE,
 } from "@/server/payments/providers/registry"
 import { queuePaymentWebhook } from "@/server/payments/webhook-service"
@@ -33,6 +34,8 @@ export type CreatedDevelopmentPayment = {
   paymentId: string
   reference: string
   status: PaymentLifecycleStatus
+  checkoutUrl: string | null
+  environment: "TEST" | "LIVE"
   idempotent: boolean
 }
 
@@ -65,6 +68,8 @@ export async function createDevelopmentPayment(
         id: true,
         reference: true,
         status: true,
+        checkoutUrl: true,
+        environment: true,
       },
     })
 
@@ -73,9 +78,22 @@ export async function createDevelopmentPayment(
         paymentId: existing.id,
         reference: existing.reference,
         status: existing.status as PaymentLifecycleStatus,
+        checkoutUrl: existing.checkoutUrl,
+        environment: existing.environment,
         idempotent: true,
       }
     }
+  }
+
+  const environment: "TEST" | "LIVE" =
+    values.environment === "LIVE" ? "LIVE" : "TEST"
+  const isSimulated = environment === "TEST"
+
+  if (environment === "LIVE" && !getSadadConfigStatus().liveConfigured) {
+    throw new DomainError(
+      "LIVE_NOT_AVAILABLE",
+      "LIVE Sadad gateway credentials (SADAD_MERCHANT_ID, SADAD_TERMINAL_ID, SADAD_TERMINAL_KEY) are not configured on the server."
+    )
   }
 
   const service = await db.connectedService.findUnique({
@@ -95,7 +113,7 @@ export async function createDevelopmentPayment(
   }
 
   const { provider, account: providerAccount } =
-    await getSadadAccountForEnvironment("TEST")
+    await getSadadAccountForEnvironment(environment)
 
   const existingOrder = await db.payment.findFirst({
     where: {
@@ -113,7 +131,9 @@ export async function createDevelopmentPayment(
   }
 
   const reference = createPaymentReference()
-  const externalOrderId = values.externalOrderId || `TEST-${reference}`
+  const externalOrderId =
+    values.externalOrderId || `${environment}-${reference}`
+  const returnUrl = new URL("/admin/payments", getAppBaseUrl()).toString()
 
   let payment: Payment
   try {
@@ -126,11 +146,12 @@ export async function createDevelopmentPayment(
           amount,
           currency: "IRR",
           direction: "INCOMING",
-          environment: "TEST",
+          environment,
           status: "PENDING",
           description: values.description,
+          returnUrl,
           metadata: {
-            simulated: true,
+            simulated: isSimulated,
             createdBy: "admin",
           },
           providerId: provider.id,
@@ -144,9 +165,12 @@ export async function createDevelopmentPayment(
           type: PAYMENT_EVENT_TYPES.CREATED,
           source: "MANAGER",
           newStatus: "PENDING",
-          message: "Sadad test payment created from admin console.",
+          message:
+            environment === "LIVE"
+              ? "Sadad LIVE payment created from admin console."
+              : "Sadad test payment created from admin console.",
           metadata: {
-            simulated: true,
+            simulated: isSimulated,
             gatewayOrderId: String(created.gatewayOrderId),
           },
         },
@@ -155,7 +179,10 @@ export async function createDevelopmentPayment(
       await tx.auditLog.create({
         data: {
           actorId: input.actorId,
-          action: "payment.sadad_test_created",
+          action:
+            environment === "LIVE"
+              ? "payment.sadad_live_created"
+              : "payment.sadad_test_created",
           entityType: "Payment",
           entityId: created.id,
           after: {
@@ -165,7 +192,7 @@ export async function createDevelopmentPayment(
             providerAccountId: providerAccount.id,
             amount: amount.toFixed(0),
             status: "PENDING",
-            environment: "TEST",
+            environment,
           },
         },
       })
@@ -195,10 +222,10 @@ export async function createDevelopmentPayment(
       amount: amount.toFixed(0),
       currency: "IRR",
       description: payment.description,
-      returnUrl: null,
+      returnUrl,
       callbackUrl: getSadadCallbackUrl(),
-      environment: "TEST",
-      metadata: { simulated: true },
+      environment,
+      metadata: { simulated: isSimulated },
     })
 
     const updated = await db.$transaction(async (tx) => {
@@ -224,7 +251,10 @@ export async function createDevelopmentPayment(
           source: "SYSTEM",
           previousStatus: "PENDING",
           newStatus: "PENDING",
-          message: "Sadad test session token created.",
+          message:
+            environment === "LIVE"
+              ? "Sadad LIVE session token created."
+              : "Sadad test session token created.",
           metadata: {
             simulated: session.simulated,
             providerSessionId: session.providerSessionId,
@@ -255,8 +285,11 @@ export async function createDevelopmentPayment(
           source: "SYSTEM",
           previousStatus: "PENDING",
           newStatus: "FAILED",
-          message: "Sadad test session could not be created.",
-          metadata: { simulated: true },
+          message:
+            environment === "LIVE"
+              ? "Sadad LIVE session could not be created."
+              : "Sadad test session could not be created.",
+          metadata: { simulated: isSimulated },
         },
       })
     })
@@ -272,7 +305,7 @@ export async function createDevelopmentPayment(
       "PROVIDER_SESSION_FAILED",
       error instanceof Error
         ? error.message
-        : "The Sadad test session could not be created."
+        : "The Sadad session could not be created."
     )
   }
 
@@ -280,6 +313,8 @@ export async function createDevelopmentPayment(
     paymentId: payment.id,
     reference: payment.reference,
     status: payment.status as PaymentLifecycleStatus,
+    checkoutUrl: payment.checkoutUrl,
+    environment,
     idempotent: false,
   }
 }
