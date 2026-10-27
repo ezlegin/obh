@@ -178,7 +178,11 @@ function IncomeWorkspace({ data }: { data: IncomeWorkspace }) {
         <AccountingStat
           label="Business balance"
           value={formatIrrDecimal(data.summary.totalBusinessBalance)}
-          hint={`Includes ${formatIrrDecimal(data.summary.completedPaymentsAllTime)} from completed payments plus recorded income, minus expenses.`}
+          hint={
+            Number(data.summary.installmentReceivable) > 0
+              ? `Cash received from payments and income, minus expenses. Excludes ${formatIrrDecimal(data.summary.installmentReceivable)} of installments not deposited yet; ${formatIrrDecimal(data.summary.allCashBusinessBalance)} if everything were paid in cash.`
+              : `Includes ${formatIrrDecimal(data.summary.completedPaymentsAllTime)} from completed payments plus recorded income, minus expenses.`
+          }
           icon={Wallet}
         />
         <AccountingStat

@@ -1,5 +1,20 @@
 # @obhco/payments changelog
 
+## 0.2.0 — unreleased
+
+- Added `listGateways()` (`GET /api/v1/gateways`) so checkout pages can list
+  the gateways OBH offers and let the customer choose one.
+- Added `gateway` and `customerMobile` to `startPayment`. Digipay installments
+  (`"digipay"`) require `customerMobile`. The default gateway stays Sadad.
+- Added `payment.gateway`. Responses from servers without the field are still
+  accepted.
+- Added `PaymentGateway`, `PaymentGatewayCode`, `PaymentGatewayKind`, and
+  `ListGatewaysOptions` types.
+- Additive, backward-compatible release. Requires the OBH API with gateway
+  support for `gateway`, `customerMobile`, and `listGateways()`.
+- Digipay has been tested only against the OBH simulator, not the real Digipay
+  UPG.
+
 ## 0.1.0 — 2026-10-27
 
 First public release on npm as `@obhco/payments`.

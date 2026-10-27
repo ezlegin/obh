@@ -28,18 +28,32 @@ export const metadata: Metadata = {
 export default async function AdminDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string | string[] }>
+  searchParams: Promise<{
+    period?: string | string[]
+    balance?: string | string[]
+  }>
 }) {
   const params = await searchParams
   const selectedPeriod = parseDashboardPeriod(params.period)
+  const allCash = params.balance === "all-cash"
   const dashboard = await getDashboardDataForAdmin(selectedPeriod)
+  const receivable = dashboard.summary.installmentReceivable
 
   const summaryCards = [
     {
       id: "balance",
-      label: "Total business balance",
-      value: dashboard.summary.totalBalance,
-      hint: `Across ${dashboard.summary.accountCount} active account${dashboard.summary.accountCount === 1 ? "" : "s"}`,
+      label: allCash
+        ? "Business balance (all paid in cash)"
+        : "Total business balance",
+      value: allCash
+        ? dashboard.summary.allCashBalance
+        : dashboard.summary.totalBalance,
+      hint:
+        receivable > 0
+          ? allCash
+            ? `Includes ${formatIrr(receivable)} of installments not deposited yet`
+            : `Excludes ${formatIrr(receivable)} of installments not deposited yet`
+          : `Across ${dashboard.summary.accountCount} active account${dashboard.summary.accountCount === 1 ? "" : "s"}`,
       icon: Wallet,
       change: `${dashboard.summary.accountCount} active`,
       changeTone: "neutral" as const,
@@ -95,30 +109,66 @@ export default async function AdminDashboardPage({
             </h2>
           </div>
 
-          <div
-            role="group"
-            aria-label="Filter dashboard period"
-            className="inline-flex flex-wrap items-center gap-0.5 self-start rounded-xl border border-border bg-white/[0.02] p-0.5 lg:self-auto"
-          >
-            {DASHBOARD_PERIOD_OPTIONS.map((option) => {
-              const active = dashboard.period === option.id
-              return (
-                <Link
-                  key={option.id}
-                  href={`/admin?period=${option.id}`}
-                  scroll={false}
-                  aria-current={active ? "true" : undefined}
-                  className={cn(
-                    "rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
-                    active
-                      ? "bg-foreground text-background"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {option.label}
-                </Link>
-              )
-            })}
+          <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
+            <div
+              role="group"
+              aria-label="Business balance basis"
+              className="inline-flex items-center gap-0.5 rounded-xl border border-border bg-white/[0.02] p-0.5"
+            >
+              {[
+                { id: "received", label: "Received cash" },
+                { id: "all-cash", label: "Assume all paid" },
+              ].map((option) => {
+                const active = allCash === (option.id === "all-cash")
+                return (
+                  <Link
+                    key={option.id}
+                    href={`/admin?period=${dashboard.period}${option.id === "all-cash" ? "&balance=all-cash" : ""}`}
+                    scroll={false}
+                    aria-current={active ? "true" : undefined}
+                    title={
+                      option.id === "all-cash"
+                        ? "Show the balance as if every installment purchase had been paid in full"
+                        : "Show only money actually received"
+                    }
+                    className={cn(
+                      "rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      active
+                        ? "bg-foreground text-background"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {option.label}
+                  </Link>
+                )
+              })}
+            </div>
+
+            <div
+              role="group"
+              aria-label="Filter dashboard period"
+              className="inline-flex flex-wrap items-center gap-0.5 rounded-xl border border-border bg-white/[0.02] p-0.5"
+            >
+              {DASHBOARD_PERIOD_OPTIONS.map((option) => {
+                const active = dashboard.period === option.id
+                return (
+                  <Link
+                    key={option.id}
+                    href={`/admin?period=${option.id}${allCash ? "&balance=all-cash" : ""}`}
+                    scroll={false}
+                    aria-current={active ? "true" : undefined}
+                    className={cn(
+                      "rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      active
+                        ? "bg-foreground text-background"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {option.label}
+                  </Link>
+                )
+              })}
+            </div>
           </div>
         </div>
 

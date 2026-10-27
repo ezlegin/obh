@@ -36,6 +36,24 @@ export const createPaymentRequestSchema = z
     returnUrl: httpUrlSchema.optional(),
     metadata: metadataSchema.optional(),
     simulator: z.boolean().optional(),
+    gateway: z
+      .string()
+      .trim()
+      .regex(/^[a-z0-9_-]{1,40}$/, "Use a gateway code from GET /gateways.")
+      .optional(),
+    customer: z
+      .object({
+        mobile: z
+          .string()
+          .trim()
+          .regex(
+            /^(\+98|0098|98|0)?9\d{9}$/,
+            "Enter an Iranian mobile number such as 09121234567."
+          )
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
 

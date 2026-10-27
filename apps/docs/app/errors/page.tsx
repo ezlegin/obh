@@ -32,8 +32,8 @@ export default function ErrorsPage() {
       description={
         <>
           Every API failure becomes one typed error. This page explains its
-          fields, which codes the SDK generates itself, which come from the
-          API, and how to recover without guessing.
+          fields, which codes the SDK generates itself, which come from the API,
+          and how to recover without guessing.
         </>
       }
       sections={sections}
@@ -127,8 +127,8 @@ try {
 
       <h2 id="sdk-errors">SDK-generated codes</h2>
       <p>
-        These codes never come from the API. They are produced by the SDK
-        before or around the call.
+        These codes never come from the API. They are produced by the SDK before
+        or around the call.
       </p>
 
       <Table
@@ -142,7 +142,9 @@ try {
         }
       >
         <tr>
-          <td><code>INVALID_ARGUMENT</code></td>
+          <td>
+            <code>INVALID_ARGUMENT</code>
+          </td>
           <td>
             Constructor or input validation failed — bad amount, URL, timeout,
             credential prefix, metadata, or idempotency key.
@@ -151,16 +153,20 @@ try {
           <td>Correct the input. No request was sent.</td>
         </tr>
         <tr>
-          <td><code>NETWORK_ERROR</code></td>
           <td>
-            <code>fetch</code> rejected before a response — DNS, TLS,
-            connection reset, or offline.
+            <code>NETWORK_ERROR</code>
+          </td>
+          <td>
+            <code>fetch</code> rejected before a response — DNS, TLS, connection
+            reset, or offline.
           </td>
           <td>Yes</td>
           <td>Retry with backoff, using the same idempotency key.</td>
         </tr>
         <tr>
-          <td><code>TIMEOUT</code></td>
+          <td>
+            <code>TIMEOUT</code>
+          </td>
           <td>
             The SDK’s <code>timeoutMs</code> elapsed and the request was
             aborted.
@@ -169,7 +175,9 @@ try {
           <td>Retry or retrieve. The outcome is unknown, not failed.</td>
         </tr>
         <tr>
-          <td><code>INVALID_RESPONSE</code></td>
+          <td>
+            <code>INVALID_RESPONSE</code>
+          </td>
           <td>
             The response was not JSON, or its <code>data</code> did not match
             the payment shape.
@@ -181,13 +189,17 @@ try {
           </td>
         </tr>
         <tr>
-          <td><code>API_ERROR</code></td>
+          <td>
+            <code>API_ERROR</code>
+          </td>
           <td>
             An error response had no <code>error.code</code>. Used as a
             fallback.
           </td>
           <td>Based on status</td>
-          <td>Inspect <code>status</code> and <code>message</code>.</td>
+          <td>
+            Inspect <code>status</code> and <code>message</code>.
+          </td>
         </tr>
       </Table>
 
@@ -208,62 +220,117 @@ try {
       >
         <tr>
           <td>400</td>
-          <td><code>VALIDATION_ERROR</code></td>
-          <td>Malformed or invalid request body. Check <code>details</code>.</td>
+          <td>
+            <code>VALIDATION_ERROR</code>
+          </td>
+          <td>
+            Malformed or invalid request body. Check <code>details</code>.
+          </td>
         </tr>
         <tr>
           <td>401</td>
-          <td><code>AUTH_INVALID</code></td>
+          <td>
+            <code>AUTH_INVALID</code>
+          </td>
           <td>Missing, malformed, revoked, or invalid credential.</td>
         </tr>
         <tr>
           <td>403</td>
-          <td><code>SERVICE_INACTIVE</code></td>
+          <td>
+            <code>SERVICE_INACTIVE</code>
+          </td>
           <td>The service is deactivated.</td>
         </tr>
         <tr>
           <td>404</td>
-          <td><code>PAYMENT_NOT_FOUND</code></td>
+          <td>
+            <code>PAYMENT_NOT_FOUND</code>
+          </td>
           <td>Not found in this service’s scope.</td>
         </tr>
         <tr>
           <td>409</td>
-          <td><code>IDEMPOTENCY_CONFLICT</code></td>
+          <td>
+            <code>IDEMPOTENCY_CONFLICT</code>
+          </td>
           <td>The same key was used for a different request.</td>
         </tr>
         <tr>
           <td>409</td>
-          <td><code>ORDER_CONFLICT</code></td>
+          <td>
+            <code>ORDER_CONFLICT</code>
+          </td>
           <td>The external order already exists with conflicting details.</td>
         </tr>
         <tr>
           <td>409</td>
-          <td><code>PAYMENT_STATE_CONFLICT</code></td>
+          <td>
+            <code>PAYMENT_STATE_CONFLICT</code>
+          </td>
           <td>Invalid lifecycle operation for the current state.</td>
         </tr>
         <tr>
           <td>413</td>
-          <td><code>PAYLOAD_TOO_LARGE</code></td>
+          <td>
+            <code>PAYLOAD_TOO_LARGE</code>
+          </td>
           <td>The request body exceeds the size limit.</td>
         </tr>
         <tr>
           <td>415</td>
-          <td><code>UNSUPPORTED_MEDIA_TYPE</code></td>
+          <td>
+            <code>UNSUPPORTED_MEDIA_TYPE</code>
+          </td>
           <td>The body is not JSON.</td>
         </tr>
         <tr>
           <td>422</td>
-          <td><code>RETURN_URL_NOT_ALLOWED</code></td>
+          <td>
+            <code>RETURN_URL_NOT_ALLOWED</code>
+          </td>
           <td>The return URL is not an exact allowlist match.</td>
         </tr>
         <tr>
           <td>422</td>
-          <td><code>RETURN_URL_REQUIRED</code></td>
+          <td>
+            <code>RETURN_URL_REQUIRED</code>
+          </td>
           <td>No return URL was supplied and no default is configured.</td>
         </tr>
         <tr>
+          <td>422</td>
+          <td>
+            <code>GATEWAY_NOT_SUPPORTED</code>
+          </td>
+          <td>
+            The <code>gateway</code> code is not one OBH offers. See{" "}
+            <Link href="/gateways">Gateways &amp; installments</Link>.
+          </td>
+        </tr>
+        <tr>
+          <td>422</td>
+          <td>
+            <code>CUSTOMER_MOBILE_REQUIRED</code>
+          </td>
+          <td>
+            The chosen gateway (Digipay) needs <code>customerMobile</code>.
+          </td>
+        </tr>
+        <tr>
+          <td>503</td>
+          <td>
+            <code>GATEWAY_NOT_AVAILABLE</code>
+          </td>
+          <td>
+            The gateway has no LIVE credentials yet. Offer another one from{" "}
+            <code>listGateways()</code>.
+          </td>
+        </tr>
+        <tr>
           <td>429</td>
-          <td><code>RATE_LIMITED</code></td>
+          <td>
+            <code>RATE_LIMITED</code>
+          </td>
           <td>
             Reserved for per-service rate limiting. Not enforced yet, but treat
             it as retryable.
@@ -271,12 +338,16 @@ try {
         </tr>
         <tr>
           <td>502</td>
-          <td><code>PROVIDER_ERROR</code></td>
+          <td>
+            <code>PROVIDER_ERROR</code>
+          </td>
           <td>Provider transport or response failure, sanitized.</td>
         </tr>
         <tr>
           <td>503</td>
-          <td><code>PROVIDER_UNAVAILABLE</code></td>
+          <td>
+            <code>PROVIDER_UNAVAILABLE</code>
+          </td>
           <td>No active provider account or adapter.</td>
         </tr>
       </Table>
@@ -284,17 +355,17 @@ try {
       <Callout variant="note" title="Provider errors are sanitized">
         <p>
           Raw provider responses, credentials, and request signing details are
-          never passed to connected services. Treat{" "}
-          <code>PROVIDER_ERROR</code> as an opaque upstream failure and retry.
+          never passed to connected services. Treat <code>PROVIDER_ERROR</code>{" "}
+          as an opaque upstream failure and retry.
         </p>
       </Callout>
 
       <h2 id="retryable">The retryable flag</h2>
       <p>
         For API errors, <code>retryable</code> is true exactly when the HTTP
-        status is <code>429</code> or <code>&gt;= 500</code>. Transport
-        failures (<code>NETWORK_ERROR</code>, <code>TIMEOUT</code>) are
-        retryable. Everything else is not.
+        status is <code>429</code> or <code>&gt;= 500</code>. Transport failures
+        (<code>NETWORK_ERROR</code>, <code>TIMEOUT</code>) are retryable.
+        Everything else is not.
       </p>
 
       <Table
@@ -306,23 +377,31 @@ try {
         }
       >
         <tr>
-          <td><code>retryable === true</code> on create</td>
+          <td>
+            <code>retryable === true</code> on create
+          </td>
           <td>
             Retry with the <em>same</em> idempotency key and backoff.
           </td>
         </tr>
         <tr>
-          <td><code>retryable === true</code> on retrieve</td>
+          <td>
+            <code>retryable === true</code> on retrieve
+          </td>
           <td>Retry freely; reads have no side effects.</td>
         </tr>
         <tr>
-          <td><code>retryable === false</code></td>
+          <td>
+            <code>retryable === false</code>
+          </td>
           <td>
             Do not retry unchanged. Fix the request, credential, or URL first.
           </td>
         </tr>
         <tr>
-          <td><code>INVALID_RESPONSE</code></td>
+          <td>
+            <code>INVALID_RESPONSE</code>
+          </td>
           <td>
             Do not retry blindly; the response contract is broken. Capture the
             request id.

@@ -8,15 +8,23 @@ import type { CreatePaymentRequest } from "@/lib/validation/payment-api"
 import { ApiError } from "@/server/api/errors"
 import type { ServiceAuthContext } from "@/server/api/service-auth"
 import { getAppBaseUrl } from "@/server/app-url"
-import { getSadadAccountForEnvironment } from "@/server/gateways/gateway-service"
+import { getGatewayAccountForEnvironment } from "@/server/gateways/gateway-service"
 import {
   assertPaymentTransition,
   PAYMENT_EVENT_TYPES,
   type PaymentLifecycleStatus,
 } from "@/server/payments/lifecycle"
 import {
+  createInstallmentPlanInTx,
+  installmentPurchaseType,
+} from "@/server/payments/installments/installment-service"
+import { normalizeIranianMobile } from "@/server/payments/providers/digipay"
+import {
+  DEFAULT_PROVIDER_CODE,
+  DIGIPAY_PROVIDER_CODE,
   getPaymentProviderAdapter,
-  getSadadConfigStatus,
+  isKnownPaymentProvider,
+  providerSupportsEnvironment,
   SADAD_PROVIDER_CODE,
 } from "@/server/payments/providers/registry"
 import { describeSadadCode } from "@/server/payments/providers/sadad"
@@ -43,6 +51,8 @@ export type ApiPayment = {
   amount: string
   currency: string
   environment: "test" | "live"
+  /** Gateway code, e.g. `sadad` or `digipay`. */
+  gateway: string
   status: ApiPaymentStatus
   description: string
   checkoutUrl: string | null
@@ -52,11 +62,22 @@ export type ApiPayment = {
   verifiedAt: string | null
 }
 
+type PaymentWithProvider = Payment & {
+  provider: { code: string } | null
+}
+
+const withProvider = {
+  provider: { select: { code: true } },
+} as const
+
 function mapStatus(status: PaymentLifecycleStatus): ApiPaymentStatus {
   return status.toLowerCase() as ApiPaymentStatus
 }
 
-function mapPayment(payment: Payment, serviceSlug: string): ApiPayment {
+function mapPayment(
+  payment: PaymentWithProvider,
+  serviceSlug: string
+): ApiPayment {
   return {
     id: payment.id,
     reference: payment.reference,
@@ -65,6 +86,7 @@ function mapPayment(payment: Payment, serviceSlug: string): ApiPayment {
     amount: payment.amount.toFixed(0),
     currency: payment.currency,
     environment: payment.environment === "LIVE" ? "live" : "test",
+    gateway: payment.provider?.code ?? SADAD_PROVIDER_CODE,
     status: mapStatus(payment.status as PaymentLifecycleStatus),
     description: payment.description,
     checkoutUrl: payment.checkoutUrl,
@@ -86,8 +108,15 @@ function createPaymentReference() {
   return `OBH-${randomBytes(8).toString("hex").toUpperCase()}`
 }
 
+export function getGatewayCallbackUrl(code: string, appOrigin?: string) {
+  return new URL(
+    `/api/v1/${code}/callback`,
+    getAppBaseUrl(appOrigin)
+  ).toString()
+}
+
 export function getSadadCallbackUrl(appOrigin?: string) {
-  return new URL("/api/v1/sadad/callback", getAppBaseUrl(appOrigin)).toString()
+  return getGatewayCallbackUrl(SADAD_PROVIDER_CODE, appOrigin)
 }
 
 function resolveReturnUrl(
@@ -118,7 +147,7 @@ function resolveReturnUrl(
 async function findIdempotencyRecord(serviceId: string, key: string) {
   return getDb().paymentIdempotencyRecord.findUnique({
     where: { serviceId_key: { serviceId, key } },
-    include: { payment: true },
+    include: { payment: { include: withProvider } },
   })
 }
 
@@ -167,6 +196,7 @@ async function findExistingPayment(
   const db = getDb()
   const byKey = await db.payment.findFirst({
     where: { serviceId, idempotencyKey },
+    include: withProvider,
   })
 
   if (byKey) {
@@ -175,6 +205,7 @@ async function findExistingPayment(
 
   const byOrder = await db.payment.findFirst({
     where: { serviceId, externalOrderId },
+    include: withProvider,
   })
 
   if (byOrder) {
@@ -185,7 +216,7 @@ async function findExistingPayment(
 }
 
 function assertMatchingFingerprint(
-  existing: Payment,
+  existing: PaymentWithProvider,
   fingerprint: string,
   source: "idempotency" | "order"
 ) {
@@ -212,7 +243,7 @@ function assertMatchingFingerprint(
 }
 
 async function replayExistingPayment(
-  existing: Payment,
+  existing: PaymentWithProvider,
   fingerprint: string,
   source: "idempotency" | "order",
   serviceId: string,
@@ -252,12 +283,38 @@ export async function createApiPayment(
 
   const amount = new Prisma.Decimal(input.amount)
   const environment: "TEST" | "LIVE" = input.simulator ? "TEST" : "LIVE"
+  const gateway = input.gateway ?? DEFAULT_PROVIDER_CODE
 
-  if (environment === "LIVE" && !getSadadConfigStatus().liveConfigured) {
+  if (!isKnownPaymentProvider(gateway)) {
+    throw new ApiError(
+      422,
+      "GATEWAY_NOT_SUPPORTED",
+      "This payment gateway is not offered by OBH. List gateways with GET /api/v1/gateways."
+    )
+  }
+
+  if (!providerSupportsEnvironment(gateway, environment)) {
     throw new ApiError(
       503,
-      "LIVE_NOT_AVAILABLE",
-      "LIVE Sadad gateway credentials are not configured on the server."
+      gateway === SADAD_PROVIDER_CODE
+        ? "LIVE_NOT_AVAILABLE"
+        : "GATEWAY_NOT_AVAILABLE",
+      `LIVE ${getPaymentProviderAdapter(gateway).descriptor.name} credentials are not configured on the server.`
+    )
+  }
+
+  const customerMobile = input.customer?.mobile
+    ? normalizeIranianMobile(input.customer.mobile)
+    : null
+
+  if (
+    getPaymentProviderAdapter(gateway).descriptor.requiresCustomerMobile &&
+    !customerMobile
+  ) {
+    throw new ApiError(
+      422,
+      "CUSTOMER_MOBILE_REQUIRED",
+      "This gateway requires customer.mobile (an Iranian mobile number such as 09121234567)."
     )
   }
 
@@ -269,6 +326,8 @@ export async function createApiPayment(
     description: input.description,
     returnUrl,
     metadata: input.metadata,
+    gateway,
+    customerMobile,
   })
 
   const idempotencyRecord = await findIdempotencyRecord(
@@ -309,14 +368,15 @@ export async function createApiPayment(
   }
 
   const { provider, account: providerAccount } =
-    await getSadadAccountForEnvironment(environment)
+    await getGatewayAccountForEnvironment(gateway, environment)
 
   const reference = createPaymentReference()
-  let payment: Payment
+  let payment: PaymentWithProvider
 
   try {
     payment = await db.$transaction(async (tx) => {
       const created = await tx.payment.create({
+        include: withProvider,
         data: {
           reference,
           serviceId: auth.service.id,
@@ -346,6 +406,7 @@ export async function createApiPayment(
           metadata: {
             serviceId: auth.service.id,
             gatewayOrderId: String(created.gatewayOrderId),
+            gateway,
           },
         },
       })
@@ -369,6 +430,7 @@ export async function createApiPayment(
             gatewayOrderId: String(created.gatewayOrderId),
             serviceId: auth.service.id,
             environment,
+            gateway,
             amount: amount.toFixed(0),
             status: "PENDING",
           },
@@ -431,7 +493,7 @@ export async function createApiPayment(
 
   try {
     const session = await getPaymentProviderAdapter(
-      SADAD_PROVIDER_CODE
+      gateway
     ).createCheckoutSession({
       paymentReference: payment.reference,
       gatewayOrderId: String(payment.gatewayOrderId),
@@ -440,9 +502,10 @@ export async function createApiPayment(
       currency: "IRR",
       description: payment.description,
       returnUrl,
-      callbackUrl: getSadadCallbackUrl(appOrigin),
+      callbackUrl: getGatewayCallbackUrl(gateway, appOrigin),
       environment,
       metadata: input.metadata ?? {},
+      customerMobile,
     })
 
     const checkoutUrl = session.checkoutUrl
@@ -452,6 +515,7 @@ export async function createApiPayment(
     payment = await db.$transaction(async (tx) => {
       const updated = await tx.payment.update({
         where: { id: payment.id },
+        include: withProvider,
         data: {
           providerSessionId: session.providerSessionId,
           providerReference: session.providerReference,
@@ -468,7 +532,10 @@ export async function createApiPayment(
           source: "SYSTEM",
           previousStatus: "PENDING",
           newStatus: "PENDING",
-          message: "Sadad PaymentRequest token issued.",
+          message:
+            gateway === SADAD_PROVIDER_CODE
+              ? "Sadad PaymentRequest token issued."
+              : `${getPaymentProviderAdapter(gateway).descriptor.name} checkout ticket issued.`,
           metadata: {
             checkoutUrl: checkoutUrl !== null,
             simulated: session.simulated,
@@ -497,7 +564,7 @@ export async function createApiPayment(
           gatewayResultText:
             error instanceof Error
               ? error.message
-              : "Sadad PaymentRequest failed.",
+              : "Gateway checkout request failed.",
         },
       })
 
@@ -508,7 +575,7 @@ export async function createApiPayment(
           source: "SYSTEM",
           previousStatus: "PENDING",
           newStatus: "FAILED",
-          message: "Sadad PaymentRequest could not create a payment token.",
+          message: `${getPaymentProviderAdapter(gateway).descriptor.name} could not create a checkout session.`,
         },
       })
     })
@@ -540,13 +607,14 @@ export async function getApiPayment(
 ) {
   let payment = await getDb().payment.findFirst({
     where: { serviceId, reference },
+    include: withProvider,
   })
 
   if (!payment) {
     throw new ApiError(404, "PAYMENT_NOT_FOUND", "Payment was not found.")
   }
 
-  // If the callback arrived from Sadad with ResCode=0 but Verify previously
+  // If the gateway reported success in its callback but Verify previously
   // timed out, retry Verify on read so the service gets the verified outcome.
   if (
     payment.status === "PENDING" &&
@@ -554,17 +622,18 @@ export async function getApiPayment(
     payment.gatewayResultCode === 0 &&
     payment.providerSessionId
   ) {
-    await verifyPendingSadadPayment(payment.id).catch(() => null)
+    await verifyPendingPayment(payment.id).catch(() => null)
     payment =
       (await getDb().payment.findFirst({
         where: { serviceId, reference },
+        include: withProvider,
       })) ?? payment
   }
 
   return mapPayment(payment, serviceSlug)
 }
 
-export type SadadCheckoutView = {
+export type SimulatorCheckoutView = {
   reference: string
   gatewayOrderId: string
   serviceName: string
@@ -578,10 +647,13 @@ export type SadadCheckoutView = {
   createdAt: string
 }
 
-export async function getSadadSimulatorView(
+export type SadadCheckoutView = SimulatorCheckoutView
+
+async function getSimulatorView(
+  code: string,
   token: string
-): Promise<SadadCheckoutView | null> {
-  if (!token.startsWith("sadad_sim_")) {
+): Promise<SimulatorCheckoutView | null> {
+  if (!token.startsWith(`${code}_sim_`)) {
     return null
   }
 
@@ -589,7 +661,7 @@ export async function getSadadSimulatorView(
     where: {
       providerSessionId: token,
       environment: "TEST",
-      provider: { code: SADAD_PROVIDER_CODE },
+      provider: { code },
     },
     include: {
       service: { select: { name: true, domain: true } },
@@ -610,9 +682,17 @@ export async function getSadadSimulatorView(
     description: payment.description,
     status: payment.status as PaymentLifecycleStatus,
     returnUrl: payment.returnUrl,
-    callbackUrl: getSadadCallbackUrl(),
+    callbackUrl: getGatewayCallbackUrl(code),
     createdAt: payment.createdAt.toISOString(),
   }
+}
+
+export async function getSadadSimulatorView(token: string) {
+  return getSimulatorView(SADAD_PROVIDER_CODE, token)
+}
+
+export async function getDigipaySimulatorView(ticket: string) {
+  return getSimulatorView(DIGIPAY_PROVIDER_CODE, ticket)
 }
 
 export type SadadCallbackPayload = {
@@ -623,6 +703,88 @@ export type SadadCallbackPayload = {
   PrimaryAccNo?: string | null
   HashedCardNo?: string | null
   CardHolderFullName?: string | null
+}
+
+type CallbackOutcome = {
+  paymentId: string
+  reference: string
+  status: PaymentLifecycleStatus
+  returnUrl: string | null
+}
+
+function finalizedOutcome(payment: Payment): CallbackOutcome {
+  return {
+    paymentId: payment.id,
+    reference: payment.reference,
+    status: payment.status as PaymentLifecycleStatus,
+    returnUrl: payment.returnUrl,
+  }
+}
+
+/**
+ * Marks a pending payment FAILED from a gateway callback that already reports
+ * failure or cancellation, without calling the gateway's verify endpoint.
+ */
+async function failPaymentFromCallback(
+  payment: Payment,
+  input: {
+    method: string
+    resultCode: number
+    failureText: string
+    metadata: Record<string, unknown>
+  }
+) {
+  const db = getDb()
+  const now = new Date()
+
+  await db.$transaction(async (tx) => {
+    const updated = await tx.payment.updateMany({
+      where: { id: payment.id, status: "PENDING" },
+      data: {
+        status: "FAILED",
+        failedAt: now,
+        gatewayResultCode: input.resultCode,
+        gatewayResultText: input.failureText,
+      },
+    })
+
+    if (updated.count === 1) {
+      await tx.paymentVerification.create({
+        data: {
+          paymentId: payment.id,
+          status: "FAILED",
+          method: input.method,
+          providerReference: payment.providerSessionId,
+          verifiedAt: now,
+          failureReason: input.failureText,
+          metadata: input.metadata as Prisma.InputJsonValue,
+        },
+      })
+
+      await tx.paymentEvent.create({
+        data: {
+          paymentId: payment.id,
+          type: PAYMENT_EVENT_TYPES.FAILED,
+          source: "PROVIDER",
+          previousStatus: "PENDING",
+          newStatus: "FAILED",
+          message: input.failureText,
+          metadata: { resultCode: input.resultCode },
+        },
+      })
+    }
+  })
+
+  await queuePaymentWebhook(payment.id).catch((error) => {
+    console.error(
+      "Webhook notification could not be delivered.",
+      error instanceof Error ? error.name : "Unknown error"
+    )
+  })
+
+  return finalizedOutcome(
+    await db.payment.findUniqueOrThrow({ where: { id: payment.id } })
+  )
 }
 
 /**
@@ -645,13 +807,19 @@ export async function processSadadCallback(input: SadadCallbackPayload) {
 
   if (rawToken) {
     payment = await db.payment.findFirst({
-      where: { providerSessionId: rawToken },
+      where: {
+        providerSessionId: rawToken,
+        provider: { code: SADAD_PROVIDER_CODE },
+      },
     })
   }
 
   if (!payment && rawOrderId && /^\d+$/.test(rawOrderId)) {
-    payment = await db.payment.findUnique({
-      where: { gatewayOrderId: BigInt(rawOrderId) },
+    payment = await db.payment.findFirst({
+      where: {
+        gatewayOrderId: BigInt(rawOrderId),
+        provider: { code: SADAD_PROVIDER_CODE },
+      },
     })
   }
 
@@ -673,12 +841,7 @@ export async function processSadadCallback(input: SadadCallbackPayload) {
 
   // Idempotent return when already finalized
   if (payment.status !== "PENDING") {
-    return {
-      paymentId: payment.id,
-      reference: payment.reference,
-      status: payment.status as PaymentLifecycleStatus,
-      returnUrl: payment.returnUrl,
-    }
+    return finalizedOutcome(payment)
   }
 
   const now = new Date()
@@ -714,81 +877,61 @@ export async function processSadadCallback(input: SadadCallbackPayload) {
 
   // Non-zero ResCode in callback means customer cancelled or payment failed at Sadad
   if (resCode !== 0) {
-    const failureText = describeSadadCode(resCode)
-
-    await db.$transaction(async (tx) => {
-      const updated = await tx.payment.updateMany({
-        where: { id: payment.id, status: "PENDING" },
-        data: {
-          status: "FAILED",
-          failedAt: now,
-          gatewayResultCode: resCode,
-          gatewayResultText: failureText,
-        },
-      })
-
-      if (updated.count === 1) {
-        await tx.paymentVerification.create({
-          data: {
-            paymentId: payment.id,
-            status: "FAILED",
-            method: "sadad/callback",
-            providerReference: payment.providerSessionId,
-            verifiedAt: now,
-            failureReason: failureText,
-            metadata: {
-              resCode,
-              switchResCode: input.SwitchResCode ?? null,
-            },
-          },
-        })
-
-        await tx.paymentEvent.create({
-          data: {
-            paymentId: payment.id,
-            type: PAYMENT_EVENT_TYPES.FAILED,
-            source: "PROVIDER",
-            previousStatus: "PENDING",
-            newStatus: "FAILED",
-            message: failureText,
-            metadata: { resCode },
-          },
-        })
-      }
+    return failPaymentFromCallback(payment, {
+      method: "sadad/callback",
+      resultCode: resCode,
+      failureText: describeSadadCode(resCode),
+      metadata: {
+        resCode,
+        switchResCode: input.SwitchResCode ?? null,
+      },
     })
-
-    await queuePaymentWebhook(payment.id).catch((error) => {
-      console.error(
-        "Webhook notification could not be delivered.",
-        error instanceof Error ? error.name : "Unknown error"
-      )
-    })
-
-    const latest = await db.payment.findUniqueOrThrow({
-      where: { id: payment.id },
-    })
-
-    return {
-      paymentId: latest.id,
-      reference: latest.reference,
-      status: latest.status as PaymentLifecycleStatus,
-      returnUrl: latest.returnUrl,
-    }
   }
 
-  return verifyPendingSadadPayment(payment.id, {
+  return verifyPendingPayment(payment.id, {
     ResCode: 0,
     PrimaryAccNo: maskedCard ?? undefined,
   })
 }
 
-export async function verifyPendingSadadPayment(
-  paymentId: string,
-  callbackPayload?: Record<string, unknown>
-) {
+/**
+ * Digipay posts the payment result to the callback URL with `amount`,
+ * `providerId` (our gatewayOrderId), `trackingCode`, `result`
+ * (`SUCCESS`/`FAILURE`), `type` and optional `rrn`/`psp`/`isCredit`.
+ */
+export type DigipayCallbackPayload = {
+  amount?: string | null
+  providerId?: string | null
+  trackingCode?: string | null
+  rrn?: string | null
+  psp?: string | null
+  isCredit?: string | null
+  result?: string | null
+  type?: string | null
+}
+
+/**
+ * Processes an inbound Digipay POST (`/api/v1/digipay/callback`), stores the
+ * tracking code and purchase type, runs `purchases/verify` on SUCCESS, and
+ * returns the redirect target for the customer's browser.
+ */
+export async function processDigipayCallback(input: DigipayCallbackPayload) {
   const db = getDb()
-  const payment = await db.payment.findUnique({
-    where: { id: paymentId },
+  const rawProviderId = input.providerId?.trim()
+
+  if (!rawProviderId || !/^\d+$/.test(rawProviderId)) {
+    throw new ApiError(
+      400,
+      "INVALID_CALLBACK",
+      "Digipay callback is missing providerId."
+    )
+  }
+
+  const payment = await db.payment.findFirst({
+    where: {
+      gatewayOrderId: BigInt(rawProviderId),
+      provider: { code: DIGIPAY_PROVIDER_CODE },
+    },
   })
 
   if (!payment) {
@@ -796,32 +939,121 @@ export async function verifyPendingSadadPayment(
   }
 
   if (payment.status !== "PENDING") {
-    return {
-      paymentId: payment.id,
-      reference: payment.reference,
-      status: payment.status as PaymentLifecycleStatus,
-      returnUrl: payment.returnUrl,
-    }
+    return finalizedOutcome(payment)
   }
 
-  const verification = await getPaymentProviderAdapter(
-    SADAD_PROVIDER_CODE
-  ).verifyPayment({
+  const result = input.result?.trim().toUpperCase() ?? ""
+  const succeeded = result === "SUCCESS"
+  const trackingCode = input.trackingCode?.trim() || null
+  const callbackPayload = {
+    result,
+    trackingCode,
+    providerId: rawProviderId,
+    amount: input.amount?.trim() || null,
+    type: input.type?.trim() || null,
+    rrn: input.rrn?.trim() || null,
+    psp: input.psp?.trim() || null,
+    isCredit: input.isCredit?.trim() || null,
+  }
+  const now = new Date()
+
+  await db.$transaction(async (tx) => {
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: {
+        callbackReceivedAt: payment.callbackReceivedAt ?? now,
+        providerReference: trackingCode ?? payment.providerReference,
+        gatewayResultCode: succeeded ? 0 : 9007,
+        gatewayResultText: succeeded
+          ? "Digipay reported SUCCESS; awaiting verify."
+          : "Digipay reported FAILURE.",
+      },
+    })
+
+    await tx.paymentEvent.create({
+      data: {
+        paymentId: payment.id,
+        type: PAYMENT_EVENT_TYPES.CALLBACK_RECEIVED,
+        source: "PROVIDER",
+        previousStatus: "PENDING",
+        newStatus: "PENDING",
+        message: `Digipay callback received (result=${result || "missing"}).`,
+        metadata: callbackPayload,
+      },
+    })
+  })
+
+  if (!succeeded) {
+    return failPaymentFromCallback(payment, {
+      method: "digipay/callback",
+      resultCode: 9007,
+      failureText: "پرداخت دیجی‌پی ناموفق بود یا توسط کاربر لغو شد.",
+      metadata: callbackPayload,
+    })
+  }
+
+  return verifyPendingPayment(payment.id, callbackPayload)
+}
+
+/**
+ * Recovers the stored gateway callback body for a retried verify. Digipay
+ * needs the `trackingCode` and purchase `type` it sent on the callback.
+ */
+async function readLatestCallbackPayload(paymentId: string) {
+  const event = await getDb().paymentEvent.findFirst({
+    where: { paymentId, type: PAYMENT_EVENT_TYPES.CALLBACK_RECEIVED },
+    orderBy: { createdAt: "desc" },
+    select: { metadata: true },
+  })
+
+  return event?.metadata &&
+    typeof event.metadata === "object" &&
+    !Array.isArray(event.metadata)
+    ? (event.metadata as Record<string, unknown>)
+    : undefined
+}
+
+export async function verifyPendingPayment(
+  paymentId: string,
+  callbackPayload?: Record<string, unknown>
+) {
+  const db = getDb()
+  const payment = await db.payment.findUnique({
+    where: { id: paymentId },
+    include: withProvider,
+  })
+
+  if (!payment) {
+    throw new ApiError(404, "PAYMENT_NOT_FOUND", "Payment was not found.")
+  }
+
+  if (payment.status !== "PENDING") {
+    return finalizedOutcome(payment)
+  }
+
+  const gateway = payment.provider?.code ?? SADAD_PROVIDER_CODE
+  const payload =
+    callbackPayload ??
+    (gateway === SADAD_PROVIDER_CODE
+      ? undefined
+      : await readLatestCallbackPayload(payment.id))
+
+  const verification = await getPaymentProviderAdapter(gateway).verifyPayment({
     providerSessionId: payment.providerSessionId,
     providerReference: payment.providerReference,
     gatewayOrderId: String(payment.gatewayOrderId),
     expectedAmount: payment.amount.toFixed(0),
     environment: payment.environment,
-    payload: callbackPayload,
+    payload,
   })
 
-  // Network/timeout on Verify: keep PENDING so it can be retried within 15 minutes
+  // Network/timeout on Verify: keep PENDING so it can be retried later
   if (verification.status === "PENDING") {
     await db.paymentVerification.create({
       data: {
         paymentId: payment.id,
         status: "PENDING",
-        method: "sadad/verify",
+        method: `${gateway}/verify`,
         providerReference: verification.providerReference,
         failureReason: verification.resultMessage,
         metadata: verification.metadata as Prisma.InputJsonValue,
@@ -868,13 +1100,24 @@ export async function verifyPendingSadadPayment(
         data: {
           paymentId: payment.id,
           status: targetStatus === "COMPLETED" ? "VERIFIED" : "FAILED",
-          method: "sadad/verify",
+          method: `${gateway}/verify`,
           providerReference: verification.providerReference,
           verifiedAt: now,
           failureReason: verification.failureReason,
           metadata: verification.metadata as Prisma.InputJsonValue,
         },
       })
+
+      const purchaseType = installmentPurchaseType(verification.metadata)
+      if (targetStatus === "COMPLETED" && purchaseType) {
+        await createInstallmentPlanInTx(tx, {
+          paymentId: payment.id,
+          amount: payment.amount,
+          currency: payment.currency,
+          completedAt: now,
+          purchaseType,
+        })
+      }
 
       await tx.paymentEvent.create({
         data: {
@@ -888,6 +1131,7 @@ export async function verifyPendingSadadPayment(
           newStatus: targetStatus,
           message: verification.resultMessage,
           metadata: {
+            gateway,
             resCode: verification.resultCode,
             retrievalRefNo: verification.providerReference,
             systemTraceNo: verification.traceNumber,
@@ -897,13 +1141,14 @@ export async function verifyPendingSadadPayment(
 
       await tx.auditLog.create({
         data: {
-          action: "payment.sadad_verified",
+          action: `payment.${gateway}_verified`,
           entityType: "Payment",
           entityId: payment.id,
           before: { status: "PENDING" },
           after: {
             status: targetStatus,
             environment: payment.environment,
+            gateway,
             resCode: verification.resultCode,
             retrievalRefNo: verification.providerReference,
             systemTraceNo: verification.traceNumber,
@@ -937,3 +1182,6 @@ export async function verifyPendingSadadPayment(
     returnUrl: updated.returnUrl,
   }
 }
+
+/** @deprecated Use `verifyPendingPayment`, which works for every gateway. */
+export const verifyPendingSadadPayment = verifyPendingPayment

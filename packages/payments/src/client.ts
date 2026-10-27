@@ -1,15 +1,17 @@
 import { OBHPaymentsError } from "./errors.js"
 import type {
   APIErrorEnvelope,
+  ListGatewaysOptions,
   OBHPaymentsOptions,
   Payment,
+  PaymentGateway,
   PaymentReceipt,
   PaymentStatus,
   StartPaymentInput,
   VerifyReturnInput,
 } from "./types.js"
 
-const SDK_VERSION = "0.1.0"
+const SDK_VERSION = "0.2.0"
 const DEFAULT_BASE_URL = "https://obhco.ir/api/v1"
 const DEFAULT_TIMEOUT_MS = 15_000
 const VALID_STATUSES = new Set<PaymentStatus>([
@@ -90,7 +92,30 @@ function isPayment(value: unknown): value is Payment {
     VALID_STATUSES.has(payment.status as PaymentStatus) &&
     typeof payment.description === "string" &&
     isReceipt(payment.receipt) &&
-    typeof payment.createdAt === "string"
+    typeof payment.createdAt === "string" &&
+    (payment.gateway === undefined || typeof payment.gateway === "string")
+  )
+}
+
+function isGatewayList(value: unknown): value is PaymentGateway[] {
+  return (
+    Array.isArray(value) &&
+    value.every((gateway) => {
+      if (!gateway || typeof gateway !== "object") {
+        return false
+      }
+
+      const candidate = gateway as Partial<PaymentGateway>
+
+      return (
+        typeof candidate.code === "string" &&
+        typeof candidate.name === "string" &&
+        typeof candidate.displayName === "string" &&
+        (candidate.kind === "card" || candidate.kind === "installment") &&
+        typeof candidate.requiresCustomerMobile === "boolean" &&
+        typeof candidate.isDefault === "boolean"
+      )
+    })
   )
 }
 
@@ -138,6 +163,22 @@ function validateStartInput(input: StartPaymentInput) {
     if (JSON.stringify(input.metadata).length > 8 * 1024) {
       throw invalidArgument("metadata cannot exceed 8 KB.")
     }
+  }
+
+  if (
+    input.gateway !== undefined &&
+    !/^[a-z0-9_-]{1,40}$/.test(input.gateway)
+  ) {
+    throw invalidArgument("gateway must be a code returned by listGateways().")
+  }
+
+  if (
+    input.customerMobile !== undefined &&
+    !/^(\+98|0098|98|0)?9\d{9}$/.test(input.customerMobile.trim())
+  ) {
+    throw invalidArgument(
+      "customerMobile must be an Iranian mobile number such as 09121234567."
+    )
   }
 
   if (
@@ -262,13 +303,26 @@ export class OBHPayments {
       body.metadata = input.metadata
     }
 
-    return this.#request("/payments", {
-      method: "POST",
-      headers: {
-        "Idempotency-Key": idempotencyKey,
+    if (input.gateway !== undefined) {
+      body.gateway = input.gateway
+    }
+
+    if (input.customerMobile !== undefined) {
+      body.customer = { mobile: input.customerMobile.trim() }
+    }
+
+    return this.#request(
+      "/payments",
+      {
+        method: "POST",
+        headers: {
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    })
+      isPayment,
+      "payment"
+    )
   }
 
   async getPayment(reference: string): Promise<Payment> {
@@ -276,9 +330,28 @@ export class OBHPayments {
       throw invalidArgument("A valid payment reference is required.")
     }
 
-    return this.#request(`/payments/${encodeURIComponent(reference)}`, {
-      method: "GET",
-    })
+    return this.#request(
+      `/payments/${encodeURIComponent(reference)}`,
+      { method: "GET" },
+      isPayment,
+      "payment"
+    )
+  }
+
+  /**
+   * Lists the payment gateways OBH currently offers to this service, so a
+   * checkout page can let the customer choose one (e.g. card or installments).
+   * Pass the chosen `code` as `gateway` to `startPayment`.
+   */
+  async listGateways(options?: ListGatewaysOptions): Promise<PaymentGateway[]> {
+    const simulator = options?.simulator ?? this.#simulator
+
+    return this.#request(
+      `/gateways?simulator=${simulator ? "true" : "false"}`,
+      { method: "GET" },
+      isGatewayList,
+      "gateway list"
+    )
   }
 
   /**
@@ -318,7 +391,12 @@ export class OBHPayments {
     return payment
   }
 
-  async #request(path: string, init: RequestInit): Promise<Payment> {
+  async #request<T>(
+    path: string,
+    init: RequestInit,
+    isExpected: (value: unknown) => value is T,
+    shapeName: string
+  ): Promise<T> {
     const controller = new AbortController()
     let timedOut = false
     const timeout = setTimeout(() => {
@@ -392,9 +470,9 @@ export class OBHPayments {
       )
     }
 
-    if (!isPayment(payload.data)) {
+    if (!isExpected(payload.data)) {
       throw new OBHPaymentsError(
-        "The OBH API returned an unexpected payment shape.",
+        `The OBH API returned an unexpected ${shapeName} shape.`,
         {
           code: "INVALID_RESPONSE",
           status: response.status,

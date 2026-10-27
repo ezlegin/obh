@@ -357,7 +357,21 @@ type SadadVerifyResponse = {
 
 export const sadadPaymentAdapter: PaymentProviderAdapter = {
   code: SADAD_PROVIDER_CODE,
+  descriptor: {
+    code: SADAD_PROVIDER_CODE,
+    name: SADAD_PROVIDER_NAME,
+    displayName: "پرداخت با کارت بانکی (سداد)",
+    description:
+      "Pay in full with any Shetab bank card through Sadad (Bank Melli Iran).",
+    kind: "card",
+    requiresCustomerMobile: false,
+    minAmount: null,
+  },
   supportedEnvironments: ["TEST", "LIVE"],
+
+  isLiveConfigured() {
+    return getSadadConfigStatus().liveConfigured
+  },
 
   async createCheckoutSession(
     input: CheckoutSessionInput
@@ -682,9 +696,7 @@ export const sadadPaymentAdapter: PaymentProviderAdapter = {
     const retrievalRefNo = data.RetrivalRefNo
       ? String(data.RetrivalRefNo)
       : (input.providerReference ?? token)
-    const systemTraceNo = data.SystemTraceNo
-      ? String(data.SystemTraceNo)
-      : null
+    const systemTraceNo = data.SystemTraceNo ? String(data.SystemTraceNo) : null
     const maskedCardNumber =
       typeof input.payload?.PrimaryAccNo === "string"
         ? input.payload.PrimaryAccNo

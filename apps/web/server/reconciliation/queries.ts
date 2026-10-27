@@ -1,7 +1,7 @@
 import "server-only"
 
 import { getDb } from "@/lib/db/client"
-import { ensureSadadGateway } from "@/server/gateways/gateway-service"
+import { ensureAllPaymentGateways } from "@/server/gateways/gateway-service"
 import { calculateProviderBalance } from "@/server/reconciliation/service"
 
 export type ProviderAccountBalanceView = {
@@ -13,11 +13,15 @@ export type ProviderAccountBalanceView = {
   isActive: boolean
   openingBalance: string
   payments: string
+  /** Installments of completed purchases not deposited yet. */
+  unreceivedInstallments: string
   settledFees: string
   pendingFees: string
   transfersOut: string
   transfersIn: string
   calculatedBalance: string
+  /** Balance if every installment purchase had been paid in full. */
+  allCashBalance: string
   lastReconciliation: {
     id: string
     asOf: string
@@ -90,7 +94,7 @@ export type ReconciliationWorkspace = {
 }
 
 export async function getReconciliationWorkspace(): Promise<ReconciliationWorkspace> {
-  await ensureSadadGateway()
+  await ensureAllPaymentGateways()
   const db = getDb()
   const accountRows = await db.financialAccount.findMany({
     where: { kind: "PROVIDER" },
@@ -178,11 +182,13 @@ export async function getReconciliationWorkspace(): Promise<ReconciliationWorksp
       isActive: account.isActive,
       openingBalance: account.openingBalance.toFixed(2),
       payments: (balance?.payments ?? 0).toFixed(2),
+      unreceivedInstallments: (balance?.unreceivedInstallments ?? 0).toFixed(2),
       settledFees: (balance?.settledFees ?? 0).toFixed(2),
       pendingFees: (balance?.pendingFees ?? 0).toFixed(2),
       transfersOut: (balance?.transfersOut ?? 0).toFixed(2),
       transfersIn: (balance?.transfersIn ?? 0).toFixed(2),
       calculatedBalance: (balance?.calculatedBalance ?? 0).toFixed(2),
+      allCashBalance: (balance?.allCashBalance ?? 0).toFixed(2),
       lastReconciliation: last
         ? {
             id: last.id,

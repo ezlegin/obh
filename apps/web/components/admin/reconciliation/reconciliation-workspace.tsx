@@ -460,6 +460,12 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
                   <p className="mt-1 text-2xl font-medium tracking-[-0.03em] tabular-nums">
                     {formatIrrDecimal(account.calculatedBalance)}
                   </p>
+                  {Number(account.unreceivedInstallments) > 0 ? (
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      {formatIrrDecimal(account.allCashBalance)} if all
+                      installments were paid in cash
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -501,7 +507,7 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
                   </span>
                 </p>
                 <p>
-                  Payments{" "}
+                  Payments received{" "}
                   <span className="float-right tabular-nums">
                     {formatIrrDecimal(account.payments)}
                   </span>
@@ -530,6 +536,14 @@ function ReconciliationWorkspace({ data }: { data: ReconciliationWorkspace }) {
                     {formatIrrDecimal(account.pendingFees)}
                   </span>
                 </p>
+                {Number(account.unreceivedInstallments) > 0 ? (
+                  <p>
+                    Installments not deposited{" "}
+                    <span className="float-right tabular-nums">
+                      {formatIrrDecimal(account.unreceivedInstallments)}
+                    </span>
+                  </p>
+                ) : null}
               </div>
 
               <div className="mt-3 flex flex-col justify-between gap-2 rounded-xl border border-border bg-white/[0.02] p-4 text-[11px] sm:flex-row sm:items-center">

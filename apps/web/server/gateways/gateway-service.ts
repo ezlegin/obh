@@ -2,50 +2,89 @@ import "server-only"
 
 import { getDb } from "@/lib/db/client"
 import {
+  DIGIPAY_PROVIDER_CODE,
+  DIGIPAY_PROVIDER_NAME,
   SADAD_PROVIDER_CODE,
   SADAD_PROVIDER_NAME,
 } from "@/server/payments/providers/registry"
 import type { ProviderEnvironmentValue } from "@/server/payments/providers/types"
 
-const SADAD_ACCOUNTS: Record<
-  ProviderEnvironmentValue,
-  { name: string; institution: string; notes: string }
-> = {
-  TEST: {
-    name: "Sadad Test Settlement (Bank Melli)",
-    institution: "Bank Melli Iran — Sadad IPG (Test)",
-    notes:
-      "Automatically provisioned Sadad test settlement account. Used for simulated or sandbox TEST payments.",
+type GatewayDefinition = {
+  name: string
+  description: string
+  accounts: Record<
+    ProviderEnvironmentValue,
+    { name: string; institution: string; notes: string }
+  >
+}
+
+const GATEWAYS: Record<string, GatewayDefinition> = {
+  [SADAD_PROVIDER_CODE]: {
+    name: SADAD_PROVIDER_NAME,
+    description:
+      "Official Sadad (Bank Melli Iran) Internet Payment Gateway (`sadad.shaparak.ir`). Full payment with Shetab bank cards.",
+    accounts: {
+      TEST: {
+        name: "Sadad Test Settlement (Bank Melli)",
+        institution: "Bank Melli Iran — Sadad IPG (Test)",
+        notes:
+          "Automatically provisioned Sadad test settlement account. Used for simulated or sandbox TEST payments.",
+      },
+      LIVE: {
+        name: "Sadad Live Settlement (Bank Melli)",
+        institution: "Bank Melli Iran — Sadad IPG",
+        notes:
+          "Automatically provisioned Sadad live acquiring account. Receives verified customer payments before bank settlement.",
+      },
+    },
   },
-  LIVE: {
-    name: "Sadad Live Settlement (Bank Melli)",
-    institution: "Bank Melli Iran — Sadad IPG",
-    notes:
-      "Automatically provisioned Sadad live acquiring account. Receives verified customer payments before bank settlement.",
+  [DIGIPAY_PROVIDER_CODE]: {
+    name: DIGIPAY_PROVIDER_NAME,
+    description:
+      "Digipay Unified Payment Gateway (`mydigipay.com`). Installment (BNPL/credit), wallet, and card purchases.",
+    accounts: {
+      TEST: {
+        name: "Digipay Test Settlement",
+        institution: "Digipay UPG (Test)",
+        notes:
+          "Automatically provisioned Digipay test settlement account. Used for simulated TEST payments.",
+      },
+      LIVE: {
+        name: "Digipay Live Settlement",
+        institution: "Digipay UPG",
+        notes:
+          "Automatically provisioned Digipay live account. Receives verified installment and wallet purchases before settlement.",
+      },
+    },
   },
 }
 
 /**
- * Ensures the single Sadad payment gateway (`code: "sadad"`) and both its
- * `TEST` and `LIVE` provider financial accounts exist and are active.
+ * Ensures a supported payment gateway and both its `TEST` and `LIVE`
+ * provider financial accounts exist and are active.
  *
- * OBH operates exclusively on Sadad (Bank Melli Iran); gateways are never
- * manually added, edited, or deleted from the admin panel.
+ * Gateways are defined in code (Sadad and Digipay); they are never manually
+ * added, edited, or deleted from the admin panel.
  */
-export async function ensureSadadGateway() {
+export async function ensurePaymentGateway(code: string) {
+  const definition = GATEWAYS[code]
+
+  if (!definition) {
+    throw new Error(`Unknown payment gateway ${code}.`)
+  }
+
   const db = getDb()
 
   const provider = await db.paymentProvider.upsert({
-    where: { code: SADAD_PROVIDER_CODE },
+    where: { code },
     update: {
-      name: SADAD_PROVIDER_NAME,
+      name: definition.name,
       isActive: true,
     },
     create: {
-      code: SADAD_PROVIDER_CODE,
-      name: SADAD_PROVIDER_NAME,
-      description:
-        "Official Sadad (Bank Melli Iran) Internet Payment Gateway (`sadad.shaparak.ir`). Single gateway for all OBH connected services.",
+      code,
+      name: definition.name,
+      description: definition.description,
       isActive: true,
     },
   })
@@ -58,70 +97,65 @@ export async function ensureSadadGateway() {
     orderBy: { createdAt: "asc" },
   })
 
-  let testAccount = existingAccounts.find(
-    (account) => account.environment === "TEST"
-  )
-  let liveAccount = existingAccounts.find(
-    (account) => account.environment === "LIVE"
-  )
+  const accounts = {} as Record<
+    ProviderEnvironmentValue,
+    (typeof existingAccounts)[number]
+  >
 
-  if (!testAccount) {
-    testAccount = await db.financialAccount.create({
-      data: {
-        name: SADAD_ACCOUNTS.TEST.name,
-        kind: "PROVIDER",
-        providerId: provider.id,
-        environment: "TEST",
-        institution: SADAD_ACCOUNTS.TEST.institution,
-        currency: "IRR",
-        openingBalance: 0,
-        isActive: true,
-        notes: SADAD_ACCOUNTS.TEST.notes,
-      },
-    })
-  } else if (!testAccount.isActive) {
-    testAccount = await db.financialAccount.update({
-      where: { id: testAccount.id },
-      data: { isActive: true },
-    })
+  for (const environment of ["TEST", "LIVE"] as const) {
+    let account = existingAccounts.find(
+      (candidate) => candidate.environment === environment
+    )
+    const template = definition.accounts[environment]
+
+    if (!account) {
+      account = await db.financialAccount.create({
+        data: {
+          name: template.name,
+          kind: "PROVIDER",
+          providerId: provider.id,
+          environment,
+          institution: template.institution,
+          currency: "IRR",
+          openingBalance: 0,
+          isActive: true,
+          notes: template.notes,
+        },
+      })
+    } else if (!account.isActive) {
+      account = await db.financialAccount.update({
+        where: { id: account.id },
+        data: { isActive: true },
+      })
+    }
+
+    accounts[environment] = account
   }
 
-  if (!liveAccount) {
-    liveAccount = await db.financialAccount.create({
-      data: {
-        name: SADAD_ACCOUNTS.LIVE.name,
-        kind: "PROVIDER",
-        providerId: provider.id,
-        environment: "LIVE",
-        institution: SADAD_ACCOUNTS.LIVE.institution,
-        currency: "IRR",
-        openingBalance: 0,
-        isActive: true,
-        notes: SADAD_ACCOUNTS.LIVE.notes,
-      },
-    })
-  } else if (!liveAccount.isActive) {
-    liveAccount = await db.financialAccount.update({
-      where: { id: liveAccount.id },
-      data: { isActive: true },
-    })
-  }
+  return { provider, accounts }
+}
 
+export async function ensureSadadGateway() {
+  return ensurePaymentGateway(SADAD_PROVIDER_CODE)
+}
+
+export async function ensureAllPaymentGateways() {
+  return Promise.all(Object.keys(GATEWAYS).map(ensurePaymentGateway))
+}
+
+export async function getGatewayAccountForEnvironment(
+  code: string,
+  environment: ProviderEnvironmentValue
+) {
+  const { provider, accounts } = await ensurePaymentGateway(code)
   return {
     provider,
-    accounts: {
-      TEST: testAccount,
-      LIVE: liveAccount,
-    },
+    account: accounts[environment],
   }
 }
 
 export async function getSadadAccountForEnvironment(
   environment: ProviderEnvironmentValue
 ) {
-  const { provider, accounts } = await ensureSadadGateway()
-  return {
-    provider,
-    account: accounts[environment],
-  }
+  return getGatewayAccountForEnvironment(SADAD_PROVIDER_CODE, environment)
 }

@@ -4,15 +4,46 @@ export type PaymentStatus =
 export type PaymentEnvironment = "test" | "live"
 
 /**
+ * Gateway code. OBH currently offers `"sadad"` (bank card, full payment) and
+ * `"digipay"` (installments / BNPL). Use `listGateways()` for the live list.
+ */
+export type PaymentGatewayCode = "sadad" | "digipay" | (string & {})
+
+export type PaymentGatewayKind = "card" | "installment"
+
+/** A gateway the service can offer on its checkout page. */
+export type PaymentGateway = {
+  code: PaymentGatewayCode
+  /** English name, e.g. `"Digipay (Installments / BNPL)"`. */
+  name: string
+  /** Persian label ready for a checkout page. */
+  displayName: string
+  description: string
+  kind: PaymentGatewayKind
+  /** When true, pass `customerMobile` to `startPayment`. */
+  requiresCustomerMobile: boolean
+  /** Minimum whole Rial amount, or `null` when the gateway sets none. */
+  minAmount: string | null
+  /** The gateway used when `startPayment` gets no `gateway`. */
+  isDefault: boolean
+  environment: PaymentEnvironment
+}
+
+export type ListGatewaysOptions = {
+  /** List TEST simulator gateways. Defaults to the client's `simulator`. */
+  simulator?: boolean
+}
+
+/**
  * Customer-facing receipt and bank reconciliation details populated from
- * gateway verification (Sadad IPG).
+ * gateway verification.
  */
 export type PaymentReceipt = {
-  /** Unique numeric order ID sent to the payment gateway (`OrderId`). */
+  /** Unique numeric order ID sent to the gateway (Sadad `OrderId`, Digipay `providerId`). */
   orderNumber: string
-  /** Transaction tracking number (`SystemTraceNo`). */
+  /** Transaction tracking number (Sadad `SystemTraceNo`, Digipay `rrn`). */
   traceNumber: string | null
-  /** Transaction reference number (`RetrivalRefNo`). */
+  /** Transaction reference number (Sadad `RetrivalRefNo`, Digipay `trackingCode`). */
   referenceNumber: string | null
   /** Masked card number (`PrimaryAccNo`). */
   maskedCardNumber: string | null
@@ -31,6 +62,8 @@ export type Payment = {
   amount: string
   currency: string
   environment: PaymentEnvironment
+  /** Gateway that processes this payment. */
+  gateway: PaymentGatewayCode
   status: PaymentStatus
   description: string
   checkoutUrl: string | null
@@ -49,7 +82,17 @@ export type StartPaymentInput = {
   returnUrl?: string
   metadata?: Record<string, unknown>
   /**
-   * Optional per-request override for the OBH Sadad simulator.
+   * Gateway the customer chose on your checkout page (a `code` from
+   * `listGateways()`). Defaults to the OBH default gateway (`"sadad"`).
+   */
+  gateway?: PaymentGatewayCode
+  /**
+   * Customer mobile number, e.g. `"09121234567"`. Required by gateways with
+   * `requiresCustomerMobile` (Digipay).
+   */
+  customerMobile?: string
+  /**
+   * Optional per-request override for the OBH gateway simulators.
    * Defaults to the client's `simulator` option or `process.env.OBH_SIMULATOR === "true"`.
    */
   simulator?: boolean
@@ -71,8 +114,9 @@ export type OBHPaymentsOptions = {
    */
   baseUrl?: string
   /**
-   * When true, routes payments to the OBH Sadad simulator (`/pay/sadad/[token]`)
-   * instead of the real Sadad gateway. Defaults to `process.env.OBH_SIMULATOR === "true"`.
+   * When true, routes payments to the OBH gateway simulators
+   * (`/pay/sadad/[token]`, `/pay/digipay/[ticket]`) instead of the real
+   * gateways. Defaults to `process.env.OBH_SIMULATOR === "true"`.
    */
   simulator?: boolean
   timeoutMs?: number

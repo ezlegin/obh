@@ -33,8 +33,8 @@ export default function CreatePaymentPage() {
       title="Create a payment"
       description={
         <>
-          <code>startPayment()</code> creates a payment record, asks OBH to
-          open a provider session, and returns everything you need to send the
+          <code>startPayment()</code> creates a payment record, asks OBH to open
+          a provider session, and returns everything you need to send the
           customer to checkout. It is safe to retry when you use a stable
           idempotency key.
         </>
@@ -104,6 +104,21 @@ export default function CreatePaymentPage() {
               "Informational JSON object, serialized to at most 8 KB. Never used for authorization or amounts.",
           },
           {
+            name: "gateway",
+            type: '"sadad" | "digipay"',
+            required: false,
+            defaultValue: '"sadad"',
+            description:
+              "The gateway the customer chose at checkout. Use a code from listGateways(). See Gateways & installments.",
+          },
+          {
+            name: "customerMobile",
+            type: "string",
+            required: false,
+            description:
+              "Customer mobile number such as 09121234567. Required when the gateway has requiresCustomerMobile (Digipay).",
+          },
+          {
             name: "idempotencyKey",
             type: "string",
             required: false,
@@ -116,7 +131,7 @@ export default function CreatePaymentPage() {
             required: false,
             defaultValue: "process.env.OBH_SIMULATOR === 'true'",
             description:
-              "When true, routes the payment to the OBH Sadad simulator instead of the live Sadad IPG.",
+              "When true, routes the payment to the OBH gateway simulators instead of the live gateways.",
           },
         ]}
       />
@@ -187,9 +202,29 @@ export default function CreatePaymentPage() {
         </tr>
         <tr>
           <td>
+            <code>gateway</code>
+          </td>
+          <td>
+            Lowercase letters, digits, <code>_</code> or <code>-</code>, at most
+            40 characters. Whether OBH offers it is checked by the API.
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <code>customerMobile</code>
+          </td>
+          <td>
+            An Iranian mobile number: <code>09…</code>, <code>+989…</code> or{" "}
+            <code>989…</code>.
+          </td>
+        </tr>
+        <tr>
+          <td>
             <code>idempotencyKey</code>
           </td>
-          <td>1–191 printable ASCII characters (no spaces or control characters).</td>
+          <td>
+            1–191 printable ASCII characters (no spaces or control characters).
+          </td>
         </tr>
       </Table>
 
@@ -220,10 +255,12 @@ await obh.startPayment({ amount: "10.99" /* ... */ })`}
         is no wildcard or prefix matching.
       </p>
       <ul>
-        <li>If you omit <code>returnUrl</code>, the service’s default is used.</li>
         <li>
-          If neither exists, the API fails with{" "}
-          <code>RETURN_URL_REQUIRED</code>.
+          If you omit <code>returnUrl</code>, the service’s default is used.
+        </li>
+        <li>
+          If neither exists, the API fails with <code>RETURN_URL_REQUIRED</code>
+          .
         </li>
         <li>
           If the URL is not on the allowlist, the API fails with{" "}
@@ -288,15 +325,14 @@ await obh.startPayment({ amount: "10.99" /* ... */ })`}
       <p>
         Reusing a key with an identical request returns the original payment.
         Reusing it with a different request returns{" "}
-        <code>409 IDEMPOTENCY_CONFLICT</code>. The full rules and retry
-        strategy live in{" "}
-        <Link href="/idempotency">Idempotency &amp; retries</Link>.
+        <code>409 IDEMPOTENCY_CONFLICT</code>. The full rules and retry strategy
+        live in <Link href="/idempotency">Idempotency &amp; retries</Link>.
       </p>
 
       <h2 id="what-you-get-back">What you get back</h2>
       <p>
-        A resolved promise is a <code>Payment</code> object. The fields you
-        will use most:
+        A resolved promise is a <code>Payment</code> object. The fields you will
+        use most:
       </p>
       <CodeBlock
         filename="Payment"
@@ -309,6 +345,7 @@ await obh.startPayment({ amount: "10.99" /* ... */ })`}
   "amount": "245000000",
   "currency": "IRR",
   "environment": "live",
+  "gateway": "sadad",
   "status": "pending",
   "description": "Annual design workspace",
   "checkoutUrl": "https://sadad.shaparak.ir/VPG/Purchase?Token=...",
@@ -326,17 +363,21 @@ await obh.startPayment({ amount: "10.99" /* ... */ })`}
 }`}
       />
 
-      <p>
-        Three details matter:
-      </p>
+      <p>Three details matter:</p>
       <ul>
         <li>
-          <strong>Store <code>reference</code> now.</strong> It is how you read
-          the payment later. Without it, you cannot recover the result.
+          <strong>
+            Store <code>reference</code> now.
+          </strong>{" "}
+          It is how you read the payment later. Without it, you cannot recover
+          the result.
         </li>
         <li>
-          <strong><code>checkoutUrl</code> may be null.</strong> Some adapters
-          do not use a browser redirect. Do not dereference it blindly.
+          <strong>
+            <code>checkoutUrl</code> may be null.
+          </strong>{" "}
+          Some adapters do not use a browser redirect. Do not dereference it
+          blindly.
         </li>
         <li>
           <strong>The amount is returned in whole Iranian Rials (IRR).</strong>{" "}
@@ -346,11 +387,10 @@ await obh.startPayment({ amount: "10.99" /* ... */ })`}
 
       <Callout variant="tip" title="The SDK does not expose the HTTP status">
         <p>
-          OBH returns <code>201</code> for a new payment and{" "}
-          <code>200</code> for an idempotent replay, with an{" "}
-          <code>Idempotent-Replayed</code> header. The SDK normalizes both into
-          the same <code>Payment</code> value. If you need to distinguish them,
-          call the HTTP API directly.
+          OBH returns <code>201</code> for a new payment and <code>200</code>{" "}
+          for an idempotent replay, with an <code>Idempotent-Replayed</code>{" "}
+          header. The SDK normalizes both into the same <code>Payment</code>{" "}
+          value. If you need to distinguish them, call the HTTP API directly.
         </p>
       </Callout>
 
@@ -403,8 +443,8 @@ export async function checkout(orderId: string) {
       <h2 id="errors">Errors from creation</h2>
       <p>
         Creation can fail before or during the request. The most common codes
-        are listed here; the full table is in{" "}
-        <Link href="/errors">Errors</Link>.
+        are listed here; the full table is in <Link href="/errors">Errors</Link>
+        .
       </p>
 
       <Table
@@ -455,6 +495,27 @@ export async function checkout(orderId: string) {
         </tr>
         <tr>
           <td>
+            <code>GATEWAY_NOT_SUPPORTED</code>
+          </td>
+          <td>The gateway code is not one OBH offers.</td>
+          <td>No. Pick a gateway from listGateways().</td>
+        </tr>
+        <tr>
+          <td>
+            <code>CUSTOMER_MOBILE_REQUIRED</code>
+          </td>
+          <td>The chosen gateway (Digipay) needs customerMobile.</td>
+          <td>Only after adding the mobile number.</td>
+        </tr>
+        <tr>
+          <td>
+            <code>GATEWAY_NOT_AVAILABLE</code>
+          </td>
+          <td>The gateway is not enabled for LIVE payments yet.</td>
+          <td>No. Offer another gateway from listGateways().</td>
+        </tr>
+        <tr>
+          <td>
             <code>PROVIDER_UNAVAILABLE</code>
           </td>
           <td>No active provider account or adapter for the environment.</td>
@@ -465,9 +526,7 @@ export async function checkout(orderId: string) {
             <code>TIMEOUT</code> / <code>NETWORK_ERROR</code>
           </td>
           <td>The request never produced a definitive answer.</td>
-          <td>
-            Retrieve first, then retry with the same key if needed.
-          </td>
+          <td>Retrieve first, then retry with the same key if needed.</td>
         </tr>
       </Table>
 

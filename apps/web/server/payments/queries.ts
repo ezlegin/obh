@@ -3,7 +3,10 @@ import "server-only"
 import { randomBytes } from "node:crypto"
 
 import { getDb } from "@/lib/db/client"
-import { ensureSadadGateway } from "@/server/gateways/gateway-service"
+import {
+  ensureAllPaymentGateways,
+  ensureSadadGateway,
+} from "@/server/gateways/gateway-service"
 import { getSadadCallbackUrl } from "@/server/payments/api-payment-service"
 import {
   getSadadConfigStatus,
@@ -393,7 +396,7 @@ function mapAdminPayment(
 }
 
 export async function getPaymentsForAdmin(): Promise<AdminPayment[]> {
-  await ensureSadadGateway()
+  await ensureAllPaymentGateways()
   const payments = await getDb().payment.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,

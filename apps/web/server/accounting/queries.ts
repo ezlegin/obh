@@ -135,6 +135,10 @@ export type IncomeWorkspace = {
   incomes: AdminIncome[]
   summary: {
     totalBusinessBalance: string
+    /** Installment amounts the gateways still owe the business. */
+    installmentReceivable: string
+    /** Total business balance if every installment purchase were paid in full. */
+    allCashBusinessBalance: string
     completedPaymentsAllTime: string
     receivedThisMonth: string
     receivedAllTime: string
@@ -503,6 +507,10 @@ export async function getIncomeWorkspace(): Promise<IncomeWorkspace> {
         )
 
   const totalBusinessBalance = providerTotal.plus(businessTotal)
+  const installmentReceivable = providerBalances.reduce(
+    (sum, b) => sum.plus(b.unreceivedInstallments),
+    zero
+  )
 
   return {
     accounts,
@@ -524,6 +532,10 @@ export async function getIncomeWorkspace(): Promise<IncomeWorkspace> {
     })),
     summary: {
       totalBusinessBalance: totalBusinessBalance.toFixed(2),
+      installmentReceivable: installmentReceivable.toFixed(2),
+      allCashBusinessBalance: totalBusinessBalance
+        .plus(installmentReceivable)
+        .toFixed(2),
       completedPaymentsAllTime:
         completedPaymentsAgg._sum.amount?.toFixed(2) ?? "0.00",
       receivedThisMonth: monthTotal._sum.amount?.toFixed(2) ?? "0.00",

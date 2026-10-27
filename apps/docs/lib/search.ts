@@ -9,6 +9,24 @@ export type SearchEntry = {
 
 export const searchIndex: SearchEntry[] = [
   {
+    page: "Gateways & installments",
+    pageHref: "/gateways",
+    title: "List available gateways",
+    hash: "list-gateways",
+    description:
+      "Call listGateways() to show OBH's gateways on your checkout page.",
+    keywords: "listGateways gateways checkout picker sadad digipay choose",
+  },
+  {
+    page: "Gateways & installments",
+    pageHref: "/gateways",
+    title: "Pay in installments with Digipay",
+    hash: "digipay-installments",
+    description:
+      "Start a Digipay BNPL payment with gateway and customerMobile.",
+    keywords: "digipay installment bnpl credit aghsati customerMobile mobile",
+  },
+  {
     page: "Introduction",
     pageHref: "/",
     title: "What is @obhco/payments?",
@@ -73,8 +91,7 @@ export const searchIndex: SearchEntry[] = [
     pageHref: "/concepts",
     title: "Money and environments",
     hash: "money-and-environments",
-    description:
-      "IRR decimal strings and the TEST/LIVE separation of records.",
+    description: "IRR decimal strings and the TEST/LIVE separation of records.",
     keywords: "amount currency IRR test live environment strings",
   },
   {
@@ -196,8 +213,7 @@ export const searchIndex: SearchEntry[] = [
     pageHref: "/api-reference",
     title: "HTTP API",
     hash: "http-api",
-    description:
-      "POST /api/v1/payments and GET /api/v1/payments/{reference}.",
+    description: "POST /api/v1/payments and GET /api/v1/payments/{reference}.",
     keywords: "http api endpoint rest curl authorization",
   },
   {
@@ -205,8 +221,7 @@ export const searchIndex: SearchEntry[] = [
     pageHref: "/api-reference",
     title: "TypeScript types",
     hash: "typescript-types",
-    description:
-      "Payment, StartPaymentInput, options, and the error envelope.",
+    description: "Payment, StartPaymentInput, options, and the error envelope.",
     keywords: "types Payment StartPaymentInput PaymentStatus",
   },
   {

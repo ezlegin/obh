@@ -51,6 +51,34 @@ if (verified.status === "completed") {
 }
 ```
 
+## Letting customers choose a gateway
+
+OBH offers more than one gateway. Sadad (`"sadad"`) takes a full bank card
+payment, and Digipay (`"digipay"`) lets the customer pay in installments
+(BNPL/credit). List them on your checkout page instead of hard-coding them, so
+new gateways show up automatically:
+
+```ts
+// Server: load the options for your checkout page
+const gateways = await obh.listGateways()
+// [{ code: "sadad", displayName: "پرداخت با کارت بانکی (سداد)", kind: "card", isDefault: true, ... },
+//  { code: "digipay", displayName: "خرید اقساطی با دیجی‌پی", kind: "installment", requiresCustomerMobile: true, ... }]
+
+// Server: start the payment with the gateway the customer picked
+const payment = await obh.startPayment({
+  externalOrderId: "AF-8822",
+  amount: "15000000",
+  description: "Pro subscription (yearly)",
+  gateway: selected.code,
+  // Required when the gateway has requiresCustomerMobile (Digipay)
+  customerMobile: selected.requiresCustomerMobile ? "09121234567" : undefined,
+})
+```
+
+Verification is the same for every gateway: call `verifyReturn` or
+`getPayment` and trust only `payment.status`. `payment.gateway` reports which
+gateway processed the payment.
+
 ## API
 
 ### `new OBHPayments(options)`
@@ -65,7 +93,17 @@ if (verified.status === "completed") {
 ### `startPayment(input): Promise<Payment>`
 
 Creates a payment through `POST /api/v1/payments`. `amount` must be a positive
-whole Rial integer string without decimals (e.g. `"150000"`).
+whole Rial integer string without decimals (e.g. `"150000"`). Optional
+`gateway` selects a gateway from `listGateways()` (default `"sadad"`).
+`customerMobile` is required for gateways with `requiresCustomerMobile`.
+
+### `listGateways(options?): Promise<PaymentGateway[]>`
+
+Lists the gateways OBH currently offers through `GET /api/v1/gateways`. Each
+item has `code`, `name`, Persian `displayName`, `description`, `kind` (`"card"`
+or `"installment"`), `requiresCustomerMobile`, `minAmount` and `isDefault`.
+`{ simulator: true }` lists the TEST simulators. The default comes from the
+client's `simulator` option.
 
 ### `getPayment(reference): Promise<Payment>`
 
@@ -80,9 +118,11 @@ asserts `expectedOrderId` and `expectedAmount`.
 
 ## Receipt fields (`payment.receipt`)
 
-- `orderNumber`: Gateway numeric order ID (`OrderId`)
-- `traceNumber`: Transaction tracking number (`SystemTraceNo`)
-- `referenceNumber`: Transaction reference number (`RetrivalRefNo`)
-- `maskedCardNumber`: Masked card number (`PrimaryAccNo`)
-- `resultCode`: Gateway response code (`ResCode`)
-- `resultMessage`: Gateway response description (`Description`)
+| Field              | Sadad           | Digipay                     |
+| ------------------ | --------------- | --------------------------- |
+| `orderNumber`      | `OrderId`       | `providerId`                |
+| `traceNumber`      | `SystemTraceNo` | `rrn` (card purchases only) |
+| `referenceNumber`  | `RetrivalRefNo` | `trackingCode`              |
+| `maskedCardNumber` | `PrimaryAccNo`  | `maskedPan`                 |
+| `resultCode`       | `ResCode`       | `result.status`             |
+| `resultMessage`    | `Description`   | `result.message`            |

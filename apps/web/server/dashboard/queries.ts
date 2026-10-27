@@ -9,7 +9,8 @@ import {
   parseDateOnly,
   todayDateOnlyInTehran,
 } from "@/server/accounting/dates"
-import { ensureSadadGateway } from "@/server/gateways/gateway-service"
+import { ensureAllPaymentGateways } from "@/server/gateways/gateway-service"
+import { settleDueInstallments } from "@/server/payments/installments/installment-service"
 import {
   getSadadConfigStatus,
   SADAD_PROVIDER_NAME,
@@ -17,12 +18,7 @@ import {
 import { calculateProviderBalance } from "@/server/reconciliation/service"
 
 export type DashboardPeriod =
-  | "today"
-  | "weekly"
-  | "monthly"
-  | "3m"
-  | "6m"
-  | "annual"
+  "today" | "weekly" | "monthly" | "3m" | "6m" | "annual"
 
 export const DASHBOARD_PERIOD_OPTIONS: ReadonlyArray<{
   id: DashboardPeriod
@@ -54,11 +50,7 @@ export function parseDashboardPeriod(
 }
 
 export type DashboardTransactionStatus =
-  | "completed"
-  | "pending"
-  | "failed"
-  | "cancelled"
-  | "expired"
+  "completed" | "pending" | "failed" | "cancelled" | "expired"
 
 export type DashboardTransaction = {
   id: string
@@ -108,6 +100,10 @@ export type DashboardData = {
   period: DashboardPeriod
   summary: {
     totalBalance: number
+    /** Total balance if every installment purchase had been paid in full. */
+    allCashBalance: number
+    /** Installment amounts the gateways still owe the business. */
+    installmentReceivable: number
     revenue: number
     expenses: number
     netProfit: number
@@ -357,7 +353,11 @@ function mapPaymentStatus(
 
 function buildCashflowPoints(
   window: PeriodWindow,
-  payments: Array<{ amount: Prisma.Decimal; completedAt: Date | null; createdAt: Date }>,
+  payments: Array<{
+    amount: Prisma.Decimal
+    completedAt: Date | null
+    createdAt: Date
+  }>,
   incomes: Array<{ amount: Prisma.Decimal; receivedOn: Date }>,
   expenses: Array<{ amount: Prisma.Decimal; spentOn: Date }>,
   fees: Array<{ amount: Prisma.Decimal; chargedAt: Date }>
@@ -464,9 +464,7 @@ function buildCashflowPoints(
     for (let i = 0; i < bucketCount; i += 1) {
       const startDate = addDays(window.currentFromDate, i * 7)
       const endDate =
-        i === bucketCount - 1
-          ? window.currentToDate
-          : addDays(startDate, 6)
+        i === bucketCount - 1 ? window.currentToDate : addDays(startDate, 6)
       const startKey = formatDateOnly(startDate)
       const endKey = formatDateOnly(endDate)
       buckets.push({
@@ -478,7 +476,11 @@ function buildCashflowPoints(
       })
     }
 
-    const addByKey = (dateKey: string, kind: "revenue" | "expenses", amount: number) => {
+    const addByKey = (
+      dateKey: string,
+      kind: "revenue" | "expenses",
+      amount: number
+    ) => {
       const target = buckets.find(
         (b) => dateKey >= b.startKey && dateKey <= b.endKey
       )
@@ -539,7 +541,9 @@ function buildCashflowPoints(
   }
 
   for (const payment of payments) {
-    const key = toTehranDateOnly(payment.completedAt ?? payment.createdAt).slice(0, 7)
+    const key = toTehranDateOnly(
+      payment.completedAt ?? payment.createdAt
+    ).slice(0, 7)
     const bucket = byMonth.get(key)
     if (bucket) {
       bucket.revenue += toNumber(payment.amount)
@@ -574,7 +578,9 @@ function buildCashflowPoints(
     const bucket = byMonth.get(key) ?? { revenue: 0, expenses: 0 }
     return {
       label:
-        monthCount <= 6 ? formatMonthLabel(key).slice(0, 3) : formatMonthShortLabel(key),
+        monthCount <= 6
+          ? formatMonthLabel(key).slice(0, 3)
+          : formatMonthShortLabel(key),
       revenue: bucket.revenue,
       expenses: bucket.expenses,
     }
@@ -584,7 +590,8 @@ function buildCashflowPoints(
 export async function getDashboardDataForAdmin(
   period: DashboardPeriod = "monthly"
 ): Promise<DashboardData> {
-  await ensureSadadGateway()
+  await ensureAllPaymentGateways()
+  await settleDueInstallments()
   const db = getDb()
 
   const window = resolvePeriodWindow(period)
@@ -995,6 +1002,11 @@ export async function getDashboardDataForAdmin(
     (sum, account) => sum + account.calculatedBalance,
     0
   )
+  const installmentReceivable = providerBalances.reduce(
+    (sum, balance) => sum + toNumber(balance.unreceivedInstallments),
+    0
+  )
+  const allCashBalance = totalBalance + installmentReceivable
 
   const currentRevenue =
     toNumber(currentCompletedPayments._sum.amount) +
@@ -1146,6 +1158,8 @@ export async function getDashboardDataForAdmin(
     period: window.period,
     summary: {
       totalBalance,
+      allCashBalance,
+      installmentReceivable,
       revenue: currentRevenue,
       expenses: currentExpenses,
       netProfit: currentNetProfit,

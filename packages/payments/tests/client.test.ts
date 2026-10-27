@@ -15,6 +15,7 @@ const payment = {
   amount: "150000",
   currency: "IRR",
   environment: "test" as const,
+  gateway: "sadad",
   status: "pending" as const,
   description: "Test",
   checkoutUrl: "http://localhost:3100/pay/sadad/sadad_tok_x",
@@ -265,5 +266,113 @@ test("maps aborted requests to retryable timeouts", async () => {
       isOBHPaymentsError(error) &&
       error.code === "TIMEOUT" &&
       error.retryable === true
+  )
+})
+
+test("lists available gateways for the checkout page", async () => {
+  let requestedUrl = ""
+  const gateways = [
+    {
+      code: "sadad",
+      name: "Sadad (Bank Melli Iran)",
+      displayName: "پرداخت با کارت بانکی (سداد)",
+      description: "Pay in full with a bank card.",
+      kind: "card",
+      requiresCustomerMobile: false,
+      minAmount: null,
+      isDefault: true,
+      environment: "test",
+    },
+    {
+      code: "digipay",
+      name: "Digipay (Installments / BNPL)",
+      displayName: "خرید اقساطی با دیجی‌پی",
+      description: "Pay in installments.",
+      kind: "installment",
+      requiresCustomerMobile: true,
+      minAmount: null,
+      isDefault: false,
+      environment: "test",
+    },
+  ]
+
+  const client = new OBHPayments({
+    secretKey: "svc_test_key.secret",
+    baseUrl: "http://localhost:3100",
+    simulator: true,
+    fetch: async (input) => {
+      requestedUrl = String(input)
+      return jsonResponse({ data: gateways })
+    },
+  })
+
+  const result = await client.listGateways()
+
+  assert.equal(
+    requestedUrl,
+    "http://localhost:3100/api/v1/gateways?simulator=true"
+  )
+  assert.deepEqual(
+    result.map((gateway) => gateway.code),
+    ["sadad", "digipay"]
+  )
+  assert.equal(result[1]?.requiresCustomerMobile, true)
+})
+
+test("sends the chosen gateway and customer mobile when starting a payment", async () => {
+  let sentBody: Record<string, unknown> = {}
+
+  const client = new OBHPayments({
+    secretKey: "svc_test_key.secret",
+    baseUrl: "http://localhost:3100",
+    fetch: async (_input, init) => {
+      sentBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return jsonResponse({ data: { ...payment, gateway: "digipay" } }, 201)
+    },
+  })
+
+  const result = await client.startPayment({
+    externalOrderId: "AF-2",
+    amount: "150000",
+    description: "Installment test",
+    gateway: "digipay",
+    customerMobile: "09121234567",
+  })
+
+  assert.equal(sentBody.gateway, "digipay")
+  assert.deepEqual(sentBody.customer, { mobile: "09121234567" })
+  assert.equal(result.gateway, "digipay")
+})
+
+test("rejects invalid gateway codes and mobile numbers before calling the API", async () => {
+  const client = new OBHPayments({
+    secretKey: "svc_test_key.secret",
+    baseUrl: "http://localhost:3100",
+    fetch: async () => {
+      throw new Error("fetch should not be called")
+    },
+  })
+
+  await assert.rejects(
+    () =>
+      client.startPayment({
+        externalOrderId: "AF-3",
+        amount: "150000",
+        description: "Bad gateway",
+        gateway: "Digi Pay!",
+      }),
+    /gateway must be a code/
+  )
+
+  await assert.rejects(
+    () =>
+      client.startPayment({
+        externalOrderId: "AF-3",
+        amount: "150000",
+        description: "Bad mobile",
+        gateway: "digipay",
+        customerMobile: "12345",
+      }),
+    /customerMobile/
   )
 })

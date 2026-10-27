@@ -48,9 +48,13 @@ export { OBHPaymentsError, isOBHPaymentsError } from "@obhco/payments"
 export type {
   APIErrorDetail,
   APIErrorEnvelope,
+  ListGatewaysOptions,
   OBHPaymentsOptions,
   Payment,
   PaymentEnvironment,
+  PaymentGateway,
+  PaymentGatewayCode,
+  PaymentGatewayKind,
   PaymentReceipt,
   PaymentStatus,
   StartPaymentInput,
@@ -71,6 +75,11 @@ export type {
             signature: "startPayment(input): Promise<Payment>",
             body: "Creates a payment. Sends POST https://obhco.ir/api/v1/payments with an idempotency key.",
             href: "/payments/create",
+          },
+          {
+            signature: "listGateways(options?): Promise<PaymentGateway[]>",
+            body: "Lists the gateways OBH offers for your checkout page. Sends GET https://obhco.ir/api/v1/gateways.",
+            href: "/gateways",
           },
           {
             signature: "getPayment(reference): Promise<Payment>",
@@ -130,6 +139,26 @@ function isOBHPaymentsError(error: unknown): error is OBHPaymentsError`}
 
 type PaymentEnvironment = "test" | "live"
 
+type PaymentGatewayCode = "sadad" | "digipay" | (string & {})
+
+type PaymentGatewayKind = "card" | "installment"
+
+type PaymentGateway = {
+  code: PaymentGatewayCode
+  name: string
+  displayName: string // Persian label for checkout
+  description: string
+  kind: PaymentGatewayKind
+  requiresCustomerMobile: boolean
+  minAmount: string | null
+  isDefault: boolean
+  environment: PaymentEnvironment
+}
+
+type ListGatewaysOptions = {
+  simulator?: boolean
+}
+
 type PaymentReceipt = {
   orderNumber: string | null
   traceNumber: string | null
@@ -147,6 +176,7 @@ type Payment = {
   amount: string
   currency: string
   environment: PaymentEnvironment
+  gateway: PaymentGatewayCode
   status: PaymentStatus
   description: string
   checkoutUrl: string | null
@@ -163,6 +193,8 @@ type StartPaymentInput = {
   description: string
   returnUrl?: string
   metadata?: Record<string, unknown>
+  gateway?: PaymentGatewayCode // default "sadad"
+  customerMobile?: string // required by Digipay
   idempotencyKey?: string
   simulator?: boolean
 }
@@ -197,7 +229,10 @@ type APIErrorEnvelope = {
 }`}
       />
 
-      <Callout variant="tip" title="Runtime validation is intentionally shallow">
+      <Callout
+        variant="tip"
+        title="Runtime validation is intentionally shallow"
+      >
         <p>
           The SDK checks that a successful response looks like a{" "}
           <code>Payment</code> — required strings, a known status, a known
@@ -222,28 +257,46 @@ type APIErrorEnvelope = {
         }
       >
         <tr>
-          <td><code>Authorization</code></td>
-          <td><code>Bearer svc_...</code></td>
+          <td>
+            <code>Authorization</code>
+          </td>
+          <td>
+            <code>Bearer svc_...</code>
+          </td>
           <td>Required on every request.</td>
         </tr>
         <tr>
-          <td><code>Content-Type</code></td>
-          <td><code>application/json</code></td>
+          <td>
+            <code>Content-Type</code>
+          </td>
+          <td>
+            <code>application/json</code>
+          </td>
           <td>Required for POST.</td>
         </tr>
         <tr>
-          <td><code>Accept</code></td>
-          <td><code>application/json</code></td>
+          <td>
+            <code>Accept</code>
+          </td>
+          <td>
+            <code>application/json</code>
+          </td>
           <td>Set by the SDK.</td>
         </tr>
         <tr>
-          <td><code>Idempotency-Key</code></td>
+          <td>
+            <code>Idempotency-Key</code>
+          </td>
           <td>1–191 printable ASCII characters</td>
           <td>Required for POST; scoped to the service.</td>
         </tr>
         <tr>
-          <td><code>User-Agent</code></td>
-          <td><code>@obhco/payments/0.1.0</code></td>
+          <td>
+            <code>User-Agent</code>
+          </td>
+          <td>
+            <code>@obhco/payments/0.2.0</code>
+          </td>
           <td>Set by the SDK for diagnostics.</td>
         </tr>
       </Table>
@@ -265,7 +318,8 @@ type APIErrorEnvelope = {
   "currency": "IRR",
   "description": "Annual design workspace",
   "returnUrl": "https://igraphical.ir/payments/return",
-  "metadata": { "plan": "annual" }
+  "metadata": { "plan": "annual" },
+  "gateway": "sadad"
 }`}
       />
 
@@ -281,6 +335,7 @@ type APIErrorEnvelope = {
     "amount": "245000000",
     "currency": "IRR",
     "environment": "live",
+    "gateway": "sadad",
     "status": "pending",
     "description": "Annual design workspace",
     "checkoutUrl": "https://sadad.shaparak.ir/VPG/Purchase?Token=...",
@@ -312,9 +367,16 @@ type APIErrorEnvelope = {
           does not use a redirect.
         </li>
         <li>
-          Pass <code>"simulator": true</code> (or set <code>OBH_SIMULATOR="true"</code>{" "}
-          when using the SDK) to route the payment to the OBH Sadad simulator
-          instead of the live Sadad IPG.
+          Pass <code>"simulator": true</code> (or set{" "}
+          <code>OBH_SIMULATOR="true"</code> when using the SDK) to route the
+          payment to the OBH Sadad simulator instead of the live Sadad IPG.
+        </li>
+        <li>
+          <code>gateway</code> is optional and defaults to <code>"sadad"</code>.
+          Use a code from <code>GET /api/v1/gateways</code>. Digipay (
+          <code>"digipay"</code>) also needs{" "}
+          <code>{'"customer": { "mobile": "09121234567" }'}</code>. See{" "}
+          <Link href="/gateways">Gateways &amp; installments</Link>.
         </li>
         <li>
           The OBH reference is generated by OBH and sent to the provider only
@@ -412,8 +474,8 @@ type APIErrorEnvelope = {
       <Callout variant="note" title="Not implemented yet">
         <p>
           There is no endpoint for cancellation, refunds, captures, or listing
-          payments. Do not design around them. Rate limiting is reserved
-          (<code>429</code>) but not enforced.
+          payments. Do not design around them. Rate limiting is reserved (
+          <code>429</code>) but not enforced.
         </p>
       </Callout>
     </DocPage>

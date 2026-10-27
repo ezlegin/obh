@@ -10,6 +10,7 @@ import {
   CreditCard,
   FileCode2,
   KeyRound,
+  Landmark,
   LifeBuoy,
   LockKeyhole,
   Rocket,
@@ -62,6 +63,14 @@ export const navigation: NavGroup[] = [
         href: "/payments/create",
         description: "startPayment, its inputs, and its guarantees.",
         icon: CreditCard,
+      },
+      {
+        title: "Gateways & installments",
+        href: "/gateways",
+        description:
+          "listGateways, a gateway picker, and Digipay installments.",
+        icon: Landmark,
+        badge: "New",
       },
       {
         title: "Check status",

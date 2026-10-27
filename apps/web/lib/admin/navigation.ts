@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   Activity,
   Boxes,
+  CalendarClock,
   CircleDollarSign,
   CreditCard,
   FileText,
@@ -53,6 +54,13 @@ export const adminNavigation: AdminNavGroup[] = [
         icon: CreditCard,
       },
       {
+        label: "Installments",
+        href: "/admin/installments",
+        description:
+          "Installment purchases, deposits received, and amounts still owed.",
+        icon: CalendarClock,
+      },
+      {
         label: "Services",
         href: "/admin/services",
         description: "Connected services and payment credentials.",
@@ -81,6 +89,7 @@ export const adminNavigation: AdminNavGroup[] = [
         description:
           "Sadad (Bank Melli) IPG status, callback URL, and settlement accounts.",
         icon: Landmark,
+        exact: true,
       },
       {
         label: "Mellat Bank",
@@ -91,12 +100,11 @@ export const adminNavigation: AdminNavGroup[] = [
         badge: "Soon",
       },
       {
-        label: "Digipay",
-        href: "#digipay",
-        description: "Digipay BNPL and wallet gateway integration.",
+        label: "Digipay gateway",
+        href: "/admin/gateways/digipay",
+        description:
+          "Digipay installment (BNPL) gateway status, callback URL, and settlement accounts.",
         icon: Landmark,
-        disabled: true,
-        badge: "Soon",
       },
     ],
   },

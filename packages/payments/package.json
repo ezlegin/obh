@@ -1,6 +1,6 @@
 {
   "name": "@obhco/payments",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Server-side TypeScript SDK for the versioned OBH payment API.",
   "license": "UNLICENSED",
   "type": "module",

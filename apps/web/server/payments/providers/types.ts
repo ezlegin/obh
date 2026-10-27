@@ -13,6 +13,8 @@ export type CheckoutSessionInput = {
   callbackUrl: string
   environment: ProviderEnvironmentValue
   metadata: Record<string, unknown>
+  /** Customer mobile number (`09xxxxxxxxx`). Required by Digipay. */
+  customerMobile?: string | null
 }
 
 export type CheckoutSession = {
@@ -48,9 +50,29 @@ export type VerifyPaymentResult = {
   metadata: Record<string, unknown>
 }
 
+export type PaymentGatewayKind = "card" | "installment"
+
+/**
+ * Public description of a gateway that connected services can offer at
+ * checkout. Credentials and endpoints never appear here.
+ */
+export type PaymentGatewayDescriptor = {
+  code: string
+  name: string
+  /** Persian label suitable for a checkout page. */
+  displayName: string
+  description: string
+  kind: PaymentGatewayKind
+  requiresCustomerMobile: boolean
+  minAmount: string | null
+}
+
 export interface PaymentProviderAdapter {
   readonly code: string
+  readonly descriptor: PaymentGatewayDescriptor
   readonly supportedEnvironments: readonly ProviderEnvironmentValue[]
+  /** True when LIVE credentials are present in server environment variables. */
+  isLiveConfigured(): boolean
   createCheckoutSession(input: CheckoutSessionInput): Promise<CheckoutSession>
   verifyPayment(input: VerifyPaymentInput): Promise<VerifyPaymentResult>
 }

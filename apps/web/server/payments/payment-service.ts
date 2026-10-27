@@ -13,6 +13,10 @@ import { DomainError } from "@/server/errors"
 import { getSadadAccountForEnvironment } from "@/server/gateways/gateway-service"
 import { getSadadCallbackUrl } from "@/server/payments/api-payment-service"
 import {
+  createInstallmentPlanInTx,
+  installmentPurchaseType,
+} from "@/server/payments/installments/installment-service"
+import {
   assertPaymentTransition,
   PAYMENT_EVENT_TYPES,
   type PaymentLifecycleStatus,
@@ -348,20 +352,30 @@ export async function simulateDevelopmentPaymentResult(
     )
   }
 
-  const adapter = getPaymentProviderAdapter(SADAD_PROVIDER_CODE)
+  const gateway = payment.provider?.code ?? SADAD_PROVIDER_CODE
+  const adapter = getPaymentProviderAdapter(gateway)
   const verification = await adapter.verifyPayment({
     providerSessionId: payment.providerSessionId,
     providerReference: payment.providerReference,
     gatewayOrderId: String(payment.gatewayOrderId),
     expectedAmount: payment.amount.toFixed(0),
     environment: "TEST",
-    payload: { outcome: values.outcome },
+    payload:
+      gateway === SADAD_PROVIDER_CODE
+        ? { outcome: values.outcome }
+        : {
+            result: values.outcome === "success" ? "SUCCESS" : "FAILURE",
+            trackingCode: `sim_${payment.reference}`,
+            providerId: String(payment.gatewayOrderId),
+            amount: payment.amount.toFixed(0),
+            type: 13,
+          },
   })
 
   if (verification.status === "PENDING") {
     throw new DomainError(
       "VERIFICATION_PENDING",
-      "The Sadad test simulator did not return a terminal result."
+      "The test simulator did not return a terminal result."
     )
   }
 
@@ -403,13 +417,24 @@ export async function simulateDevelopmentPaymentResult(
       data: {
         paymentId: payment.id,
         status: targetStatus === "COMPLETED" ? "VERIFIED" : "FAILED",
-        method: "sadad/simulated",
+        method: `${gateway}/simulated`,
         providerReference: verification.providerReference,
         verifiedAt: now,
         failureReason: verification.failureReason,
         metadata: verification.metadata as Prisma.InputJsonValue,
       },
     })
+
+    const purchaseType = installmentPurchaseType(verification.metadata)
+    if (targetStatus === "COMPLETED" && purchaseType) {
+      await createInstallmentPlanInTx(tx, {
+        paymentId: payment.id,
+        amount: payment.amount,
+        currency: payment.currency,
+        completedAt: now,
+        purchaseType,
+      })
+    }
 
     await tx.paymentEvent.create({
       data: {
@@ -423,8 +448,8 @@ export async function simulateDevelopmentPaymentResult(
         newStatus: targetStatus,
         message:
           targetStatus === "COMPLETED"
-            ? "Simulated Sadad Verify succeeded."
-            : "Simulated Sadad Verify failed.",
+            ? `Simulated ${gateway} verify succeeded.`
+            : `Simulated ${gateway} verify failed.`,
         metadata: {
           simulated: true,
           outcome: values.outcome,
@@ -438,7 +463,7 @@ export async function simulateDevelopmentPaymentResult(
     await tx.auditLog.create({
       data: {
         actorId,
-        action: "payment.sadad_result_simulated",
+        action: `payment.${gateway}_result_simulated`,
         entityType: "Payment",
         entityId: payment.id,
         before: { status: "PENDING" },

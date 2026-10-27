@@ -25,6 +25,8 @@ export type PaymentRequestFingerprintInput = {
   description: string
   returnUrl: string
   metadata?: Record<string, unknown>
+  gateway?: string
+  customerMobile?: string | null
 }
 
 /**
@@ -42,6 +44,12 @@ export function createPaymentRequestFingerprint(
       description: input.description,
       returnUrl: input.returnUrl,
       metadata: input.metadata ?? null,
+      // Only non-default choices are hashed, so fingerprints stored before
+      // gateway selection existed still match Sadad replays.
+      ...(input.gateway && input.gateway !== "sadad"
+        ? { gateway: input.gateway }
+        : {}),
+      ...(input.customerMobile ? { customerMobile: input.customerMobile } : {}),
     })
   )
 

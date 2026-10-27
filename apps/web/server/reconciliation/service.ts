@@ -11,6 +11,7 @@ import type {
 } from "@/lib/validation/reconciliation"
 import { DomainError } from "@/server/errors"
 import { parseDateOnly } from "@/server/accounting/dates"
+import { getUnreceivedInstallmentTotal } from "@/server/payments/installments/installment-service"
 
 export async function calculateProviderBalance(accountId: string) {
   const db = getDb()
@@ -26,49 +27,56 @@ export async function calculateProviderBalance(accountId: string) {
     )
   }
 
-  const [payments, settledFees, pendingFees, transfersOut, transfersIn] =
-    await Promise.all([
-      db.payment.aggregate({
-        where: {
-          providerAccountId: account.id,
-          status: "COMPLETED",
-          currency: account.currency,
-        },
-        _sum: { amount: true },
-      }),
-      db.providerFee.aggregate({
-        where: {
-          providerAccountId: account.id,
-          status: "SETTLED",
-          currency: account.currency,
-        },
-        _sum: { amount: true },
-      }),
-      db.providerFee.aggregate({
-        where: {
-          providerAccountId: account.id,
-          status: "PENDING",
-          currency: account.currency,
-        },
-        _sum: { amount: true },
-      }),
-      db.transfer.aggregate({
-        where: {
-          fromAccountId: account.id,
-          status: "COMPLETED",
-          currency: account.currency,
-        },
-        _sum: { amount: true },
-      }),
-      db.transfer.aggregate({
-        where: {
-          toAccountId: account.id,
-          status: "COMPLETED",
-          currency: account.currency,
-        },
-        _sum: { amount: true },
-      }),
-    ])
+  const [
+    payments,
+    settledFees,
+    pendingFees,
+    transfersOut,
+    transfersIn,
+    unreceivedInstallments,
+  ] = await Promise.all([
+    db.payment.aggregate({
+      where: {
+        providerAccountId: account.id,
+        status: "COMPLETED",
+        currency: account.currency,
+      },
+      _sum: { amount: true },
+    }),
+    db.providerFee.aggregate({
+      where: {
+        providerAccountId: account.id,
+        status: "SETTLED",
+        currency: account.currency,
+      },
+      _sum: { amount: true },
+    }),
+    db.providerFee.aggregate({
+      where: {
+        providerAccountId: account.id,
+        status: "PENDING",
+        currency: account.currency,
+      },
+      _sum: { amount: true },
+    }),
+    db.transfer.aggregate({
+      where: {
+        fromAccountId: account.id,
+        status: "COMPLETED",
+        currency: account.currency,
+      },
+      _sum: { amount: true },
+    }),
+    db.transfer.aggregate({
+      where: {
+        toAccountId: account.id,
+        status: "COMPLETED",
+        currency: account.currency,
+      },
+      _sum: { amount: true },
+    }),
+    getUnreceivedInstallmentTotal(account.id, account.currency),
+  ])
 
   const zero = new Prisma.Decimal(0)
   const paymentsTotal = payments._sum.amount ?? zero
@@ -76,8 +84,10 @@ export async function calculateProviderBalance(accountId: string) {
   const pendingFeesTotal = pendingFees._sum.amount ?? zero
   const out = transfersOut._sum.amount ?? zero
   const incoming = transfersIn._sum.amount ?? zero
+  // Installment purchases only count once each installment is deposited.
+  const receivedPayments = paymentsTotal.minus(unreceivedInstallments)
   const calculated = account.openingBalance
-    .plus(paymentsTotal)
+    .plus(receivedPayments)
     .minus(fees)
     .minus(out)
     .plus(incoming)
@@ -85,12 +95,16 @@ export async function calculateProviderBalance(accountId: string) {
   return {
     account,
     openingBalance: account.openingBalance,
-    payments: paymentsTotal,
+    payments: receivedPayments,
+    grossPayments: paymentsTotal,
+    unreceivedInstallments,
     settledFees: fees,
     pendingFees: pendingFeesTotal,
     transfersOut: out,
     transfersIn: incoming,
     calculatedBalance: calculated,
+    /** Balance if every installment purchase had been paid in full. */
+    allCashBalance: calculated.plus(unreceivedInstallments),
   }
 }
 

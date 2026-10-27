@@ -121,6 +121,18 @@ enum PayoutStatus {
   CANCELLED
 }
 
+enum InstallmentPlanStatus {
+  ACTIVE
+  SETTLED
+  CANCELLED
+}
+
+enum InstallmentStatus {
+  SCHEDULED
+  SETTLED
+  CANCELLED
+}
+
 /// The authenticated manager account. Authentication is implemented in Step 3;
 /// this model only reserves the durable identity and audit relationship.
 model User {
@@ -206,10 +218,11 @@ model ServiceCredential {
   @@index([serviceId, environment, revokedAt])
 }
 
-/// The payment gateway record. OBH uses exactly one gateway (Sadad, Bank
-/// Melli), provisioned automatically with code `sadad`; it is never created or
-/// edited from the admin panel. Credentials are intentionally not stored here;
-/// they remain server-side environment values.
+/// The payment gateway record. OBH offers the gateways defined in code —
+/// `sadad` (Bank Melli card payments) and `digipay` (installments / BNPL) —
+/// provisioned automatically; they are never created or edited from the admin
+/// panel. Credentials are intentionally not stored here; they remain
+/// server-side environment values.
 model PaymentProvider {
   id          String   @id @default(uuid(7)) @db.Uuid
   code        String   @unique @db.VarChar(80)
@@ -303,6 +316,12 @@ model PaymentMethod {
 /// - `providerSessionId` → Sadad payment `Token`
 /// - `providerReference` → Sadad `RetrivalRefNo` (reference number)
 /// - `traceNumber`       → Sadad `SystemTraceNo` (tracking number)
+///
+/// Digipay field mapping:
+/// - `gatewayOrderId`    → Digipay `providerId`
+/// - `providerSessionId` → Digipay purchase `ticket`
+/// - `providerReference` → Digipay `trackingCode`
+/// - `traceNumber`       → Digipay `rrn` (IPG purchases only)
 model Payment {
   id                 String              @id @default(uuid(7)) @db.Uuid
   reference          String              @unique @db.VarChar(48)
@@ -346,6 +365,7 @@ model Payment {
   fees               ProviderFee[]
   webhookDeliveries  WebhookDelivery[]
   idempotencyRecords PaymentIdempotencyRecord[]
+  installmentPlan    InstallmentPlan?
 
   @@unique([serviceId, externalOrderId])
   @@unique([serviceId, idempotencyKey])
@@ -356,6 +376,47 @@ model Payment {
   @@index([providerReference])
   @@index([providerSessionId])
   @@index([status, callbackReceivedAt])
+}
+
+/// Settlement schedule for a verified installment (Digipay BNPL/credit)
+/// purchase. The customer pays the first installment at checkout; the gateway
+/// deposits each remaining installment on the 7th of the following Iranian
+/// (Solar Hijri) months. Only SETTLED installments count toward the provider
+/// account balance; SCHEDULED ones are a receivable.
+model InstallmentPlan {
+  id               String                @id @default(uuid(7)) @db.Uuid
+  paymentId        String                @unique @db.Uuid
+  totalAmount      Decimal               @db.Decimal(24, 2)
+  installmentCount Int
+  currency         String                @default("IRR") @db.VarChar(3)
+  status           InstallmentPlanStatus @default(ACTIVE)
+  /// Gateway purchase type, e.g. `BNPL` or `CREDIT`.
+  purchaseType     String?               @db.VarChar(40)
+  createdAt        DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime              @updatedAt @db.Timestamptz(3)
+
+  payment      Payment       @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  installments Installment[]
+
+  @@index([status])
+}
+
+model Installment {
+  id        String            @id @default(uuid(7)) @db.Uuid
+  planId    String            @db.Uuid
+  sequence  Int
+  amount    Decimal           @db.Decimal(24, 2)
+  /// Date (Tehran calendar day) the gateway settles this installment.
+  dueOn     DateTime          @db.Date
+  status    InstallmentStatus @default(SCHEDULED)
+  settledAt DateTime?         @db.Timestamptz(3)
+  createdAt DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime          @updatedAt @db.Timestamptz(3)
+
+  plan InstallmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, sequence])
+  @@index([status, dueOn])
 }
 
 /// Every consumed service idempotency key, including keys that replay an
@@ -622,9 +683,9 @@ model Shareholder {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  ownershipRecords     OwnershipRecord[]
-  capitalContributions CapitalContribution[]
-  distributions        ProfitDistribution[]
+  ownershipRecords       OwnershipRecord[]
+  capitalContributions   CapitalContribution[]
+  distributions          ProfitDistribution[]
   serviceOwnershipShares ServiceOwnershipShare[]
   serviceDistributions   ServiceProfitDistribution[]
 
@@ -756,7 +817,7 @@ model ServiceProfitPeriod {
   createdAt           DateTime @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime @updatedAt @db.Timestamptz(3)
 
-  service       ConnectedService           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  service       ConnectedService            @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   distributions ServiceProfitDistribution[]
 
   @@unique([serviceId, startsOn, endsOn])

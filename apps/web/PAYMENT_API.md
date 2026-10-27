@@ -64,6 +64,7 @@ A service-visible payment contains:
   "amount": "245000000",
   "currency": "IRR",
   "environment": "test",
+  "gateway": "sadad",
   "status": "pending",
   "description": "Annual design workspace",
   "checkoutUrl": null,
@@ -87,6 +88,56 @@ A terminal payment never transitions again. A browser redirect must never be
 used as proof of success; only a server-side provider verification may produce
 `completed`.
 
+`gateway` is the code of the gateway processing the payment. Payments created
+before gateway selection existed report `sadad`.
+
+## 3a. List available gateways
+
+```http
+GET /api/v1/gateways?simulator=true|false
+Authorization: Bearer <service credential>
+```
+
+Returns the gateways the service can offer on its checkout page, so the customer
+can pick one (for example, a full card payment or installments).
+`simulator=true` lists TEST gateways backed by the OBH simulators. Otherwise
+only LIVE gateways whose credentials are configured on the server are listed,
+so the list changes as OBH enables gateways. Do not hard-code it.
+
+```json
+{
+  "data": [
+    {
+      "code": "sadad",
+      "name": "Sadad (Bank Melli Iran)",
+      "displayName": "پرداخت با کارت بانکی (سداد)",
+      "description": "Pay in full with any Shetab bank card through Sadad (Bank Melli Iran).",
+      "kind": "card",
+      "requiresCustomerMobile": false,
+      "minAmount": null,
+      "isDefault": true,
+      "environment": "live"
+    },
+    {
+      "code": "digipay",
+      "name": "Digipay (Installments / BNPL)",
+      "displayName": "خرید اقساطی با دیجی‌پی",
+      "description": "Buy now and pay later in installments with Digipay credit, or pay with a Digipay wallet or bank card.",
+      "kind": "installment",
+      "requiresCustomerMobile": true,
+      "minAmount": null,
+      "isDefault": false,
+      "environment": "live"
+    }
+  ]
+}
+```
+
+| Gateway | `kind` | Notes |
+| --- | --- | --- |
+| `sadad` | `card` | Default. Full payment with Shetab cards through Sadad (Bank Melli). |
+| `digipay` | `installment` | Digipay UPG: BNPL, credit, wallet, or card. Requires `customer.mobile`. |
+
 ## 4. Create a payment
 
 ```http
@@ -107,11 +158,26 @@ Request body:
   "returnUrl": "https://igraphical.ir/payments/return",
   "metadata": {
     "plan": "annual"
+  },
+  "gateway": "digipay",
+  "customer": {
+    "mobile": "09121234567"
   }
 }
 ```
 
 Rules:
+
+- `gateway` is optional and defaults to `sadad`. It must be a `code` returned
+  by `GET /api/v1/gateways` for the same environment. An unknown code returns
+  `422 GATEWAY_NOT_SUPPORTED`. A known gateway without LIVE credentials returns
+  `503 GATEWAY_NOT_AVAILABLE`, or `503 LIVE_NOT_AVAILABLE` for Sadad.
+- `customer.mobile` is required when the gateway has
+  `requiresCustomerMobile: true` (Digipay). Otherwise the request returns
+  `422 CUSTOMER_MOBILE_REQUIRED`. `+98…`, `98…` and `09…` forms are accepted.
+- The gateway and mobile number are part of the request fingerprint, so
+  replaying an idempotency key with a different gateway returns
+  `409 IDEMPOTENCY_CONFLICT`.
 
 - `externalOrderId` is required, 1–191 characters, and unique per service.
 - `amount` is a positive decimal string with at most two decimal places.
@@ -219,6 +285,9 @@ Core codes:
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | Request body is not JSON |
 | 422 | `RETURN_URL_NOT_ALLOWED` | Return URL is not in the exact allowlist |
 | 422 | `RETURN_URL_REQUIRED` | No return URL provided or configured |
+| 422 | `GATEWAY_NOT_SUPPORTED` | `gateway` is not a gateway OBH offers |
+| 422 | `CUSTOMER_MOBILE_REQUIRED` | The chosen gateway needs `customer.mobile` |
+| 503 | `GATEWAY_NOT_AVAILABLE` | The chosen gateway has no LIVE credentials configured |
 | 429 | `RATE_LIMITED` | Reserved for per-service rate limiting (not enforced yet) |
 | 502 | `PROVIDER_ERROR` | Provider transport or response failure |
 | 503 | `PROVIDER_UNAVAILABLE` | No active provider account/adapter |
@@ -304,11 +373,42 @@ Server-side adapters implement the `PaymentProviderAdapter` interface:
 ```ts
 type PaymentProviderAdapter = {
   code: string
+  descriptor: PaymentGatewayDescriptor // what GET /gateways exposes
   supportedEnvironments: ("TEST" | "LIVE")[]
+  isLiveConfigured(): boolean
   createCheckoutSession(input: CheckoutSessionInput): Promise<CheckoutSession>
   verifyPayment(input: VerifyPaymentInput): Promise<VerifyPaymentResult>
 }
 ```
+
+Registered adapters (`server/payments/providers/registry.ts`):
+
+| Code | Callback | TEST simulator | LIVE credentials |
+| --- | --- | --- | --- |
+| `sadad` | `POST /api/v1/sadad/callback` | `/pay/sadad/<token>` | `SADAD_MERCHANT_ID`, `SADAD_TERMINAL_ID`, `SADAD_TERMINAL_KEY` |
+| `digipay` | `POST /api/v1/digipay/callback` | `/pay/digipay/<ticket>` | `DIGIPAY_USERNAME`, `DIGIPAY_PASSWORD`, `DIGIPAY_CLIENT_ID`, `DIGIPAY_CLIENT_SECRET` |
+
+Digipay flow, following the Digipay UPG guide:
+
+1. Log in with `POST oauth/token` (`grant_type=password`, Basic
+   `client_id:client_secret`). The bearer token is cached until shortly before
+   `expires_in`, and requested again once on a `401`.
+2. Create a ticket with `POST tickets/business?type=11` and `amount`,
+   `cellNumber`, `providerId` (the OBH `gatewayOrderId`), `callbackUrl` and a
+   one-item `basketDetailsDto` (product type 3, service). Credit and BNPL
+   purchases require the basket. The customer is redirected to the returned
+   `redirectUrl`.
+3. Digipay POSTs `result`, `trackingCode`, `providerId`, `amount` and `type` to
+   the callback. OBH checks `providerId` and `amount` against the payment, then
+   calls `POST purchases/verify?type=<type>` with the `trackingCode` and
+   `providerId`. Purchases that are not verified are reversed by Digipay
+   automatically.
+4. Network failures and the retryable codes `9004`, `9006` and `9011` keep the
+   payment `pending`. `GET /payments/{reference}` retries verify using the
+   stored callback data.
+
+Not implemented for Digipay yet: `purchases/deliver` (needed for CREDIT and
+BNPL purchases after fulfilment), manual `reverse`, and `refunds`.
 
 - Provider-specific imports, credentials, request signing, and response parsing
   stay under `server/payments/providers`.
@@ -378,6 +478,16 @@ const payment = await obh.startPayment({
 })
 
 const status = await obh.getPayment(payment.reference)
+
+// Checkout page: let the customer pick a gateway OBH currently offers.
+const gateways = await obh.listGateways()
+const installment = await obh.startPayment({
+  externalOrderId: "IG-8822",
+  amount: "245000000",
+  description: "Annual design workspace",
+  gateway: "digipay",
+  customerMobile: "09121234567",
+})
 ```
 
 - The SDK is ESM, server-only, Node.js 20+, and depends on no database or
