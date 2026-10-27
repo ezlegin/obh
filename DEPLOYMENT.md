@@ -83,11 +83,9 @@ Production uses one image containing both apps (`Dockerfile`):
 - `.github/workflows/deploy.yml` connects to the server as `obh-deploy`
   (restricted key + forced command), applies the schema with `prisma db push`,
   and restarts the changed containers;
-- `deploy/compose.yml` runs `obh-db` (PostgreSQL 18), `obh-web` (port 3000,
-  public) and `obh-docs` (port 3200, served at `/docs` through the web app's
-  rewrite);
-- `deploy/backup.sh` and `deploy/crontab` keep nightly dumps and run the webhook
-  worker every minute.
+- `deploy/compose.yml` runs `obh-db` (PostgreSQL 18) and `obh-web` (port 3000,
+  public, including the SDK docs at `/docs` and the webhook retry worker);
+- `deploy/backup.sh` and `deploy/crontab` keep nightly dumps.
 
 See [`deploy/README.md`](deploy/README.md) for DNS, secrets, rollback and the
 server layout.
@@ -116,11 +114,8 @@ pnpm webhooks:process
 every minute from cron, a platform scheduler, or a managed worker. Run only one
 worker at a time unless delivery claiming is added to prevent duplicate attempts.
 
-Recommended crontab entry:
-
-```cron
-* * * * * cd /srv/obh && pnpm webhooks:process >> /var/log/obh-webhooks.log 2>&1
-```
+In production the web server runs this every minute itself
+(`apps/web/instrumentation.ts`; disable with `OBH_WEBHOOK_WORKER=false`).
 
 ## Private document storage
 
@@ -201,7 +196,6 @@ See [`packages/payments/RELEASING.md`](packages/payments/RELEASING.md).
 - No MFA or self-service password reset.
 - No antivirus scanning or object-storage adapter for documents.
 - No automatic provider statement import.
-- No automatic webhook worker scheduling in this repository.
 - No live payment provider certification.
 - No formal revenue-recognition/tax policy.
 - Reports load the selected range in memory and are not paginated/streamed.

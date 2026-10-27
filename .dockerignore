@@ -17,4 +17,3 @@ apps/web/tests
 .env.*
 !**/.env.example
 *.md
-!apps/docs/app/fonts/README.md

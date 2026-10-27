@@ -3,8 +3,7 @@
 # started by hand from the Actions tab to deploy or roll back a commit.
 #
 # It connects as `obh-deploy`, whose key can only run
-# /opt/obh/deploy.sh-wrapper with a commit sha (or "latest") and which apps to
-# restart.
+# /opt/obh/deploy.sh-wrapper with a commit sha (or "latest").
 #
 # Repository secrets:
 #   DEPLOY_SSH_KEY      private key of the server's obh-deploy user
@@ -22,11 +21,6 @@ on:
         description: Full 40-character commit sha to deploy (empty = latest built image)
         required: false
         default: ""
-      target:
-        description: Apps to restart
-        type: choice
-        options: [both, web, docs]
-        default: both
 
 concurrency:
   group: deploy
@@ -46,13 +40,11 @@ jobs:
           EVENT: ${{ github.event_name }}
           RUN_SHA: ${{ github.event.workflow_run.head_sha }}
           INPUT_SHA: ${{ inputs.sha }}
-          INPUT_TARGET: ${{ inputs.target }}
         run: |
           set -eu
           if [ "$EVENT" = "workflow_run" ]; then
             printf '%s' "$RUN_SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "run has no valid commit sha"; exit 1; }
             echo "TARGET=$RUN_SHA" >> "$GITHUB_ENV"
-            echo "TARGET_APPS=both" >> "$GITHUB_ENV"
             exit 0
           fi
           sha=$(printf '%s' "${INPUT_SHA:-}" | tr 'A-Z' 'a-z')
@@ -62,7 +54,6 @@ jobs:
           else
             echo "TARGET=latest" >> "$GITHUB_ENV"
           fi
-          echo "TARGET_APPS=${INPUT_TARGET:-both}" >> "$GITHUB_ENV"
 
       - name: Deploy over SSH
         env:
@@ -72,4 +63,4 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          ssh -i ~/.ssh/deploy -o BatchMode=yes obh-deploy@91.107.179.58 "$TARGET ${TARGET_APPS:-both}"
+          ssh -i ~/.ssh/deploy -o BatchMode=yes obh-deploy@91.107.179.58 "$TARGET"

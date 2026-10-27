@@ -1,25 +1,21 @@
 #!/bin/sh
 # Deploys an image GitHub built. Run on the server:
-#   /opt/obh/deploy.sh                       # latest build, both apps
-#   /opt/obh/deploy.sh <full-sha> [target]   # target: web | docs | both
+#   /opt/obh/deploy.sh               # latest build
+#   /opt/obh/deploy.sh <full-sha>    # a specific commit
 # A rollback is a deploy of an older sha (images are never deleted by the
 # build workflow, so any earlier commit stays pullable).
 #
 # Pulls the image, applies the Prisma schema with it (the project uses
 # `prisma db push`, not migrations), and only when that succeeds restarts the
-# target apps. A failed schema push stops here and leaves everything running
+# web app. A failed schema push stops here and leaves everything running
 # as it was.
 set -eu
 cd /opt/obh
 image=ghcr.io/ezlegin/obh
 tag="${1:-latest}"
-target="${2:-both}"
-case "$target" in
-  web) apps="web" ;;
-  docs) apps="docs" ;;
-  both) apps="web docs" ;;
-  *) echo "target must be web, docs or both" >&2; exit 2 ;;
-esac
+# The docs used to be a separate app; a second argument (web|docs|both) is
+# still accepted from older callers and ignored.
+apps="web"
 # Images are tagged with the full commit sha (or latest).
 if [ "$tag" != latest ] && ! printf '%s' "$tag" | grep -Eqx '[0-9a-f]{40}'; then
   echo "expected a full 40-character commit sha or \"latest\"" >&2
@@ -51,7 +47,7 @@ if ! WEB_TAG="$sha" docker compose run --rm -T web \
   exit 1
 fi
 
-# Pin each target app, remembering the commit it replaces, before compose
+# Pin the app, remembering the commit it replaces, before compose
 # reads .env.
 for app in $apps; do
   var=$(echo "${app}_TAG" | tr a-z A-Z)
@@ -63,15 +59,15 @@ for app in $apps; do
   fi
 done
 
-# Compose recreates only the containers whose image changed.
+# Compose recreates only the containers whose image changed, and removes the
+# retired obh-docs container.
 # shellcheck disable=SC2086
-docker compose up -d $apps
-echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $sha $target" >> deploys.log
+docker compose up -d --remove-orphans $apps
+echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $sha" >> deploys.log
 docker compose ps
 
 # A restart is not success: the shared proxy must serve the site and the
-# /docs subpath (the latter exercises the web -> docs rewrite). Give Next a
-# moment to bind.
+# /docs pages. Give Next a moment to bind.
 smoke_ok=0
 # Through the local proxy over HTTPS (plain HTTP only redirects); before the
 # certificate exists the proxy serves a self-signed one, hence -k.

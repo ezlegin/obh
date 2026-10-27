@@ -19,7 +19,6 @@ and the reusable payment SDK.
 ```text
 apps/
   web/                 Next.js public site and (later) admin/payment API
-  docs/                Reserved for the standalone SDK documentation app
 packages/
   payments/            Server-side @obhco/payments SDK
   ui/                  Shared shadcn/ui primitives and design tokens
@@ -273,7 +272,7 @@ Applied decisions:
 - shared shadcn/ui primitives in `packages/ui`
 - dark-only design system with Inter and fully rounded controls
 - original OBH SVG wordmark used in the navbar, footer, and system map
-- standalone documentation app boundary reserved in `apps/docs` (not built)
+- SDK documentation at `/docs` (`apps/web/app/docs`)
 - published `@obhco/payments` 0.1.0 package, built, pack-checked, and available on
   npm
 - Prisma 7 server-only database boundary with an initial financial schema
@@ -326,7 +325,7 @@ Public:
 - `/terms` — website terms
 - `/login` — manager sign-in (not linked from the public website)
 - `/pay/dev/<session>` — noindex development checkout (TEST only)
-- `/docs` — not implemented; reserved for the separate documentation app
+- `/docs` — SDK documentation
 
 API:
 

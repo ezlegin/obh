@@ -6,11 +6,10 @@ builds Next.js. The public surface is a single origin, `https://obhco.ir`:
 
 | Route | Served by |
 | --- | --- |
-| `/` and the admin/API routes | `obh-web` (Next.js `apps/web`, port 3000) |
-| `/docs` (SDK documentation) | `obh-docs` (Next.js `apps/docs`, port 3200, `basePath: "/docs"`), reached through the web app's rewrite to `http://docs:3200/docs` |
+| `/`, `/docs` (SDK documentation) and the admin/API routes | `obh-web` (Next.js `apps/web`, port 3000) |
 | TLS / host routing | the existing `nginx-proxy` + Let's Encrypt companion containers |
 
-The docs app has no host port. Only `obh-web` joins the proxy's external
+Only `obh-web` joins the proxy's external
 `app_network` and declares `VIRTUAL_HOST`/`LETSENCRYPT_HOST`, so the shared
 proxy is untouched and no second domain/certificate is needed.
 
@@ -47,7 +46,7 @@ The repository's `GITHUB_TOKEN` pushes the image to
 Workflows:
 
 - `.github/workflows/deploy-image.yml` — on every push to `master`, builds the
-  single image (web + docs) and pushes `:latest` and `:<commit sha>`.
+  single image and pushes `:latest` and `:<commit sha>`.
 - `.github/workflows/deploy.yml` — after a successful build, SSHes to the server
   as `obh-deploy` (forced command, sudo only for `deploy.sh`), applies the schema
   and restarts the apps. Run it manually with a commit sha to roll back.
@@ -64,7 +63,7 @@ Workflows:
   .env.production           runtime secrets for the containers
   backups/                  database dumps (last 14)
   deploys.log               commit + target per deploy
-/etc/cron.d/obh             webhook worker (every minute) + nightly backup
+/etc/cron.d/obh             nightly backup
 /etc/logrotate.d/obh        weekly rotation of /var/log/obh.log
 /var/log/obh.log            cron output
 ```
@@ -81,13 +80,13 @@ the cron log rotates weekly.
 ```sh
 mkdir -p /opt/obh/backups
 # copy compose.yml, deploy.sh, deploy.sh-wrapper, backup.sh
-# write .env  (POSTGRES_PASSWORD, WEB_TAG=latest, DOCS_TAG=latest)
+# write .env  (POSTGRES_PASSWORD, WEB_TAG=latest)
 # write .env.production (DATABASE_URL, AUTH_SECRET, APP_URL, …)
 # install /etc/cron.d/obh from crontab
 ```
 
 Then push to `master`. The first deploy creates the schema (`prisma db push`),
-starts Postgres, web and docs, and the proxy issues the TLS certificate once
+starts Postgres and web, and the proxy issues the TLS certificate once
 DNS resolves.
 
 Create the first manager after the database exists (credentials come from the
@@ -109,7 +108,7 @@ Then remove `ADMIN_PASSWORD` from `.env.production`.
   current and previous tags locally).
 - **Logs**: `docker compose -f /opt/obh/compose.yml logs -f web`
 - **Status**: `docker compose -f /opt/obh/compose.yml ps`
-- **Manual deploy**: `/opt/obh/deploy.sh <sha> [web|docs|both]`
+- **Manual deploy**: `/opt/obh/deploy.sh <sha>`
 
 ## Backups
 
@@ -124,5 +123,5 @@ dump before deploying a commit that changes `apps/web/prisma/schema.prisma`.
 ## Resource notes
 
 The VPS has ~3.7 GB RAM and other live apps. The stack is capped at
-512 MB (Postgres) + 1 GB (web) + 512 MB (docs); tweak `mem_limit` in
+512 MB (Postgres) + 1 GB (web); tweak `mem_limit` in
 `compose.yml` if the host starts swapping.

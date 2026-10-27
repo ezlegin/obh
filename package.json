@@ -6,7 +6,6 @@
     "build": "turbo build",
     "dev": "turbo dev",
     "dev:web": "pnpm --filter web dev --port 3100",
-    "dev:docs": "pnpm --filter docs dev --port 3200",
     "lint": "turbo lint",
     "format": "turbo format",
     "typecheck": "turbo typecheck",
