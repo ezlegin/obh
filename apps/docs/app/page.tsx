@@ -37,7 +37,7 @@ const sections = [
 
 const statusFacts = [
   { label: "Package version", value: "0.1.0" },
-  { label: "Published to npm", value: "No — prepared for review" },
+  { label: "Published to npm", value: "Yes — @obhco/payments@0.1.0" },
   { label: "Environment", value: "TEST only" },
   { label: "Real provider tested", value: "No" },
   { label: "Runtime", value: "Node.js 20+" },
@@ -61,7 +61,7 @@ export default function IntroductionPage() {
     >
       <h2 id="what-is-this">What this package is</h2>
       <p>
-        <code>@obh/payments</code> is the official client for talking to OBH
+        <code>@obhco/payments</code> is the official client for talking to OBH
         from one of the connected services in the OBH ecosystem. If your
         application needs to charge a customer and record the result, this
         package is the supported path.
@@ -145,7 +145,7 @@ export default function IntroductionPage() {
       <CodeBlock
         filename="checkout.ts"
         language="ts"
-        code={`import { OBHPayments, isOBHPaymentsError } from "@obh/payments"
+        code={`import { OBHPayments, isOBHPaymentsError } from "@obhco/payments"
 
 const obh = new OBHPayments({
   secretKey: process.env.OBH_SERVICE_KEY!,

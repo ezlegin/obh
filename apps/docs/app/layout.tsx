@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     template: "%s — OBH Payments SDK",
   },
   description:
-    "Documentation for @obh/payments, the server-side TypeScript SDK for creating and verifying OBH payments.",
+    "Documentation for @obhco/payments, the server-side TypeScript SDK for creating and verifying OBH payments.",
   applicationName: "OBH Payments SDK",
   category: "technology",
   keywords: [

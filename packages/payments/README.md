@@ -1,11 +1,11 @@
-# @obh/payments
+# @obhco/payments
 
 Server-side TypeScript SDK for the versioned OBH payment API.
 
 ## Install
 
 ```bash
-pnpm add @obh/payments
+pnpm add @obhco/payments
 ```
 
 The package is ESM, requires Node.js 20+, and must run on a server. Never ship a
@@ -14,7 +14,7 @@ service credential to a browser.
 ## Usage
 
 ```ts
-import { OBHPayments, isOBHPaymentsError } from "@obh/payments"
+import { OBHPayments, isOBHPaymentsError } from "@obhco/payments"
 
 const obh = new OBHPayments({
   secretKey: process.env.OBH_SERVICE_KEY!,

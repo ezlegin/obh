@@ -144,7 +144,8 @@ service.
 
 ## SDK release process
 
-`@obh/payments` is version `0.1.0` and is **not published**.
+`@obhco/payments` is version `0.1.0` and is published on npm as
+`@obhco/payments`.
 
 1. Review API/contract compatibility and update `CHANGELOG.md`.
 2. Bump the package version using semver.

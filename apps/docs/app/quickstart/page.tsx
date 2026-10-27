@@ -11,7 +11,7 @@ import { Table } from "@/components/table"
 export const metadata: Metadata = {
   title: "Quickstart",
   description:
-    "Install @obh/payments, configure a service credential, and accept your first test payment.",
+    "Install @obhco/payments, configure a service credential, and accept your first test payment.",
 }
 
 const sections = [
@@ -104,10 +104,10 @@ export default function QuickstartPage() {
         filename="Terminal"
         language="bash"
         code={`# In this monorepo, add the workspace dependency
-pnpm --filter web add @obh/payments@workspace:*
+pnpm --filter web add @obhco/payments@workspace:*
 
 # The package is not on npm yet, so a public install is not possible
-# pnpm add @obh/payments`}
+# pnpm add @obhco/payments`}
       />
 
       <p>
@@ -134,7 +134,7 @@ OBH_SIMULATOR="true"`}
       <CodeBlock
         filename="lib/obh.ts"
         language="ts"
-        code={`import { OBHPayments } from "@obh/payments"
+        code={`import { OBHPayments } from "@obhco/payments"
 
 // Requests automatically target https://obhco.ir/api/v1
 export const obh = new OBHPayments({
@@ -161,7 +161,7 @@ export const obh = new OBHPayments({
       <CodeBlock
         filename="TypeScript"
         language="ts"
-        code={`import { OBHPayments } from "@obh/payments"
+        code={`import { OBHPayments } from "@obhco/payments"
 
 const obh = new OBHPayments({
   secretKey: "svc_2f4a9c18e0d14b2a.example-secret-value",

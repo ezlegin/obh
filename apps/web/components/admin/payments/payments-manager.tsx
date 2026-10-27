@@ -391,7 +391,7 @@ function PaymentsManager({ payments, services }: PaymentsManagerProps) {
                   : environmentFilter === "LIVE" && counts.test > 0
                     ? `There are ${counts.test} test payment${counts.test === 1 ? "" : "s"} recorded. Switch the filter to Test or All to view them.`
                     : canCreate
-                      ? "Create a TEST payment or initiate one from a connected service via @obh/payments."
+                      ? "Create a TEST payment or initiate one from a connected service via @obhco/payments."
                       : "Register a connected service first."
               }
               action={

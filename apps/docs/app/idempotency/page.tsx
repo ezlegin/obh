@@ -233,7 +233,7 @@ const payment = await obh.startPayment({
       <CodeBlock
         filename="lib/start-payment.ts"
         language="ts"
-        code={`import { isOBHPaymentsError } from "@obh/payments"
+        code={`import { isOBHPaymentsError } from "@obhco/payments"
 
 const sleep = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms))

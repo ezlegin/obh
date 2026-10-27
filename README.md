@@ -21,15 +21,14 @@ apps/
   web/                 Next.js public site and (later) admin/payment API
   docs/                Reserved for the standalone SDK documentation app
 packages/
-  payments/            Reserved @obh/payments SDK scaffold (no implementation)
+  payments/            Server-side @obhco/payments SDK
   ui/                  Shared shadcn/ui primitives and design tokens
   eslint-config/       Shared ESLint configuration
   typescript-config/   Shared TypeScript configuration
 ```
 
 The documentation application must remain separate from `apps/web`. The
-`@obh/payments` package name is provisional until the SDK architecture is
-approved.
+`@obhco/payments` package is published on npm at version `0.1.0`.
 
 ## Local development
 
@@ -128,8 +127,8 @@ See [`apps/web/AUTH.md`](apps/web/AUTH.md).
 
 The versioned API contract and security model are documented in
 [`apps/web/PAYMENT_API.md`](apps/web/PAYMENT_API.md). The server-side SDK is
-[`@obh/payments`](packages/payments), version `0.1.0`, prepared for review but
-**not published**.
+[`@obhco/payments`](packages/payments), version `0.1.0`, published on npm as
+[`@obhco/payments`](https://www.npmjs.com/package/@obhco/payments).
 
 Implemented in Step 5:
 
@@ -156,7 +155,7 @@ Implemented in Step 6:
 - server-side development verification producing completed/failed records
 - signed `payment.completed` / `payment.failed` webhooks with retries
 - encrypted per-service webhook signing secrets and rotation in admin
-- `@obh/payments` with typed errors, timeouts, idempotency support, and a
+- `@obhco/payments` with typed errors, timeouts, idempotency support, and a
   server-only guard
 - local API/SDK integration tests covering cross-service isolation, idempotency,
   signed webhooks, retry delivery, and revoked credentials
@@ -262,7 +261,7 @@ Completed:
 - Step 3 — authentication, login, protected admin layout, and route scaffolds
 - Step 4 — interactive dashboard and shared admin components
 - Step 5 — payment platform, provider boundary, services, and gateway foundation
-- Step 6 — versioned payment API, signed notifications, and `@obh/payments` SDK
+- Step 6 — versioned payment API, signed notifications, and `@obhco/payments` SDK
 - Step 7 — income, expenses, categories, payment sources, recurring rules, and documents
 - Step 8 — shareholders, ownership history, monthly distributions, and payouts
 - Step 9 — financial reports, CSV exports, reconciliation, and consistency checks
@@ -275,8 +274,8 @@ Applied decisions:
 - dark-only design system with Inter and fully rounded controls
 - original OBH SVG wordmark used in the navbar, footer, and system map
 - standalone documentation app boundary reserved in `apps/docs` (not built)
-- publishable `@obh/payments` 0.1.0 package boundary, built and pack-checked but
-  not published
+- published `@obhco/payments` 0.1.0 package, built, pack-checked, and available on
+  npm
 - Prisma 7 server-only database boundary with an initial financial schema
   applied through `prisma db push`
 - Auth.js v5 JWT sessions, manager provisioning CLI, server-side admin guard,

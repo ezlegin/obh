@@ -1,12 +1,12 @@
 # OBH Payment API contract — v1
 
 Status: **implemented in Step 6 for TEST credentials and the development
-adapter.** The `@obh/payments` SDK at version `0.1.0` is prepared but not
+adapter.** The `@obhco/payments` SDK at version `0.1.0` is prepared but not
 published. No real provider or live payment has been tested. LIVE credentials are
 not issued.
 
 This document defines the service-facing API and the behavior implemented by the
-`@obh/payments` package. Breaking changes require a new version.
+`@obhco/payments` package. Breaking changes require a new version.
 
 ## 1. Versioning and transport
 
@@ -312,7 +312,7 @@ type PaymentProviderAdapter = {
 
 - Provider-specific imports, credentials, request signing, and response parsing
   stay under `server/payments/providers`.
-- No provider SDK is imported by browser code or by `@obh/payments`.
+- No provider SDK is imported by browser code or by `@obhco/payments`.
 - Provider calls are not trusted merely because a request/redirect arrived.
 - The development adapter is local-only, supports TEST only, never contacts a
   network, and explicitly marks its results as simulated. It is disabled in
@@ -337,7 +337,7 @@ Implemented:
 - Scoped payment retrieval and cross-service 404 isolation.
 - Payment lifecycle events, verification records, and audit logs.
 - Signed webhook notifications, retry scheduling, delivery history, and worker.
-- `@obh/payments` 0.1.0: typed client, idempotency support, timeouts, typed
+- `@obhco/payments` 0.1.0: typed client, idempotency support, timeouts, typed
   errors, and server-only guard.
 - Unit tests and a local API/SDK integration test covering isolation,
   idempotency, checkout completion, webhook signature verification, retry
@@ -350,7 +350,7 @@ Not implemented or not verified:
 - Automatic scheduling of the webhook retry worker.
 - Cancellation and expiry notification events.
 - Webhook secret recovery after loss; rotate the secret instead.
-- npm publication. The package is prepared for review only.
+- Publishing future SDK versions; `0.1.0` is published on npm.
 - The standalone documentation application.
 
 The SDK must not be described as production-ready or integrated with a real
@@ -358,11 +358,11 @@ payment provider until an authorized environment test is completed.
 
 ## 11. SDK
 
-Package: `@obh/payments` version `0.1.0` at
+Package: `@obhco/payments` version `0.1.0` at
 [`packages/payments`](../../packages/payments).
 
 ```ts
-import { OBHPayments } from "@obh/payments"
+import { OBHPayments } from "@obhco/payments"
 
 const obh = new OBHPayments({
   secretKey: process.env.OBH_SERVICE_KEY!,

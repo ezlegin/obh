@@ -242,7 +242,7 @@ type OBHPaymentsOptions = {
       <CodeBlock
         language="ts"
         code={`// In a browser bundle, this throws:
-// "@obh/payments is server-only and must not run in browser code."
+// "@obhco/payments is server-only and must not run in browser code."
 const obh = new OBHPayments({ /* ... */ })`}
       />
 
@@ -257,7 +257,7 @@ const obh = new OBHPayments({ /* ... */ })`}
         language="ts"
         code={`import "server-only"
 
-import { OBHPayments } from "@obh/payments"
+import { OBHPayments } from "@obhco/payments"
 
 export const obh = new OBHPayments({
   secretKey: process.env.OBH_SERVICE_KEY!,

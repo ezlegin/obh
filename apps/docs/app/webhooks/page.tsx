@@ -39,7 +39,7 @@ export default function WebhooksPage() {
     >
       <Callout variant="warning" title="The SDK does not handle webhooks">
         <p>
-          There is no webhook helper in <code>@obh/payments</code>. Signatures
+          There is no webhook helper in <code>@obhco/payments</code>. Signatures
           must be verified by your server with the per-service webhook secret.
           The secret is separate from your API credential and is shown when
           created or rotated in OBH Admin.

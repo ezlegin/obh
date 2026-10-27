@@ -137,7 +137,7 @@ console.log(payment.verifiedAt)   // string | null`}
         filename="lib/wait-for-payment.ts"
         language="ts"
         code={`import { obh } from "@/lib/obh"
-import type { Payment } from "@obh/payments"
+import type { Payment } from "@obhco/payments"
 
 const sleep = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms))

@@ -4,7 +4,7 @@ import { createServer } from "node:http"
 
 import { PrismaPg } from "@prisma/adapter-pg"
 import { config } from "dotenv"
-import { OBHPayments, isOBHPaymentsError } from "@obh/payments"
+import { OBHPayments, isOBHPaymentsError } from "@obhco/payments"
 
 import { PrismaClient } from "../lib/generated/prisma/client"
 import { generateServiceCredential } from "../server/payments/service-credentials"

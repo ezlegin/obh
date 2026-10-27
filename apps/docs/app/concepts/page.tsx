@@ -32,7 +32,7 @@ const cast = [
   },
   {
     name: "Your server",
-    code: "@obh/payments",
+    code: "@obhco/payments",
     body: "Creates the payment with your service credential, stores the reference, and verifies status.",
   },
   {

@@ -155,7 +155,7 @@ export function getAdjacentDocs(href: string) {
 }
 
 export const docMeta = {
-  packageName: "@obh/payments",
+  packageName: "@obhco/payments",
   version: "0.1.0",
   apiVersion: "v1",
   apiBasePath: "/api/v1",

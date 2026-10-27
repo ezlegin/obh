@@ -1,7 +1,7 @@
-# Releasing `@obh/payments`
+# Releasing `@obhco/payments`
 
 Current version: **0.1.0**  
-Status: **prepared, not published**
+Status: **published on npm as `@obhco/payments@0.1.0`**
 
 ## Versioning policy
 
@@ -17,12 +17,12 @@ Status: **prepared, not published**
 ## Pre-release checks
 
 ```bash
-pnpm --filter @obh/payments typecheck
-pnpm --filter @obh/payments test
-pnpm --filter @obh/payments build
+pnpm --filter @obhco/payments typecheck
+pnpm --filter @obhco/payments test
+pnpm --filter @obhco/payments build
 pnpm test
 pnpm test:integration   # requires the local API and test database
-pnpm --filter @obh/payments pack --dry-run
+pnpm --filter @obhco/payments pack --dry-run
 ```
 
 Review the tarball contents. It must contain only `dist/`, `README.md`,
@@ -34,8 +34,8 @@ private infrastructure secrets, tests, `.env` files, or local credentials.
 Do **not** publish without explicit approval and npm organization access.
 
 ```bash
-pnpm --filter @obh/payments build
-pnpm --filter @obh/payments pack
+pnpm --filter @obhco/payments build
+pnpm --filter @obhco/payments pack
 npm publish --access public
 ```
 
@@ -47,7 +47,7 @@ example `npm publish --tag next`, until the SDK review is complete.
 
 ## After publishing
 
-- Verify `npm view @obh/payments@<version>` and the package entrypoints from a
+- Verify `npm view @obhco/payments@<version>` and the package entrypoints from a
   clean consumer project.
 - Keep `CHANGELOG.md` and the API compatibility notes updated.
 - Announce only the capabilities that were actually verified. Real-provider

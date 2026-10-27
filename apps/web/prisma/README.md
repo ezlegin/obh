@@ -159,7 +159,7 @@ external order for the same service.
 Only `lib/db/client.ts` constructs Prisma Client. It imports `server-only`, uses
 the PostgreSQL driver adapter, and is reused across development hot reloads.
 Query and transaction code belongs under `server/`. Shared packages, including
-`@obh/payments`, must not import this database module or generated Prisma code.
+`@obhco/payments`, must not import this database module or generated Prisma code.
 
 ## Schema workflow
 

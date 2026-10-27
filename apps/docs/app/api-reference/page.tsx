@@ -43,8 +43,8 @@ export default function ApiReferencePage() {
       <CodeBlock
         language="ts"
         code={`// Package exports
-export { OBHPayments } from "@obh/payments"
-export { OBHPaymentsError, isOBHPaymentsError } from "@obh/payments"
+export { OBHPayments } from "@obhco/payments"
+export { OBHPaymentsError, isOBHPaymentsError } from "@obhco/payments"
 export type {
   APIErrorDetail,
   APIErrorEnvelope,
@@ -55,7 +55,7 @@ export type {
   PaymentStatus,
   StartPaymentInput,
   VerifyReturnInput,
-} from "@obh/payments"`}
+} from "@obhco/payments"`}
       />
 
       <h3>Class OBHPayments</h3>
@@ -119,7 +119,7 @@ function isOBHPaymentsError(error: unknown): error is OBHPaymentsError`}
 
       <h2 id="types">TypeScript types</h2>
       <CodeBlock
-        filename="@obh/payments"
+        filename="@obhco/payments"
         language="ts"
         code={`type PaymentStatus =
   | "pending"
@@ -243,7 +243,7 @@ type APIErrorEnvelope = {
         </tr>
         <tr>
           <td><code>User-Agent</code></td>
-          <td><code>@obh/payments/0.1.0</code></td>
+          <td><code>@obhco/payments/0.1.0</code></td>
           <td>Set by the SDK for diagnostics.</td>
         </tr>
       </Table>

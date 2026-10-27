@@ -61,7 +61,7 @@ export default function NextGuidePage() {
         language="ts"
         code={`import "server-only"
 
-import { OBHPayments } from "@obh/payments"
+import { OBHPayments } from "@obhco/payments"
 
 if (!process.env.OBH_SERVICE_KEY) {
   throw new Error("OBH_SERVICE_KEY is not configured.")
@@ -89,7 +89,7 @@ export const obh = new OBHPayments({
         filename="app/api/checkout/route.ts"
         language="ts"
         code={`import { NextResponse } from "next/server"
-import { isOBHPaymentsError } from "@obh/payments"
+import { isOBHPaymentsError } from "@obhco/payments"
 
 import { obh } from "@/lib/obh"
 import { db } from "@/lib/db"
@@ -163,7 +163,7 @@ export async function POST(request: Request) {
         filename="app/payments/return/page.tsx"
         language="tsx"
         code={`import { notFound } from "next/navigation"
-import { isOBHPaymentsError, type Payment } from "@obh/payments"
+import { isOBHPaymentsError, type Payment } from "@obhco/payments"
 
 import { obh } from "@/lib/obh"
 

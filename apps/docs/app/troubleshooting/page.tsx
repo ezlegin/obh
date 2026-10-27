@@ -186,7 +186,7 @@ export default function TroubleshootingPage() {
       <p>
         The message is explicit:{" "}
         <code>
-          @obh/payments is server-only and must not run in browser code.
+          @obhco/payments is server-only and must not run in browser code.
         </code>
       </p>
       <ul>
@@ -204,7 +204,7 @@ export default function TroubleshootingPage() {
         language="ts"
         code={`import "server-only" // fails the build if imported by a client component
 
-import { OBHPayments } from "@obh/payments"
+import { OBHPayments } from "@obhco/payments"
 
 export const obh = new OBHPayments({
   secretKey: process.env.OBH_SERVICE_KEY!,
@@ -326,10 +326,10 @@ obh.startPayment({ ...input, idempotencyKey: \`order-\${id}-attempt-\${n}\` })`}
         }
       >
         <tr>
-          <td><code>Cannot find module '@obh/payments'</code></td>
+          <td><code>Cannot find module '@obhco/payments'</code></td>
           <td>
             The workspace dependency is missing. Add{" "}
-            <code>"@obh/payments": "workspace:*"</code> and reinstall. The
+            <code>"@obhco/payments": "workspace:*"</code> and reinstall. The
             package is not on npm.
           </td>
         </tr>
@@ -343,7 +343,7 @@ obh.startPayment({ ...input, idempotencyKey: \`order-\${id}-attempt-\${n}\` })`}
         <tr>
           <td>Types resolve to <code>dist</code> but the folder is empty</td>
           <td>
-            Run <code>pnpm --filter @obh/payments build</code> first.
+            Run <code>pnpm --filter @obhco/payments build</code> first.
           </td>
         </tr>
         <tr>
@@ -364,8 +364,8 @@ obh.startPayment({ ...input, idempotencyKey: \`order-\${id}-attempt-\${n}\` })`}
       <h2 id="faq">FAQ</h2>
       <h3>Is the SDK production-ready?</h3>
       <p>
-        No. It is prepared for internal review and tested locally only. It is
-        not published and has never processed a real payment.
+        No. It is published on npm as `@obhco/payments@0.1.0` and tested locally
+        only. It has never processed a real payment.
       </p>
 
       <h3>Can I use it in a browser or React client component?</h3>

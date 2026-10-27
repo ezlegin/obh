@@ -1,7 +1,7 @@
 # OBH Payments SDK documentation
 
 A standalone Next.js application that documents
-[`@obh/payments`](../../packages/payments) — the server-side TypeScript SDK for
+[`@obhco/payments`](../../packages/payments) — the server-side TypeScript SDK for
 the versioned OBH payment API.
 
 This app is intentionally independent of `apps/web`. It has no database, no
@@ -31,7 +31,7 @@ From the repository root, `pnpm dev:docs` is a shortcut for the dev server.
 The content is written for a reader who has never integrated a payment
 provider. It documents the SDK as it exists at version `0.1.0`:
 
-- TEST-only, not published, not production-ready.
+- TEST-only, published on npm as `@obhco/payments@0.1.0`, not production-ready.
 - No real provider or live payment has been tested.
 - Webhook signing is the integrating service's responsibility.
 

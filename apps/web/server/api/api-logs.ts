@@ -287,7 +287,7 @@ export async function getApiLogsForAdmin(): Promise<{
       errorCode: null,
       errorMessage: null,
       ip: null,
-      userAgent: "@obh/payments",
+      userAgent: "@obhco/payments",
       requestBody: {
         externalOrderId: payment.externalOrderId,
         amount: payment.amount.toFixed(0),

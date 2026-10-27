@@ -51,5 +51,5 @@ Rules:
   The development checkout is not proof of a real payment.
 - Reports distinguish TEST from LIVE. TEST payments are excluded from financial
   totals and profit.
-- `@workspace/ui` and `@obh/payments` remain independent of the application
+- `@workspace/ui` and `@obhco/payments` remain independent of the application
   database.

@@ -1,8 +1,8 @@
-# @obh/payments changelog
+# @obhco/payments changelog
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-10-27
 
-Prepared for review, not published.
+First public release on npm as `@obhco/payments`.
 
 - Added `OBHPayments` with `startPayment` and `getPayment`.
 - Added automatic or caller-supplied idempotency keys.

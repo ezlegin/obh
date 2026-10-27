@@ -202,7 +202,7 @@ export class OBHPayments {
   constructor(options: OBHPaymentsOptions) {
     if (typeof window !== "undefined") {
       throw new Error(
-        "@obh/payments is server-only and must not run in browser code."
+        "@obhco/payments is server-only and must not run in browser code."
       )
     }
 
@@ -336,7 +336,7 @@ export class OBHPayments {
           Accept: "application/json",
           Authorization: `Bearer ${this.#secretKey}`,
           "Content-Type": "application/json",
-          "User-Agent": `@obh/payments/${SDK_VERSION}`,
+          "User-Agent": `@obhco/payments/${SDK_VERSION}`,
           ...init.headers,
         },
       })

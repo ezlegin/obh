@@ -11,7 +11,7 @@ export const searchIndex: SearchEntry[] = [
   {
     page: "Introduction",
     pageHref: "/",
-    title: "What is @obh/payments?",
+    title: "What is @obhco/payments?",
     hash: "what-is-this",
     description:
       "A server-side TypeScript SDK for creating and reading OBH payments.",
@@ -31,7 +31,7 @@ export const searchIndex: SearchEntry[] = [
     pageHref: "/quickstart",
     title: "Install the SDK",
     hash: "install",
-    description: "Add @obh/payments to a Node.js or Next.js server project.",
+    description: "Add @obhco/payments to a Node.js or Next.js server project.",
     keywords: "install pnpm npm workspace dependency",
   },
   {

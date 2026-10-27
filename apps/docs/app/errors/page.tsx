@@ -50,7 +50,7 @@ export default function ErrorsPage() {
 
       <CodeBlock
         language="ts"
-        code={`import { isOBHPaymentsError } from "@obh/payments"
+        code={`import { isOBHPaymentsError } from "@obhco/payments"
 
 try {
   await obh.startPayment(input)
@@ -339,7 +339,7 @@ try {
       <CodeBlock
         filename="A production-shaped handler"
         language="ts"
-        code={`import { isOBHPaymentsError } from "@obh/payments"
+        code={`import { isOBHPaymentsError } from "@obhco/payments"
 
 type CheckoutFailure =
   | { kind: "retry"; message: string }
