@@ -35,11 +35,13 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     APP_VERSION=$APP_VERSION \
     APP_BUILT_AT=$APP_BUILT_AT
-RUN corepack enable && corepack prepare pnpm@11.25.0 --activate
+RUN corepack enable
 COPY --from=build --chown=node:node /app /app
 # The private document volume is initialised from this directory; it must be
 # writable by the runtime user.
 RUN mkdir -p /app/storage/expense-documents && chown -R node:node /app/storage
 USER node
+# Cached in the node user's home, so starting a container needs no download.
+RUN corepack prepare pnpm@11.25.0 --activate
 EXPOSE 3000 3200
 CMD ["pnpm", "--filter", "web", "start"]
