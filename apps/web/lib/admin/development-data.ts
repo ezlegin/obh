@@ -97,7 +97,7 @@ export const developmentDashboardData = {
     {
       id: "demo-payment-3",
       reference: "OBH-12D7E8",
-      service: "AiGENE",
+      service: "Afarin Ai",
       description: "API credits purchase",
       provider: "Sadad (Bank Melli)",
       amount: 92_500_000,
@@ -110,7 +110,7 @@ export const developmentDashboardData = {
     {
       id: "demo-payment-4",
       reference: "OBH-5A61C3",
-      service: "Chininour",
+      service: "Nour Porcelain",
       description: "Storefront order",
       provider: "Sadad (Bank Melli)",
       amount: 54_800_000,
