@@ -47,7 +47,7 @@ const statusFacts = [
 export default function IntroductionPage() {
   return (
     <DocPage
-      href="/docs/docs"
+      href="/docs"
       eyebrow="Documentation"
       title="OBH Payments SDK"
       description={

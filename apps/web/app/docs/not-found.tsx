@@ -16,7 +16,7 @@ export default function NotFound() {
       </p>
       <div className="mt-6 flex flex-wrap gap-3 text-[0.8rem]">
         <Link
-          href="/docs/docs"
+          href="/docs"
           className="rounded-lg border border-white/12 bg-white/[0.04] px-3.5 py-2 text-foreground transition-colors hover:bg-white/[0.07]"
         >
           Introduction

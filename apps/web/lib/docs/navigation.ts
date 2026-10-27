@@ -37,7 +37,7 @@ export const navigation: NavGroup[] = [
     items: [
       {
         title: "Introduction",
-        href: "/docs/docs",
+        href: "/docs",
         description: "What the OBH Payment SDK is and when to use it.",
         icon: BookOpen,
       },

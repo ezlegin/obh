@@ -9,7 +9,7 @@ export function DocsHeader() {
     <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#080808]/85 backdrop-blur-xl">
       <div className="docs-shell flex h-16 items-center gap-4">
         <Link
-          href="/docs/docs"
+          href="/docs"
           aria-label="OBH Payments documentation home"
           className="flex shrink-0 items-center gap-3 rounded-lg focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
         >

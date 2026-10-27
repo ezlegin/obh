@@ -20,7 +20,7 @@ export function DocsSidebar() {
             adapter only.
           </p>
           <Link
-            href="/docs/docs#status"
+            href="/docs#status"
             className="mt-2.5 inline-flex items-center gap-1 text-[0.7rem] text-white/60 transition-colors hover:text-foreground"
           >
             Read the status

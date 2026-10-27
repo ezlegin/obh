@@ -28,7 +28,7 @@ export const searchIndex: SearchEntry[] = [
   },
   {
     page: "Introduction",
-    pageHref: "/docs/docs",
+    pageHref: "/docs",
     title: "What is @obhco/payments?",
     hash: "what-is-this",
     description:
@@ -37,7 +37,7 @@ export const searchIndex: SearchEntry[] = [
   },
   {
     page: "Introduction",
-    pageHref: "/docs/docs",
+    pageHref: "/docs",
     title: "The one rule: the server decides",
     hash: "the-one-rule",
     description:
