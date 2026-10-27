@@ -69,6 +69,29 @@ docker compose up -d $apps
 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $sha $target" >> deploys.log
 docker compose ps
 
+# A restart is not success: the shared proxy must serve the site and the
+# /docs subpath (the latter exercises the web -> docs rewrite). Give Next a
+# moment to bind.
+smoke_ok=0
+code_web=""; code_docs=""
+for _ in $(seq 1 30); do
+  code_web=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: obhco.ir' \
+    http://127.0.0.1/ 2>/dev/null || true)
+  code_docs=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: obhco.ir' \
+    http://127.0.0.1/docs 2>/dev/null || true)
+  if [ "$code_web" = 200 ] && [ "$code_docs" = 200 ]; then
+    smoke_ok=1
+    break
+  fi
+  sleep 2
+done
+if [ "$smoke_ok" != 1 ]; then
+  echo "smoke check failed: / -> ${code_web:-no response}, /docs -> ${code_docs:-no response}" >&2
+  docker compose ps >&2
+  exit 1
+fi
+echo "smoke check passed: / and /docs return 200 through the proxy"
+
 # Keep every image an app runs or can roll back to; remove other OBH images
 # only — other apps' images are never touched.
 keep=$(sed -n 's/^\(WEB\|DOCS\)_\(PREVIOUS_\)\{0,1\}TAG=//p' .env \

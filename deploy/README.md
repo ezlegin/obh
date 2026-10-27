@@ -92,7 +92,8 @@ Then remove `ADMIN_PASSWORD` from `.env.production`.
 
 ## Day-to-day
 
-- **Deploy**: merge/push to `master`. Watch the two workflow runs.
+- **Deploy**: merge/push to `master`. Watch the two workflow runs. A deploy only
+  succeeds after the proxy returns 200 for both `/` and `/docs`.
 - **Roll back**: Actions → *Deploy to production* → Run workflow → full sha of
   the commit to restore (images are kept in GHCR, and the server keeps the
   current and previous tags locally).
