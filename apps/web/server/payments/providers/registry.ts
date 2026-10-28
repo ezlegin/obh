@@ -17,12 +17,20 @@ import type {
   PaymentProviderAdapter,
   ProviderEnvironmentValue,
 } from "./types"
+import {
+  getZarinpalConfigStatus,
+  isZarinpalSimulatorEnabled,
+  ZARINPAL_PROVIDER_CODE,
+  ZARINPAL_PROVIDER_NAME,
+  zarinpalPaymentAdapter,
+} from "./zarinpal"
 
 /** Gateway used when a service does not choose one. */
 export const DEFAULT_PROVIDER_CODE = SADAD_PROVIDER_CODE
 
 const adapters = new Map<string, PaymentProviderAdapter>([
   [sadadPaymentAdapter.code, sadadPaymentAdapter],
+  [zarinpalPaymentAdapter.code, zarinpalPaymentAdapter],
   [digipayPaymentAdapter.code, digipayPaymentAdapter],
 ])
 
@@ -96,9 +104,14 @@ export {
   digipayPaymentAdapter,
   getDigipayConfigStatus,
   getSadadConfigStatus,
+  getZarinpalConfigStatus,
   isDigipaySimulatorEnabled,
   isSadadSimulatorEnabled,
   SADAD_PROVIDER_CODE,
   SADAD_PROVIDER_NAME,
   sadadPaymentAdapter,
+  isZarinpalSimulatorEnabled,
+  ZARINPAL_PROVIDER_CODE,
+  ZARINPAL_PROVIDER_NAME,
+  zarinpalPaymentAdapter,
 }

@@ -6,6 +6,7 @@
   the gateways OBH offers and let the customer choose one.
 - Added `gateway` and `customerMobile` to `startPayment`. Digipay installments
   (`"digipay"`) require `customerMobile`. The default gateway stays Sadad.
+- Added the Zarinpal card gateway (`"zarinpal"`, minimum 10,000 R).
 - Added `payment.gateway`. Responses from servers without the field are still
   accepted.
 - Added `PaymentGateway`, `PaymentGatewayCode`, `PaymentGatewayKind`, and

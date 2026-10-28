@@ -386,6 +386,7 @@ Registered adapters (`server/payments/providers/registry.ts`):
 | Code | Callback | TEST simulator | LIVE credentials |
 | --- | --- | --- | --- |
 | `sadad` | `POST /api/v1/sadad/callback` | `/pay/sadad/<token>` | `SADAD_MERCHANT_ID`, `SADAD_TERMINAL_ID`, `SADAD_TERMINAL_KEY` |
+| `zarinpal` | `GET /api/v1/zarinpal/callback` | `/pay/zarinpal/<authority>` | `ZARINPAL_MERCHANT_ID` (`ZARINPAL_SANDBOX=true` for the sandbox) |
 | `digipay` | `POST /api/v1/digipay/callback` | `/pay/digipay/<ticket>` | `DIGIPAY_USERNAME`, `DIGIPAY_PASSWORD`, `DIGIPAY_CLIENT_ID`, `DIGIPAY_CLIENT_SECRET` |
 
 Digipay flow, following the Digipay UPG guide:

@@ -29,6 +29,7 @@ import {
   isKnownPaymentProvider,
   providerSupportsEnvironment,
   SADAD_PROVIDER_CODE,
+  ZARINPAL_PROVIDER_CODE,
 } from "@/server/payments/providers/registry"
 import { describeSadadCode } from "@/server/payments/providers/sadad"
 import { createPaymentRequestFingerprint } from "@/server/payments/request-fingerprint"
@@ -694,6 +695,10 @@ export async function getSadadSimulatorView(token: string) {
   return getSimulatorView(SADAD_PROVIDER_CODE, token)
 }
 
+export async function getZarinpalSimulatorView(authority: string) {
+  return getSimulatorView(ZARINPAL_PROVIDER_CODE, authority)
+}
+
 export async function getDigipaySimulatorView(ticket: string) {
   return getSimulatorView(DIGIPAY_PROVIDER_CODE, ticket)
 }
@@ -992,6 +997,88 @@ export async function processDigipayCallback(input: DigipayCallbackPayload) {
       method: "digipay/callback",
       resultCode: 9007,
       failureText: "پرداخت دیجی‌پی ناموفق بود یا توسط کاربر لغو شد.",
+      metadata: callbackPayload,
+    })
+  }
+
+  return verifyPendingPayment(payment.id, callbackPayload)
+}
+
+/**
+ * Zarinpal redirects the customer to the callback URL with `Authority` and
+ * `Status` (`OK`/`NOK`) in the query string.
+ */
+export type ZarinpalCallbackPayload = {
+  Authority?: string | null
+  Status?: string | null
+}
+
+/**
+ * Processes an inbound Zarinpal GET (`/api/v1/zarinpal/callback`), runs
+ * `payment/verify` when `Status=OK`, and returns the redirect target for the
+ * customer's browser.
+ */
+export async function processZarinpalCallback(input: ZarinpalCallbackPayload) {
+  const db = getDb()
+  const authority = input.Authority?.trim()
+
+  if (!authority) {
+    throw new ApiError(
+      400,
+      "INVALID_CALLBACK",
+      "Zarinpal callback is missing Authority."
+    )
+  }
+
+  const payment = await db.payment.findFirst({
+    where: {
+      providerSessionId: authority,
+      provider: { code: ZARINPAL_PROVIDER_CODE },
+    },
+  })
+
+  if (!payment) {
+    throw new ApiError(404, "PAYMENT_NOT_FOUND", "Payment was not found.")
+  }
+
+  if (payment.status !== "PENDING") {
+    return finalizedOutcome(payment)
+  }
+
+  const status = input.Status?.trim().toUpperCase() ?? ""
+  const succeeded = status === "OK"
+  const callbackPayload = { Authority: authority, Status: status }
+  const now = new Date()
+
+  await db.$transaction(async (tx) => {
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: {
+        callbackReceivedAt: payment.callbackReceivedAt ?? now,
+        gatewayResultText: succeeded
+          ? "Zarinpal reported OK; awaiting verify."
+          : "Zarinpal reported NOK.",
+      },
+    })
+
+    await tx.paymentEvent.create({
+      data: {
+        paymentId: payment.id,
+        type: PAYMENT_EVENT_TYPES.CALLBACK_RECEIVED,
+        source: "PROVIDER",
+        previousStatus: "PENDING",
+        newStatus: "PENDING",
+        message: `Zarinpal callback received (Status=${status || "missing"}).`,
+        metadata: callbackPayload,
+      },
+    })
+  })
+
+  if (!succeeded) {
+    return failPaymentFromCallback(payment, {
+      method: "zarinpal/callback",
+      resultCode: -51,
+      failureText: "پرداخت زرین‌پال ناموفق بود یا توسط کاربر لغو شد.",
       metadata: callbackPayload,
     })
   }

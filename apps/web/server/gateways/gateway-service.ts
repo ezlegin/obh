@@ -6,6 +6,8 @@ import {
   DIGIPAY_PROVIDER_NAME,
   SADAD_PROVIDER_CODE,
   SADAD_PROVIDER_NAME,
+  ZARINPAL_PROVIDER_CODE,
+  ZARINPAL_PROVIDER_NAME,
 } from "@/server/payments/providers/registry"
 import type { ProviderEnvironmentValue } from "@/server/payments/providers/types"
 
@@ -38,6 +40,25 @@ const GATEWAYS: Record<string, GatewayDefinition> = {
       },
     },
   },
+  [ZARINPAL_PROVIDER_CODE]: {
+    name: ZARINPAL_PROVIDER_NAME,
+    description:
+      "Zarinpal payment gateway (`payment.zarinpal.com`). Full payment with Shetab bank cards.",
+    accounts: {
+      TEST: {
+        name: "Zarinpal Test Settlement",
+        institution: "Zarinpal (Test)",
+        notes:
+          "Automatically provisioned Zarinpal test settlement account. Used for simulated TEST payments.",
+      },
+      LIVE: {
+        name: "Zarinpal Live Settlement",
+        institution: "Zarinpal",
+        notes:
+          "Automatically provisioned Zarinpal live account. Receives verified customer payments before settlement.",
+      },
+    },
+  },
   [DIGIPAY_PROVIDER_CODE]: {
     name: DIGIPAY_PROVIDER_NAME,
     description:
@@ -63,7 +84,7 @@ const GATEWAYS: Record<string, GatewayDefinition> = {
  * Ensures a supported payment gateway and both its `TEST` and `LIVE`
  * provider financial accounts exist and are active.
  *
- * Gateways are defined in code (Sadad and Digipay); they are never manually
+ * Gateways are defined in code (Sadad, Zarinpal and Digipay); they are never manually
  * added, edited, or deleted from the admin panel.
  */
 export async function ensurePaymentGateway(code: string) {

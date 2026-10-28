@@ -63,6 +63,18 @@ export default function GatewaysPage() {
         </tr>
         <tr>
           <td>
+            <code>zarinpal</code>
+          </td>
+          <td>
+            <code>card</code>
+          </td>
+          <td>
+            Pays the full amount with any Shetab bank card through Zarinpal.
+            Minimum 10,000 R.
+          </td>
+        </tr>
+        <tr>
+          <td>
             <code>digipay</code>
           </td>
           <td>
@@ -97,7 +109,7 @@ export default function GatewaysPage() {
         rows={[
           {
             name: "code",
-            type: '"sadad" | "digipay" | string',
+            type: '"sadad" | "zarinpal" | "digipay" | string',
             required: true,
             description: "Pass this to startPayment as gateway.",
           },
@@ -150,6 +162,16 @@ export default function GatewaysPage() {
       "requiresCustomerMobile": false,
       "minAmount": null,
       "isDefault": true,
+      "environment": "live"
+    },
+    {
+      "code": "zarinpal",
+      "name": "Zarinpal",
+      "displayName": "پرداخت با زرین‌پال",
+      "kind": "card",
+      "requiresCustomerMobile": false,
+      "minAmount": "10000",
+      "isDefault": false,
       "environment": "live"
     },
     {
@@ -260,7 +282,8 @@ export async function checkout(form: FormData) {
         With <code>simulator: true</code>, <code>listGateways()</code> returns
         every gateway, and Digipay payments open the OBH Digipay simulator at{" "}
         <code>/pay/digipay/&lt;ticket&gt;</code>. There you can simulate a BNPL,
-        credit, wallet or card purchase, or a failure.
+        credit, wallet or card purchase, or a failure. Zarinpal payments open{" "}
+        <code>/pay/zarinpal/&lt;authority&gt;</code>.
       </p>
 
       <h2 id="errors">Errors</h2>

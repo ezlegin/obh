@@ -11,7 +11,7 @@
     "lint": "eslint",
     "format": "prettier --write \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\" \"server/**/*.ts\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"types/**/*.d.ts\" \"*.{ts,mjs}\"",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/payment-lifecycle.test.ts tests/service-credentials.test.ts tests/development-adapter.test.ts tests/installment-schedule.test.ts tests/accounting-dates.test.ts tests/profit-calculator.test.ts tests/report-export.test.ts tests/login-rate-limit.test.ts",
+    "test": "tsx --test tests/payment-lifecycle.test.ts tests/service-credentials.test.ts tests/development-adapter.test.ts tests/installment-schedule.test.ts tests/zarinpal-adapter.test.ts tests/accounting-dates.test.ts tests/profit-calculator.test.ts tests/report-export.test.ts tests/login-rate-limit.test.ts",
     "test:integration": "tsx --conditions=react-server tests/sdk-integration.ts",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",

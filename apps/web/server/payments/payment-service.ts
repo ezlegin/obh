@@ -28,6 +28,7 @@ import {
   isKnownPaymentProvider,
   providerSupportsEnvironment,
   SADAD_PROVIDER_CODE,
+  ZARINPAL_PROVIDER_CODE,
 } from "@/server/payments/providers/registry"
 import { queuePaymentWebhook } from "@/server/payments/webhook-service"
 
@@ -389,7 +390,12 @@ export async function simulateDevelopmentPaymentResult(
     payload:
       gateway === SADAD_PROVIDER_CODE
         ? { outcome: values.outcome }
-        : {
+        : gateway === ZARINPAL_PROVIDER_CODE
+          ? {
+              Authority: payment.providerSessionId,
+              Status: values.outcome === "success" ? "OK" : "NOK",
+            }
+          : {
             result: values.outcome === "success" ? "SUCCESS" : "FAILURE",
             trackingCode: `sim_${payment.reference}`,
             providerId: String(payment.gatewayOrderId),

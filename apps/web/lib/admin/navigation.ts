@@ -100,6 +100,13 @@ export const adminNavigation: AdminNavGroup[] = [
         badge: "Soon",
       },
       {
+        label: "Zarinpal gateway",
+        href: "/admin/gateways/zarinpal",
+        description:
+          "Zarinpal card gateway status, callback URL, and settlement accounts.",
+        icon: Landmark,
+      },
+      {
         label: "Digipay gateway",
         href: "/admin/gateways/digipay",
         description:
