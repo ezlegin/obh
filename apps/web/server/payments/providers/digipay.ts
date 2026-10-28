@@ -337,6 +337,20 @@ export function normalizeIranianMobile(value: string | null | undefined) {
   return /^09\d{9}$/.test(local) ? local : null
 }
 
+/**
+ * Digipay keys tickets by `providerId` across the whole merchant account,
+ * which other services share, so OBH's order number alone can clash with an
+ * existing ticket. OBH sends it with an `obh-` prefix and accepts both forms
+ * back.
+ */
+export function toDigipayProviderId(gatewayOrderId: string) {
+  return `obh-${gatewayOrderId}`
+}
+
+export function fromDigipayProviderId(value: string | null) {
+  return value?.replace(/^obh-/i, "") ?? null
+}
+
 function readString(value: unknown) {
   return value === undefined || value === null || value === ""
     ? null
@@ -401,17 +415,19 @@ export const digipayPaymentAdapter: PaymentProviderAdapter = {
 
     // A basket is mandatory for credit and BNPL purchases. OBH services sell
     // services, so each purchase is described as a single service item.
+    // Digipay expects the merchant's own username as seller and supplier.
+    const merchantUsername = getLiveCredentials().username
     const requestBody = {
       amount: Number(input.amount),
       cellNumber,
-      providerId: input.gatewayOrderId,
+      providerId: toDigipayProviderId(input.gatewayOrderId),
       callbackUrl: input.callbackUrl,
       basketDetailsDto: {
         basketId: input.paymentReference,
         items: [
           {
-            sellerId: "obh",
-            supplierId: input.serviceSlug,
+            sellerId: merchantUsername,
+            supplierId: merchantUsername,
             productCode: input.serviceSlug,
             brand: "OBH",
             productType: 3,
@@ -490,7 +506,9 @@ export const digipayPaymentAdapter: PaymentProviderAdapter = {
       payload.type !== undefined && payload.type !== null
         ? Number(payload.type)
         : null
-    const callbackProviderId = readString(payload.providerId)
+    const callbackProviderId = fromDigipayProviderId(
+      readString(payload.providerId)
+    )
     const callbackAmount = readString(payload.amount)
 
     const pending = (resultCode: number, resultMessage: string) =>
@@ -617,7 +635,9 @@ export const digipayPaymentAdapter: PaymentProviderAdapter = {
         `/purchases/verify?type=${purchaseType}`,
         {
           trackingCode,
-          providerId: input.gatewayOrderId ?? callbackProviderId,
+          providerId: toDigipayProviderId(
+            input.gatewayOrderId ?? callbackProviderId ?? ""
+          ),
         }
       )
     } catch {
@@ -651,7 +671,7 @@ export const digipayPaymentAdapter: PaymentProviderAdapter = {
     }
 
     const verifiedAmount = readString(data.amount)
-    const verifiedOrderId = readString(data.providerId)
+    const verifiedOrderId = fromDigipayProviderId(readString(data.providerId))
 
     if (
       input.gatewayOrderId &&

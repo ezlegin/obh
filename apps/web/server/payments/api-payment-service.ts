@@ -18,7 +18,10 @@ import {
   createInstallmentPlanInTx,
   installmentPurchaseType,
 } from "@/server/payments/installments/installment-service"
-import { normalizeIranianMobile } from "@/server/payments/providers/digipay"
+import {
+  fromDigipayProviderId,
+  normalizeIranianMobile,
+} from "@/server/payments/providers/digipay"
 import {
   DEFAULT_PROVIDER_CODE,
   DIGIPAY_PROVIDER_CODE,
@@ -918,8 +921,9 @@ export type DigipayCallbackPayload = {
 export async function processDigipayCallback(input: DigipayCallbackPayload) {
   const db = getDb()
   const rawProviderId = input.providerId?.trim()
+  const orderId = fromDigipayProviderId(rawProviderId ?? null)
 
-  if (!rawProviderId || !/^\d+$/.test(rawProviderId)) {
+  if (!orderId || !/^\d+$/.test(orderId)) {
     throw new ApiError(
       400,
       "INVALID_CALLBACK",
@@ -929,7 +933,7 @@ export async function processDigipayCallback(input: DigipayCallbackPayload) {
 
   const payment = await db.payment.findFirst({
     where: {
-      gatewayOrderId: BigInt(rawProviderId),
+      gatewayOrderId: BigInt(orderId),
       provider: { code: DIGIPAY_PROVIDER_CODE },
     },
   })
