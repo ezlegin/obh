@@ -127,33 +127,53 @@ export function getDigipayConfigStatus(): DigipayConfigStatus {
   const username = process.env.DIGIPAY_USERNAME?.trim()
   const password = process.env.DIGIPAY_PASSWORD?.trim()
   const clientId = process.env.DIGIPAY_CLIENT_ID?.trim()
-  const clientSecret = process.env.DIGIPAY_CLIENT_SECRET?.trim()
 
   return {
     providerCode: DIGIPAY_PROVIDER_CODE,
     providerName: DIGIPAY_PROVIDER_NAME,
     baseUrl: readBaseUrl(),
-    liveConfigured: Boolean(username && password && clientId && clientSecret),
+    liveConfigured: Boolean(username && password && readBasicAuthorization()),
     usernameMasked: maskIdentifier(username),
     clientIdMasked: maskIdentifier(clientId),
     simulatorEnabled: isDigipaySimulatorEnabled(),
   }
 }
 
-function getLiveCredentials() {
-  const username = process.env.DIGIPAY_USERNAME?.trim()
-  const password = process.env.DIGIPAY_PASSWORD?.trim()
+/**
+ * The OAuth client's Basic authorization header. Digipay issues it ready-made
+ * (DIGIPAY_AUTHORIZATION, used as is); otherwise it is built from
+ * DIGIPAY_CLIENT_ID and DIGIPAY_CLIENT_SECRET.
+ */
+function readBasicAuthorization() {
+  const authorization = process.env.DIGIPAY_AUTHORIZATION?.trim()
+
+  if (authorization) {
+    return /^basic\s/i.test(authorization)
+      ? authorization
+      : `Basic ${authorization}`
+  }
+
   const clientId = process.env.DIGIPAY_CLIENT_ID?.trim()
   const clientSecret = process.env.DIGIPAY_CLIENT_SECRET?.trim()
 
-  if (!username || !password || !clientId || !clientSecret) {
+  return clientId && clientSecret
+    ? `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`
+    : null
+}
+
+function getLiveCredentials() {
+  const username = process.env.DIGIPAY_USERNAME?.trim()
+  const password = process.env.DIGIPAY_PASSWORD?.trim()
+  const authorization = readBasicAuthorization()
+
+  if (!username || !password || !authorization) {
     throw new PaymentProviderError(
       "DIGIPAY_CREDENTIALS_MISSING",
-      "Digipay credentials (DIGIPAY_USERNAME, DIGIPAY_PASSWORD, DIGIPAY_CLIENT_ID, DIGIPAY_CLIENT_SECRET) are not configured in server environment variables."
+      "Digipay credentials (DIGIPAY_USERNAME, DIGIPAY_PASSWORD, and DIGIPAY_AUTHORIZATION or DIGIPAY_CLIENT_ID + DIGIPAY_CLIENT_SECRET) are not configured in server environment variables."
     )
   }
 
-  return { username, password, clientId, clientSecret, baseUrl: readBaseUrl() }
+  return { username, password, authorization, baseUrl: readBaseUrl() }
 }
 
 function shouldSimulate(environment: ProviderEnvironmentValue): boolean {
@@ -191,10 +211,10 @@ async function getAccessToken(forceRefresh = false): Promise<string> {
     return cachedAccessToken.value
   }
 
-  const { username, password, clientId, clientSecret, baseUrl } =
-    getLiveCredentials()
+  const { username, password, authorization, baseUrl } = getLiveCredentials()
 
-  const form = new FormData()
+  // The token endpoint is a standard OAuth password grant: URL-encoded form.
+  const form = new URLSearchParams()
   form.set("username", username)
   form.set("password", password)
   form.set("grant_type", "password")
@@ -205,7 +225,7 @@ async function getAccessToken(forceRefresh = false): Promise<string> {
       method: "POST",
       headers: {
         Accept: "application/json",
-        Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+        Authorization: authorization,
       },
       body: form,
     })
