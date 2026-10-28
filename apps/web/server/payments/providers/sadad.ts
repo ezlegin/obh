@@ -16,6 +16,22 @@ export const SADAD_PROVIDER_NAME = "Sadad (Bank Melli Iran)"
 const DEFAULT_SADAD_BASE_URL = "https://sadad.shaparak.ir"
 const SADAD_TIMEOUT_MS = 15_000
 
+// Shaparak drops connections from non-Iranian IPs, so the server-to-server
+// calls (PaymentRequest, Verify) can go through a relay on an Iranian host
+// (deploy/sadad-relay). The customer's browser still opens Sadad's own
+// Purchase page.
+function getSadadApi(baseUrl: string) {
+  const relayUrl = process.env.SADAD_RELAY_URL?.trim().replace(/\/+$/, "")
+  const relaySecret = process.env.SADAD_RELAY_SECRET?.trim()
+  if (relayUrl && relaySecret) {
+    return {
+      apiBaseUrl: relayUrl,
+      apiHeaders: { "X-Relay-Secret": relaySecret } as Record<string, string>,
+    }
+  }
+  return { apiBaseUrl: baseUrl, apiHeaders: {} as Record<string, string> }
+}
+
 /**
  * Known Sadad IPG `PaymentRequest` and `Verify` response codes from
  * Sadad Electronic Payment Company "Purchase Process Implementation Guide" v1.10.
@@ -300,9 +316,9 @@ export function getSadadConfigStatus(): SadadConfigStatus {
     providerCode: SADAD_PROVIDER_CODE,
     providerName: SADAD_PROVIDER_NAME,
     baseUrl,
-    requestEndpoint: `${baseUrl}/api/v0/Request/PaymentRequest`,
+    requestEndpoint: `${getSadadApi(baseUrl).apiBaseUrl}/api/v0/Request/PaymentRequest`,
     purchaseEndpoint: `${baseUrl}/Purchase`,
-    verifyEndpoint: `${baseUrl}/api/v0/Advice/Verify`,
+    verifyEndpoint: `${getSadadApi(baseUrl).apiBaseUrl}/api/v0/Advice/Verify`,
     liveConfigured: Boolean(merchantId && terminalId && keyValid),
     merchantId: merchantId || null,
     terminalId: terminalId || null,
@@ -437,12 +453,14 @@ export const sadadPaymentAdapter: PaymentProviderAdapter = {
 
     let response: Response
     try {
-      response = await fetch(`${baseUrl}/api/v0/Request/PaymentRequest`, {
+      const { apiBaseUrl, apiHeaders } = getSadadApi(baseUrl)
+      response = await fetch(`${apiBaseUrl}/api/v0/Request/PaymentRequest`, {
         method: "POST",
         signal: controller.signal,
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
+          ...apiHeaders,
         },
         body: JSON.stringify(requestBody),
       })
@@ -618,12 +636,14 @@ export const sadadPaymentAdapter: PaymentProviderAdapter = {
 
     let response: Response
     try {
-      response = await fetch(`${baseUrl}/api/v0/Advice/Verify`, {
+      const { apiBaseUrl, apiHeaders } = getSadadApi(baseUrl)
+      response = await fetch(`${apiBaseUrl}/api/v0/Advice/Verify`, {
         method: "POST",
         signal: controller.signal,
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
+          ...apiHeaders,
         },
         body: JSON.stringify({
           Token: token,
