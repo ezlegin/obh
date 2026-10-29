@@ -7,7 +7,7 @@ export type PaymentEnvironment = "test" | "live"
  * Gateway code. OBH currently offers `"sadad"` (bank card, full payment) and
  * `"digipay"` (installments / BNPL). Use `listGateways()` for the live list.
  */
-export type PaymentGatewayCode = "sadad" | "zarinpal" | "digipay" | (string & {})
+export type PaymentGatewayCode = "sadad" | "zarinpal" | "mellat" | "digipay" | (string & {})
 
 export type PaymentGatewayKind = "card" | "installment"
 
@@ -115,7 +115,7 @@ export type OBHPaymentsOptions = {
   baseUrl?: string
   /**
    * When true, routes payments to the OBH gateway simulators
-   * (`/pay/sadad/[token]`, `/pay/zarinpal/[authority]`, `/pay/digipay/[ticket]`) instead of the real
+   * (`/pay/sadad/[token]`, `/pay/zarinpal/[authority]`, `/pay/mellat/[refId]`, `/pay/digipay/[ticket]`) instead of the real
    * gateways. Defaults to `process.env.OBH_SIMULATOR === "true"`.
    */
   simulator?: boolean

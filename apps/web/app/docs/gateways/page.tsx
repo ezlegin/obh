@@ -75,6 +75,18 @@ export default function GatewaysPage() {
         </tr>
         <tr>
           <td>
+            <code>mellat</code>
+          </td>
+          <td>
+            <code>card</code>
+          </td>
+          <td>
+            Pays the full amount with any Shetab bank card through Bank Mellat
+            (Behpardakht).
+          </td>
+        </tr>
+        <tr>
+          <td>
             <code>digipay</code>
           </td>
           <td>
@@ -109,7 +121,7 @@ export default function GatewaysPage() {
         rows={[
           {
             name: "code",
-            type: '"sadad" | "zarinpal" | "digipay" | string',
+            type: '"sadad" | "zarinpal" | "mellat" | "digipay" | string',
             required: true,
             description: "Pass this to startPayment as gateway.",
           },
@@ -171,6 +183,16 @@ export default function GatewaysPage() {
       "kind": "card",
       "requiresCustomerMobile": false,
       "minAmount": "10000",
+      "isDefault": false,
+      "environment": "live"
+    },
+    {
+      "code": "mellat",
+      "name": "Mellat (Behpardakht)",
+      "displayName": "پرداخت با کارت بانکی (به‌پرداخت ملت)",
+      "kind": "card",
+      "requiresCustomerMobile": false,
+      "minAmount": null,
       "isDefault": false,
       "environment": "live"
     },
@@ -283,7 +305,8 @@ export async function checkout(form: FormData) {
         every gateway, and Digipay payments open the OBH Digipay simulator at{" "}
         <code>/pay/digipay/&lt;ticket&gt;</code>. There you can simulate a BNPL,
         credit, wallet or card purchase, or a failure. Zarinpal payments open{" "}
-        <code>/pay/zarinpal/&lt;authority&gt;</code>.
+        <code>/pay/zarinpal/&lt;authority&gt;</code> and Mellat payments open{" "}
+        <code>/pay/mellat/&lt;refId&gt;</code>.
       </p>
 
       <h2 id="errors">Errors</h2>

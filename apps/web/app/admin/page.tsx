@@ -56,6 +56,15 @@ export default async function AdminDashboardPage({
           : `Across ${dashboard.summary.accountCount} active account${dashboard.summary.accountCount === 1 ? "" : "s"}`,
       icon: Wallet,
       change: `${dashboard.summary.accountCount} active`,
+      badge:
+        receivable > 0
+          ? {
+              label: `${formatIrr(receivable)} owed`,
+              title:
+                "Installments we have claimed that the gateway has not deposited yet. Opens the Installments page.",
+              href: "/admin/installments",
+            }
+          : undefined,
       changeTone: "neutral" as const,
     },
     {
@@ -182,6 +191,7 @@ export default async function AdminDashboardPage({
               icon={card.icon}
               change={card.change}
               changeTone={card.changeTone}
+              badge={"badge" in card ? card.badge : undefined}
             />
           ))}
         </div>

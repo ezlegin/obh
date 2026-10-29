@@ -139,7 +139,7 @@ function isOBHPaymentsError(error: unknown): error is OBHPaymentsError`}
 
 type PaymentEnvironment = "test" | "live"
 
-type PaymentGatewayCode = "sadad" | "zarinpal" | "digipay" | (string & {})
+type PaymentGatewayCode = "sadad" | "zarinpal" | "mellat" | "digipay" | (string & {})
 
 type PaymentGatewayKind = "card" | "installment"
 

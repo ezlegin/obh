@@ -105,7 +105,7 @@ export default function CreatePaymentPage() {
           },
           {
             name: "gateway",
-            type: '"sadad" | "zarinpal" | "digipay"',
+            type: '"sadad" | "zarinpal" | "mellat" | "digipay"',
             required: false,
             defaultValue: '"sadad"',
             description:

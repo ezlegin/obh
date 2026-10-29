@@ -28,6 +28,7 @@ import {
   isKnownPaymentProvider,
   providerSupportsEnvironment,
   SADAD_PROVIDER_CODE,
+  MELLAT_PROVIDER_CODE,
   ZARINPAL_PROVIDER_CODE,
 } from "@/server/payments/providers/registry"
 import { queuePaymentWebhook } from "@/server/payments/webhook-service"
@@ -390,18 +391,26 @@ export async function simulateDevelopmentPaymentResult(
     payload:
       gateway === SADAD_PROVIDER_CODE
         ? { outcome: values.outcome }
-        : gateway === ZARINPAL_PROVIDER_CODE
+        : gateway === MELLAT_PROVIDER_CODE
           ? {
-              Authority: payment.providerSessionId,
-              Status: values.outcome === "success" ? "OK" : "NOK",
+              RefId: payment.providerSessionId,
+              ResCode: values.outcome === "success" ? "0" : "17",
+              SaleOrderId: String(payment.gatewayOrderId),
+              SaleReferenceId: String(Date.now()).slice(-12),
+              CardHolderPan: "610433******5689",
             }
-          : {
-            result: values.outcome === "success" ? "SUCCESS" : "FAILURE",
-            trackingCode: `sim_${payment.reference}`,
-            providerId: String(payment.gatewayOrderId),
-            amount: payment.amount.toFixed(0),
-            type: 13,
-          },
+          : gateway === ZARINPAL_PROVIDER_CODE
+            ? {
+                Authority: payment.providerSessionId,
+                Status: values.outcome === "success" ? "OK" : "NOK",
+              }
+            : {
+                result: values.outcome === "success" ? "SUCCESS" : "FAILURE",
+                trackingCode: `sim_${payment.reference}`,
+                providerId: String(payment.gatewayOrderId),
+                amount: payment.amount.toFixed(0),
+                type: 13,
+              },
   })
 
   if (verification.status === "PENDING") {

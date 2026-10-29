@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react"
+import Link from "next/link"
 import { ArrowDownRight, ArrowUpRight } from "lucide-react"
 
 import { Badge } from "@workspace/ui/components/badge"
@@ -11,6 +12,8 @@ type SummaryCardProps = {
   icon: LucideIcon
   change: string
   changeTone: "positive" | "negative" | "neutral"
+  /** Replaces the "Live" badge, e.g. to flag money still owed to OBH. */
+  badge?: { label: string; title: string; href: string }
 }
 
 function SummaryCard({
@@ -20,6 +23,7 @@ function SummaryCard({
   icon: Icon,
   change,
   changeTone,
+  badge,
 }: SummaryCardProps) {
   const isPositive = changeTone === "positive"
   const isNegative = changeTone === "negative"
@@ -32,9 +36,21 @@ function SummaryCard({
         <span className="flex size-9 items-center justify-center rounded-full border border-border bg-white/[0.03] text-muted-foreground">
           <Icon aria-hidden="true" className="size-4" />
         </span>
-        <Badge variant="outline" className="text-[9px] tracking-[0.12em]">
-          Live
-        </Badge>
+        {badge ? (
+          <Link
+            href={badge.href}
+            title={badge.title}
+            className="rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <Badge variant="warning" className="text-[10px] tabular-nums">
+              {badge.label}
+            </Badge>
+          </Link>
+        ) : (
+          <Badge variant="outline" className="text-[9px] tracking-[0.12em]">
+            Live
+          </Badge>
+        )}
       </div>
 
       <p className="mt-5 text-xs text-muted-foreground">{label}</p>

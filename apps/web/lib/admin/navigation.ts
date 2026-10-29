@@ -92,12 +92,11 @@ export const adminNavigation: AdminNavGroup[] = [
         exact: true,
       },
       {
-        label: "Mellat Bank",
-        href: "#mellat-bank",
-        description: "Behpardakht Mellat IPG integration.",
+        label: "Mellat gateway",
+        href: "/admin/gateways/mellat",
+        description:
+          "Mellat (Behpardakht) IPG status, callback URL, relay, and settlement accounts.",
         icon: Landmark,
-        disabled: true,
-        badge: "Soon",
       },
       {
         label: "Zarinpal gateway",

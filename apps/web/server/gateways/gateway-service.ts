@@ -6,6 +6,8 @@ import {
   DIGIPAY_PROVIDER_NAME,
   SADAD_PROVIDER_CODE,
   SADAD_PROVIDER_NAME,
+  MELLAT_PROVIDER_CODE,
+  MELLAT_PROVIDER_NAME,
   ZARINPAL_PROVIDER_CODE,
   ZARINPAL_PROVIDER_NAME,
 } from "@/server/payments/providers/registry"
@@ -59,6 +61,25 @@ const GATEWAYS: Record<string, GatewayDefinition> = {
       },
     },
   },
+  [MELLAT_PROVIDER_CODE]: {
+    name: MELLAT_PROVIDER_NAME,
+    description:
+      "Bank Mellat Behpardakht Internet Payment Gateway (`bpm.shaparak.ir`). Full payment with Shetab bank cards.",
+    accounts: {
+      TEST: {
+        name: "Mellat Test Settlement",
+        institution: "Bank Mellat — Behpardakht IPG (Test)",
+        notes:
+          "Automatically provisioned Mellat test settlement account. Used for simulated TEST payments.",
+      },
+      LIVE: {
+        name: "Mellat Live Settlement",
+        institution: "Bank Mellat — Behpardakht IPG",
+        notes:
+          "Automatically provisioned Mellat live account. Receives verified and settled customer payments.",
+      },
+    },
+  },
   [DIGIPAY_PROVIDER_CODE]: {
     name: DIGIPAY_PROVIDER_NAME,
     description:
@@ -84,7 +105,7 @@ const GATEWAYS: Record<string, GatewayDefinition> = {
  * Ensures a supported payment gateway and both its `TEST` and `LIVE`
  * provider financial accounts exist and are active.
  *
- * Gateways are defined in code (Sadad, Zarinpal and Digipay); they are never manually
+ * Gateways are defined in code (Sadad, Zarinpal, Mellat and Digipay); they are never manually
  * added, edited, or deleted from the admin panel.
  */
 export async function ensurePaymentGateway(code: string) {

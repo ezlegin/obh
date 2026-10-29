@@ -29,6 +29,7 @@ import {
   isKnownPaymentProvider,
   providerSupportsEnvironment,
   SADAD_PROVIDER_CODE,
+  MELLAT_PROVIDER_CODE,
   ZARINPAL_PROVIDER_CODE,
 } from "@/server/payments/providers/registry"
 import { describeSadadCode } from "@/server/payments/providers/sadad"
@@ -695,6 +696,28 @@ export async function getSadadSimulatorView(token: string) {
   return getSimulatorView(SADAD_PROVIDER_CODE, token)
 }
 
+/** Returns the RefId page for a Mellat payment: simulator in TEST, StartPay form in LIVE. */
+export async function getMellatCheckoutView(refId: string) {
+  const payment = await getDb().payment.findFirst({
+    where: {
+      providerSessionId: refId,
+      provider: { code: MELLAT_PROVIDER_CODE },
+    },
+    select: { environment: true, status: true },
+  })
+
+  if (!payment) {
+    return null
+  }
+
+  if (payment.environment === "TEST") {
+    const view = await getSimulatorView(MELLAT_PROVIDER_CODE, refId)
+    return view ? ({ mode: "simulator", view } as const) : null
+  }
+
+  return { mode: "live", status: payment.status } as const
+}
+
 export async function getZarinpalSimulatorView(authority: string) {
   return getSimulatorView(ZARINPAL_PROVIDER_CODE, authority)
 }
@@ -1079,6 +1102,105 @@ export async function processZarinpalCallback(input: ZarinpalCallbackPayload) {
       method: "zarinpal/callback",
       resultCode: -51,
       failureText: "پرداخت زرین‌پال ناموفق بود یا توسط کاربر لغو شد.",
+      metadata: callbackPayload,
+    })
+  }
+
+  return verifyPendingPayment(payment.id, callbackPayload)
+}
+
+/**
+ * Behpardakht posts the result to the callback URL with `RefId`, `ResCode`,
+ * `SaleOrderId`, `SaleReferenceId` and `CardHolderPan`.
+ */
+export type MellatCallbackPayload = {
+  RefId?: string | null
+  ResCode?: string | null
+  SaleOrderId?: string | null
+  SaleReferenceId?: string | null
+  CardHolderPan?: string | null
+}
+
+/**
+ * Processes an inbound Mellat POST (`/api/v1/mellat/callback`). The RefId and
+ * SaleOrderId must both match an open payment. On `ResCode=0` it runs
+ * `bpVerifyRequest` then `bpSettleRequest`.
+ */
+export async function processMellatCallback(input: MellatCallbackPayload) {
+  const db = getDb()
+  const refId = input.RefId?.trim()
+  const saleOrderId = input.SaleOrderId?.trim()
+
+  if (!refId || !saleOrderId || !/^\d+$/.test(saleOrderId)) {
+    throw new ApiError(
+      400,
+      "INVALID_CALLBACK",
+      "Mellat callback is missing RefId or SaleOrderId."
+    )
+  }
+
+  const payment = await db.payment.findFirst({
+    where: {
+      gatewayOrderId: BigInt(saleOrderId),
+      providerSessionId: refId,
+      provider: { code: MELLAT_PROVIDER_CODE },
+    },
+  })
+
+  if (!payment) {
+    throw new ApiError(404, "PAYMENT_NOT_FOUND", "Payment was not found.")
+  }
+
+  if (payment.status !== "PENDING") {
+    return finalizedOutcome(payment)
+  }
+
+  const resCode = input.ResCode?.trim() ?? ""
+  const succeeded = resCode === "0"
+  const saleReferenceId = input.SaleReferenceId?.trim() || null
+  const callbackPayload = {
+    RefId: refId,
+    ResCode: resCode,
+    SaleOrderId: saleOrderId,
+    SaleReferenceId: saleReferenceId,
+    CardHolderPan: input.CardHolderPan?.trim() || null,
+  }
+  const now = new Date()
+
+  await db.$transaction(async (tx) => {
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: {
+        callbackReceivedAt: payment.callbackReceivedAt ?? now,
+        providerReference: saleReferenceId ?? payment.providerReference,
+        gatewayResultCode: Number(resCode) || 0,
+        gatewayResultText: succeeded
+          ? "Mellat reported ResCode 0; awaiting verify and settle."
+          : `Mellat reported ResCode ${resCode || "missing"}.`,
+      },
+    })
+
+    await tx.paymentEvent.create({
+      data: {
+        paymentId: payment.id,
+        type: PAYMENT_EVENT_TYPES.CALLBACK_RECEIVED,
+        source: "PROVIDER",
+        previousStatus: "PENDING",
+        newStatus: "PENDING",
+        message: `Mellat callback received (ResCode=${resCode || "missing"}).`,
+        metadata: callbackPayload,
+      },
+    })
+  })
+
+  if (!succeeded) {
+    return failPaymentFromCallback(payment, {
+      method: "mellat/callback",
+      resultCode: Number(resCode) || -1,
+      failureText:
+        resCode === "17"
+          ? "پرداخت توسط کاربر لغو شد."
+          : `پرداخت ملت ناموفق بود (کد ${resCode || "نامشخص"}).`,
       metadata: callbackPayload,
     })
   }

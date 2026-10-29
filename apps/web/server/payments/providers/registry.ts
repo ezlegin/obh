@@ -18,6 +18,13 @@ import type {
   ProviderEnvironmentValue,
 } from "./types"
 import {
+  isMellatSimulatorEnabled,
+  MELLAT_PROVIDER_CODE,
+  MELLAT_PROVIDER_NAME,
+  mellatPaymentAdapter,
+  getMellatConfigStatus,
+} from "./mellat"
+import {
   getZarinpalConfigStatus,
   isZarinpalSimulatorEnabled,
   ZARINPAL_PROVIDER_CODE,
@@ -31,6 +38,7 @@ export const DEFAULT_PROVIDER_CODE = SADAD_PROVIDER_CODE
 const adapters = new Map<string, PaymentProviderAdapter>([
   [sadadPaymentAdapter.code, sadadPaymentAdapter],
   [zarinpalPaymentAdapter.code, zarinpalPaymentAdapter],
+  [mellatPaymentAdapter.code, mellatPaymentAdapter],
   [digipayPaymentAdapter.code, digipayPaymentAdapter],
 ])
 
@@ -114,4 +122,9 @@ export {
   ZARINPAL_PROVIDER_CODE,
   ZARINPAL_PROVIDER_NAME,
   zarinpalPaymentAdapter,
+  isMellatSimulatorEnabled,
+  MELLAT_PROVIDER_CODE,
+  MELLAT_PROVIDER_NAME,
+  mellatPaymentAdapter,
+  getMellatConfigStatus,
 }
