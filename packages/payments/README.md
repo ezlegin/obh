@@ -1,4 +1,8 @@
-# @obhco/payments
+# @obhco/payments (deprecated)
+
+> **Deprecated.** OBH no longer hosts payments; the API this SDK calls
+> (`/api/v1/payments`) now returns `410`. Use [`@obhco/pay`](../pay) inside
+> your service instead.
 
 Server-side TypeScript SDK for the versioned OBH payment API.
 

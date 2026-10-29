@@ -10,8 +10,6 @@
     "format": "turbo format",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
-    "test:integration": "pnpm --filter @obhco/payments build && pnpm --filter web test:integration",
-    "webhooks:process": "pnpm --filter web webhooks:process",
     "db:generate": "pnpm --filter web db:generate",
     "db:validate": "pnpm --filter web db:validate",
     "db:push": "pnpm --filter web db:push",

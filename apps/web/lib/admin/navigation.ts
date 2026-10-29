@@ -6,7 +6,6 @@ import {
   CircleDollarSign,
   CreditCard,
   FileText,
-  Landmark,
   LayoutDashboard,
   PieChart,
   Receipt,
@@ -77,40 +76,6 @@ export const adminNavigation: AdminNavGroup[] = [
         href: "/admin/reconciliation",
         description: "Provider settlements, fees, and account reconciliation.",
         icon: Scale,
-      },
-    ],
-  },
-  {
-    label: "Gateways",
-    items: [
-      {
-        label: "Sadad gateway",
-        href: "/admin/gateways",
-        description:
-          "Sadad (Bank Melli) IPG status, callback URL, and settlement accounts.",
-        icon: Landmark,
-        exact: true,
-      },
-      {
-        label: "Mellat gateway",
-        href: "/admin/gateways/mellat",
-        description:
-          "Mellat (Behpardakht) IPG status, callback URL, relay, and settlement accounts.",
-        icon: Landmark,
-      },
-      {
-        label: "Zarinpal gateway",
-        href: "/admin/gateways/zarinpal",
-        description:
-          "Zarinpal card gateway status, callback URL, and settlement accounts.",
-        icon: Landmark,
-      },
-      {
-        label: "Digipay gateway",
-        href: "/admin/gateways/digipay",
-        description:
-          "Digipay installment (BNPL) gateway status, callback URL, and settlement accounts.",
-        icon: Landmark,
       },
     ],
   },

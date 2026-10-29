@@ -29,6 +29,28 @@ export type FinancialReport = {
     amount: string
     count: number
   }>
+  /** LIVE payment attempts created in range, by service and gateway. */
+  gatewayBreakdown: Array<{
+    service: string
+    gateway: string
+    attempts: number
+    completedCount: number
+    completedAmount: string
+    failedCount: number
+    pendingCount: number
+    /** Completed ÷ finished (completed + failed + expired), as a percent. */
+    successRate: string | null
+  }>
+  /** Whether each active service is actually reporting payments to OBH. */
+  reportingHealth: Array<{
+    service: string
+    domain: string
+    activeCredentials: number
+    lastReportAt: string | null
+    /** Pending for over two hours: the service's reconcile job is not running. */
+    stalePending: number
+    status: "reporting" | "stale" | "silent"
+  }>
   expenseCategories: Array<{
     category: string
     amount: string
@@ -75,6 +97,139 @@ function addToGroup(
   })
 }
 
+const STALE_PENDING_MS = 2 * 60 * 60 * 1000
+const SILENT_AFTER_MS = 7 * 24 * 60 * 60 * 1000
+
+async function getGatewayBreakdown(range: ReportRange) {
+  const db = getDb()
+  const [groups, services, providers] = await Promise.all([
+    db.payment.groupBy({
+      by: ["serviceId", "providerId", "status"],
+      where: {
+        environment: "LIVE",
+        createdAt: { gte: range.startInstant, lt: range.endInstant },
+      },
+      _count: { _all: true },
+      _sum: { amount: true },
+    }),
+    db.connectedService.findMany({ select: { id: true, name: true } }),
+    db.paymentProvider.findMany({ select: { id: true, name: true } }),
+  ])
+  const serviceNames = new Map(services.map((item) => [item.id, item.name]))
+  const providerNames = new Map(providers.map((item) => [item.id, item.name]))
+
+  type Row = FinancialReport["gatewayBreakdown"][number] & {
+    amount: Prisma.Decimal
+    finished: number
+  }
+  const rows = new Map<string, Row>()
+
+  for (const group of groups) {
+    const key = `${group.serviceId}:${group.providerId}`
+    const row = rows.get(key) ?? {
+      service: serviceNames.get(group.serviceId ?? "") ?? "Unassigned",
+      gateway: providerNames.get(group.providerId ?? "") ?? "Unknown gateway",
+      attempts: 0,
+      completedCount: 0,
+      completedAmount: "0.00",
+      failedCount: 0,
+      pendingCount: 0,
+      successRate: null,
+      amount: new Prisma.Decimal(0),
+      finished: 0,
+    }
+    const count = group._count._all
+    row.attempts += count
+
+    if (group.status === "COMPLETED") {
+      row.completedCount += count
+      row.amount = row.amount.plus(group._sum.amount ?? 0)
+      row.finished += count
+    } else if (group.status === "PENDING") {
+      row.pendingCount += count
+    } else {
+      row.failedCount += count
+      if (group.status !== "CANCELLED") {
+        row.finished += count
+      }
+    }
+    rows.set(key, row)
+  }
+
+  return [...rows.values()]
+    .map(({ amount, finished, ...row }) => ({
+      ...row,
+      completedAmount: amount.toFixed(2),
+      successRate:
+        finished > 0
+          ? ((row.completedCount / finished) * 100).toFixed(1)
+          : null,
+    }))
+    .sort((left, right) =>
+      new Prisma.Decimal(right.completedAmount).comparedTo(left.completedAmount)
+    )
+}
+
+export async function getReportingHealth(): Promise<
+  FinancialReport["reportingHealth"]
+> {
+  const db = getDb()
+  const now = Date.now()
+  const [services, lastReports, stale] = await Promise.all([
+    db.connectedService.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        _count: {
+          select: { credentials: { where: { revokedAt: null } } },
+        },
+      },
+      orderBy: { name: "asc" },
+    }),
+    db.payment.groupBy({
+      by: ["serviceId"],
+      where: { serviceId: { not: null } },
+      _max: { updatedAt: true },
+    }),
+    db.payment.groupBy({
+      by: ["serviceId"],
+      where: {
+        status: "PENDING",
+        createdAt: { lt: new Date(now - STALE_PENDING_MS) },
+      },
+      _count: { _all: true },
+    }),
+  ])
+  const lastByService = new Map(
+    lastReports.map((item) => [item.serviceId, item._max.updatedAt])
+  )
+  const staleByService = new Map(
+    stale.map((item) => [item.serviceId, item._count._all])
+  )
+
+  return services.map((service) => {
+    const last = lastByService.get(service.id) ?? null
+    const stalePending = staleByService.get(service.id) ?? 0
+    const status: FinancialReport["reportingHealth"][number]["status"] =
+      !last || now - last.getTime() > SILENT_AFTER_MS
+        ? "silent"
+        : stalePending > 0
+          ? "stale"
+          : "reporting"
+
+    return {
+      service: service.name,
+      domain: service.domain,
+      activeCredentials: service._count.credentials,
+      lastReportAt: last ? last.toISOString() : null,
+      stalePending,
+      status,
+    }
+  })
+}
+
 export async function getFinancialReport(
   range: ReportRange
 ): Promise<FinancialReport> {
@@ -93,6 +248,8 @@ export async function getFinancialReport(
     periods,
     reconciliations,
     checks,
+    gatewayBreakdown,
+    reportingHealth,
   ] = await Promise.all([
     db.payment.findMany({
       where: {
@@ -179,6 +336,8 @@ export async function getFinancialReport(
       include: { account: { select: { name: true } } },
     }),
     runConsistencyChecks(range),
+    getGatewayBreakdown(range),
+    getReportingHealth(),
   ])
 
   const zero = new Prisma.Decimal(0)
@@ -262,6 +421,8 @@ export async function getFinancialReport(
       .sort((left, right) =>
         new Prisma.Decimal(right.amount).comparedTo(left.amount)
       ),
+    gatewayBreakdown,
+    reportingHealth,
     expenseCategories: [...categoryGroups.entries()]
       .map(([category, group]) => ({
         category,

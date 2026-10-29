@@ -5,7 +5,6 @@ import { getDb } from "@/lib/db/client"
 import { ApiError } from "@/server/api/errors"
 import type { ServiceAuthContext } from "@/server/api/service-auth"
 import { DomainError } from "@/server/errors"
-import { PaymentProviderError } from "@/server/payments/providers/types"
 
 export type AdminApiLog = {
   id: string
@@ -67,14 +66,6 @@ export function classifyApiErrorForLog(error: unknown): {
   if (error instanceof ApiError) {
     return {
       statusCode: error.status,
-      errorCode: error.code,
-      errorMessage: error.message,
-    }
-  }
-
-  if (error instanceof PaymentProviderError) {
-    return {
-      statusCode: error.code === "PROVIDER_UNAVAILABLE" ? 503 : 502,
       errorCode: error.code,
       errorMessage: error.message,
     }

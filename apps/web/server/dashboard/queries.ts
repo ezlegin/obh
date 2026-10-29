@@ -9,13 +9,9 @@ import {
   parseDateOnly,
   todayDateOnlyInTehran,
 } from "@/server/accounting/dates"
-import { ensureAllPaymentGateways } from "@/server/gateways/gateway-service"
 import { settleDueInstallments } from "@/server/payments/installments/installment-service"
-import {
-  getSadadConfigStatus,
-  SADAD_PROVIDER_NAME,
-} from "@/server/payments/providers/sadad"
 import { calculateProviderBalance } from "@/server/reconciliation/service"
+import { getReportingHealth } from "@/server/reports/queries"
 
 export type DashboardPeriod =
   "today" | "weekly" | "monthly" | "3m" | "6m" | "annual"
@@ -590,7 +586,6 @@ function buildCashflowPoints(
 export async function getDashboardDataForAdmin(
   period: DashboardPeriod = "monthly"
 ): Promise<DashboardData> {
-  await ensureAllPaymentGateways()
   await settleDueInstallments()
   const db = getDb()
 
@@ -1042,16 +1037,15 @@ export async function getDashboardDataForAdmin(
   )
 
   const alerts: DashboardAlert[] = []
-  const sadadConfig = getSadadConfigStatus()
-
-  if (!sadadConfig.liveConfigured) {
-    alerts.push({
-      id: "alert-sadad-credentials",
-      title: "Sadad live credentials not configured",
-      description:
-        "Live Sadad environment variables (SADAD_MERCHANT_ID, SADAD_TERMINAL_ID, SADAD_TERMINAL_KEY) are missing. Simulator payments work normally.",
-      severity: "warning",
-    })
+  for (const service of await getReportingHealth()) {
+    if (service.status === "stale") {
+      alerts.push({
+        id: `alert-service-stale-${service.domain}`,
+        title: `${service.service} has payments stuck pending`,
+        description: `${service.stalePending} payment${service.stalePending === 1 ? " has" : "s have"} been pending for over two hours. The service's @obhco/pay reconcile job is probably not running, so verified payments may be missing from OBH.`,
+        severity: "warning",
+      })
+    }
   }
 
   for (const account of accounts) {
@@ -1130,7 +1124,7 @@ export async function getDashboardDataForAdmin(
       gatewayOrderId: String(payment.gatewayOrderId),
       service: payment.service?.name ?? "Unassigned",
       description: payment.description,
-      provider: payment.provider?.name ?? SADAD_PROVIDER_NAME,
+      provider: payment.provider?.name ?? "Unknown gateway",
       environment: payment.environment,
       amount: toNumber(payment.amount),
       currency: payment.currency,

@@ -4,17 +4,6 @@ import { randomBytes } from "node:crypto"
 
 import { getDb } from "@/lib/db/client"
 import {
-  ensureAllPaymentGateways,
-  ensureSadadGateway,
-} from "@/server/gateways/gateway-service"
-import { getSadadCallbackUrl } from "@/server/payments/api-payment-service"
-import {
-  getSadadConfigStatus,
-  SADAD_PROVIDER_CODE,
-  SADAD_PROVIDER_NAME,
-  type SadadConfigStatus,
-} from "@/server/payments/providers/sadad"
-import {
   generateServiceCredential,
   hashServiceSecret,
 } from "@/server/payments/service-credentials"
@@ -74,24 +63,6 @@ export type AdminPaymentProvider = {
   isActive: boolean
   accounts: AdminProviderAccount[]
   paymentCount: number
-}
-
-export type AdminSadadGatewayOverview = {
-  providerId: string
-  code: typeof SADAD_PROVIDER_CODE
-  name: typeof SADAD_PROVIDER_NAME
-  description: string
-  callbackUrl: string
-  config: SadadConfigStatus
-  accounts: AdminProviderAccount[]
-  stats: {
-    totalPayments: number
-    verifiedPayments: number
-    failedPayments: number
-    pendingPayments: number
-    testPayments: number
-    livePayments: number
-  }
 }
 
 export type AdminPaymentStatus =
@@ -279,70 +250,6 @@ export async function getConnectedServicesForAdmin(): Promise<
   )
 }
 
-export async function getSadadGatewayForAdmin(): Promise<AdminSadadGatewayOverview> {
-  const { provider } = await ensureSadadGateway()
-  const db = getDb()
-
-  const [accounts, total, verified, failed, pending, testCount, liveCount] =
-    await Promise.all([
-      db.financialAccount.findMany({
-        where: { providerId: provider.id, kind: "PROVIDER" },
-        orderBy: { environment: "desc" },
-        include: {
-          provider: { select: { name: true } },
-          _count: { select: { payments: true } },
-        },
-      }),
-      db.payment.count({ where: { providerId: provider.id } }),
-      db.payment.count({
-        where: { providerId: provider.id, status: "COMPLETED" },
-      }),
-      db.payment.count({
-        where: { providerId: provider.id, status: "FAILED" },
-      }),
-      db.payment.count({
-        where: { providerId: provider.id, status: "PENDING" },
-      }),
-      db.payment.count({
-        where: { providerId: provider.id, environment: "TEST" },
-      }),
-      db.payment.count({
-        where: { providerId: provider.id, environment: "LIVE" },
-      }),
-    ])
-
-  return {
-    providerId: provider.id,
-    code: SADAD_PROVIDER_CODE,
-    name: SADAD_PROVIDER_NAME,
-    description:
-      provider.description ??
-      "Official Sadad (Bank Melli Iran) Internet Payment Gateway.",
-    callbackUrl: getSadadCallbackUrl(),
-    config: getSadadConfigStatus(),
-    accounts: accounts.map((account) => ({
-      id: account.id,
-      name: account.name,
-      providerId: account.providerId,
-      providerName: account.provider?.name ?? SADAD_PROVIDER_NAME,
-      environment: account.environment,
-      currency: account.currency,
-      externalReference: account.externalReference,
-      isActive: account.isActive,
-      paymentCount: account._count.payments,
-      createdAt: account.createdAt.toISOString(),
-    })),
-    stats: {
-      totalPayments: total,
-      verifiedPayments: verified,
-      failedPayments: failed,
-      pendingPayments: pending,
-      testPayments: testCount,
-      livePayments: liveCount,
-    },
-  }
-}
-
 type PaymentRow = Awaited<
   ReturnType<ReturnType<typeof getDb>["payment"]["findMany"]>
 >[number]
@@ -396,7 +303,6 @@ function mapAdminPayment(
 }
 
 export async function getPaymentsForAdmin(): Promise<AdminPayment[]> {
-  await ensureAllPaymentGateways()
   const payments = await getDb().payment.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,
@@ -441,8 +347,8 @@ export async function getPaymentsForAdmin(): Promise<AdminPayment[]> {
       ...base,
       serviceName: payment.service?.name ?? null,
       serviceDomain: payment.service?.domain ?? null,
-      providerName: payment.provider?.name ?? SADAD_PROVIDER_NAME,
-      providerCode: payment.provider?.code ?? SADAD_PROVIDER_CODE,
+      providerName: payment.provider?.name ?? "Unknown gateway",
+      providerCode: payment.provider?.code ?? "unknown",
       providerAccountName: payment.providerAccount?.name ?? null,
       events: payment.events.map((event) => ({
         id: event.id,

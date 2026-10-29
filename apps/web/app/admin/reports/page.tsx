@@ -349,6 +349,80 @@ export default async function AdminReportsPage({
 
       <section className="mt-4 overflow-hidden rounded-2xl border border-border bg-card/40">
         <div className="border-b border-border p-4">
+          <p className="text-xs font-medium">Gateways by service</p>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            LIVE payment attempts created in the range, as reported by each
+            service from its own gateway terminal.
+          </p>
+        </div>
+        <ReportTable
+          caption="Gateways by service"
+          headers={[
+            "Service",
+            "Gateway",
+            "Attempts",
+            "Completed",
+            "Failed",
+            "Pending",
+            "Success rate",
+            "Volume",
+          ]}
+          rows={report.gatewayBreakdown.map((row) => [
+            row.service,
+            row.gateway,
+            String(row.attempts),
+            String(row.completedCount),
+            String(row.failedCount),
+            String(row.pendingCount),
+            row.successRate === null ? "—" : `${row.successRate}%`,
+            formatIrrDecimal(row.completedAmount),
+          ])}
+          empty="No LIVE payments were reported in this range."
+          alignLast
+        />
+      </section>
+
+      <section className="mt-4 overflow-hidden rounded-2xl border border-border bg-card/40">
+        <div className="border-b border-border p-4">
+          <p className="text-xs font-medium">Service reporting health</p>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            Whether each active service is sending payments to OBH. A service
+            is silent after seven days without a report, and stale when
+            payments stay pending for over two hours (its reconcile job is not
+            running).
+          </p>
+        </div>
+        <ReportTable
+          caption="Service reporting health"
+          headers={[
+            "Service",
+            "Domain",
+            "Active keys",
+            "Last report",
+            "Stale pending",
+            "Status",
+          ]}
+          rows={report.reportingHealth.map((row) => [
+            row.service,
+            row.domain,
+            String(row.activeCredentials),
+            row.lastReportAt
+              ? formatAccountingDate(row.lastReportAt.slice(0, 10))
+              : "Never",
+            String(row.stalePending),
+            row.status === "reporting"
+              ? "Reporting"
+              : row.status === "stale"
+                ? "Stale"
+                : "Silent",
+          ])}
+          empty="No active connected services."
+          alignLast
+        />
+      </section>
+
+      <section className="mt-4 overflow-hidden rounded-2xl border border-border bg-card/40">
+        <div className="border-b border-border p-4">
           <p className="text-xs font-medium">Income by source</p>
           <p className="mt-1 text-[10px] text-muted-foreground">
             Manual income records in the reporting range.

@@ -14,7 +14,6 @@ import type { AdminPayment } from "@/server/payments/queries"
 type PaymentDetailDialogProps = {
   payment: AdminPayment | null
   onOpenChange: (open: boolean) => void
-  onSimulate?: (payment: AdminPayment) => void
   onDelete?: (payment: AdminPayment) => void
   deleting?: boolean
 }
@@ -35,7 +34,6 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
 function PaymentDetailDialog({
   payment,
   onOpenChange,
-  onSimulate,
   onDelete,
   deleting,
 }: PaymentDetailDialogProps) {
@@ -381,20 +379,6 @@ function PaymentDetailDialog({
               Open Sadad Checkout
               <ExternalLink aria-hidden="true" className="size-3.5" />
             </a>
-          ) : null}
-          {payment.status === "PENDING" &&
-          payment.environment === "TEST" &&
-          onSimulate ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                onOpenChange(false)
-                onSimulate(payment)
-              }}
-            >
-              Simulate result
-            </Button>
           ) : null}
           {onDelete ? (
             <Button

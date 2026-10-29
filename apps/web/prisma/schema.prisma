@@ -168,6 +168,7 @@ model ConnectedService {
 
   credentials        ServiceCredential[]
   payments           Payment[]
+  accounts           FinancialAccount[]
   idempotencyRecords PaymentIdempotencyRecord[]
   webhookDeliveries  WebhookDelivery[]
   income             Income[]
@@ -248,6 +249,8 @@ model FinancialAccount {
   name              String               @db.VarChar(160)
   kind              AccountKind
   providerId        String?              @db.Uuid
+  /// Set for gateway accounts that belong to one service's own terminal.
+  serviceId         String?              @db.Uuid
   environment       ProviderEnvironment?
   externalReference String?              @db.VarChar(191)
   institution       String?              @db.VarChar(160)
@@ -261,6 +264,7 @@ model FinancialAccount {
   updatedAt         DateTime             @updatedAt @db.Timestamptz(3)
 
   provider             PaymentProvider?        @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  service              ConnectedService?       @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   payments             Payment[]               @relation("PaymentProviderAccount")
   fees                 ProviderFee[]
   transfersFrom        Transfer[]              @relation("TransferFromAccount")
@@ -274,6 +278,7 @@ model FinancialAccount {
 
   @@index([kind, isActive])
   @@index([providerId])
+  @@index([serviceId])
 }
 
 /// A manual reconciliation snapshot. Balances are otherwise calculated from
@@ -328,6 +333,9 @@ model Payment {
   gatewayOrderId     BigInt              @unique @default(autoincrement())
   serviceId          String?             @db.Uuid
   externalOrderId    String?             @db.VarChar(191)
+  /// Id of this attempt in the service's own database (`@obhco/pay`
+  /// `reference`). Payments are reported by the service, not created here.
+  serviceReference   String?             @db.VarChar(64)
   idempotencyKey     String?             @db.VarChar(191)
   amount             Decimal             @db.Decimal(24, 2)
   currency           String              @default("IRR") @db.VarChar(3)
@@ -368,6 +376,7 @@ model Payment {
   installmentPlan    InstallmentPlan?
 
   @@unique([serviceId, externalOrderId])
+  @@unique([serviceId, serviceReference])
   @@unique([serviceId, idempotencyKey])
   @@index([status, createdAt])
   @@index([environment, status, createdAt])

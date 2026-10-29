@@ -102,20 +102,13 @@ Next.js sets baseline security headers from `next.config.ts`:
 The proxy should add request-size limits and rate limits for `/login` and
 `/api/v1/*`. Application-level login/API rate limiting is not implemented yet.
 
-## Background worker
+## Background work
 
-Webhook delivery attempts happen immediately and pending retries remain in the
-database. Schedule:
-
-```bash
-pnpm webhooks:process
-```
-
-every minute from cron, a platform scheduler, or a managed worker. Run only one
-worker at a time unless delivery claiming is added to prevent duplicate attempts.
-
-In production the web server runs this every minute itself
-(`apps/web/instrumentation.ts`; disable with `OBH_WEBHOOK_WORKER=false`).
+OBH runs no background worker: it no longer sends webhooks or talks to bank
+gateways. Services report payments to `POST /api/v1/finance/events` with
+`@obhco/pay`; each service should run `pay.reconcile()` on a schedule so lost
+callbacks and unacknowledged reports are retried. The reports page flags
+services whose payments stay pending too long.
 
 ## Private document storage
 

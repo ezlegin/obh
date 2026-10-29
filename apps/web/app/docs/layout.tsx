@@ -68,6 +68,20 @@ export default function DocsLayout({
           tabIndex={-1}
           className="min-w-0 flex-1 pt-8 outline-none lg:pl-1"
         >
+          <aside
+            role="note"
+            className="mb-8 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6"
+          >
+            <strong className="font-medium">
+              The hosted OBH payment API has been retired.
+            </strong>{" "}
+            OBH no longer processes payments or hosts gateways. Services now
+            take payments with <code>@obhco/pay</code> using their own gateway
+            terminal, and report finances to OBH. The pages below describe the
+            old <code>@obhco/payments</code> SDK and are kept for reference
+            only; see the <code>@obhco/pay</code> README for current
+            instructions.
+          </aside>
           {children}
           <DocsFooter />
         </main>

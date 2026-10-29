@@ -22,51 +22,30 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table"
 import { AdminEmptyState } from "@/components/admin/empty-state"
-import { CreatePaymentDialog } from "@/components/admin/payments/create-payment-dialog"
 import { PaymentDetailDialog } from "@/components/admin/payments/payment-detail-dialog"
 import { PaymentStatusBadge } from "@/components/admin/payments/payment-status-badge"
-import { SimulateResultDialog } from "@/components/admin/payments/simulate-result-dialog"
 import {
   deleteAllTestPaymentsAction,
   deletePaymentAction,
 } from "@/app/admin/payments/actions"
 import { formatDevelopmentDate, formatIrrDecimal } from "@/lib/admin/format"
 import type { AdminPayment } from "@/server/payments/queries"
-import type { AdminPaymentGatewayOption } from "@/server/payments/providers/registry"
-
-type PaymentServiceOption = {
-  id: string
-  name: string
-  domain: string
-}
 
 type EnvironmentFilter = "LIVE" | "TEST" | "ALL"
 
 type PaymentsManagerProps = {
   payments: AdminPayment[]
-  services: PaymentServiceOption[]
-  gateways: AdminPaymentGatewayOption[]
 }
 
-function PaymentsManager({
-  payments,
-  services,
-  gateways,
-}: PaymentsManagerProps) {
+function PaymentsManager({ payments }: PaymentsManagerProps) {
   const router = useRouter()
   const [search, setSearch] = useState("")
   const [environmentFilter, setEnvironmentFilter] =
     useState<EnvironmentFilter>("LIVE")
-  const [createOpen, setCreateOpen] = useState(false)
   const [detailPayment, setDetailPayment] = useState<AdminPayment | null>(null)
-  const [simulatePayment, setSimulatePayment] = useState<AdminPayment | null>(
-    null
-  )
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [clearingTest, setClearingTest] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const canCreate = services.length > 0
 
   const removePayment = async (payment: AdminPayment) => {
     if (
@@ -242,27 +221,6 @@ function PaymentsManager({
           className="flex items-center justify-end gap-2"
           onClick={(event) => event.stopPropagation()}
         >
-          {payment.status === "PENDING" && payment.checkoutUrl ? (
-            <a
-              href={payment.checkoutUrl}
-              target="_blank"
-              rel="noreferrer"
-              className={buttonVariants({ variant: "outline", size: "xs" })}
-            >
-              Checkout
-              <ArrowUpRight aria-hidden="true" className="size-3" />
-            </a>
-          ) : null}
-          {payment.status === "PENDING" && payment.environment === "TEST" ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              onClick={() => setSimulatePayment(payment)}
-            >
-              Simulate
-            </Button>
-          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -302,33 +260,10 @@ function PaymentsManager({
           {error}
         </div>
       ) : null}
-      {!canCreate ? (
-        <div className="mt-8 grid gap-3 rounded-2xl border border-border bg-card/40 p-5 md:grid-cols-2">
-          <div>
-            <p className="font-mono text-[9px] tracking-[0.12em] text-muted-foreground/60 uppercase">
-              Setup required
-            </p>
-            <p className="mt-2 text-sm font-medium">
-              Register at least one active connected service before creating a
-              test payment.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 md:justify-end">
-            <Link
-              href="/admin/services"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              Manage services
-              <ArrowUpRight aria-hidden="true" className="size-3.5" />
-            </Link>
-          </div>
-        </div>
-      ) : null}
-
       <div
         className={cn(
           "overflow-hidden rounded-2xl border border-border bg-card/40",
-          canCreate ? "mt-8" : "mt-4"
+          "mt-8"
         )}
       >
         <div className="flex flex-col justify-between gap-4 border-b border-border p-5 sm:flex-row sm:items-end sm:p-6">
@@ -398,16 +333,6 @@ function PaymentsManager({
               )}
               Remove test payments
             </Button>
-
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => setCreateOpen(true)}
-              disabled={!canCreate}
-            >
-              <Plus aria-hidden="true" className="size-3.5" />
-              New payment
-            </Button>
           </div>
         </div>
 
@@ -455,9 +380,7 @@ function PaymentsManager({
                   ? "Clear the search to see recorded payments."
                   : environmentFilter === "LIVE" && counts.test > 0
                     ? `There are ${counts.test} test payment${counts.test === 1 ? "" : "s"} recorded. Switch the filter to Test or All to view them.`
-                    : canCreate
-                      ? "Create a TEST payment or initiate one from a connected service via @obhco/payments."
-                      : "Register a connected service first."
+                    : "Payments appear here when a connected service reports them with @obhco/pay."
               }
               action={
                 search ? (
@@ -478,31 +401,12 @@ function PaymentsManager({
                   >
                     Show all payments ({counts.all})
                   </Button>
-                ) : canCreate ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setCreateOpen(true)}
-                  >
-                    <Plus aria-hidden="true" className="size-3.5" />
-                    Create test payment
-                  </Button>
                 ) : null
               }
             />
           }
         />
       </div>
-
-      {canCreate ? (
-        <CreatePaymentDialog
-          open={createOpen}
-          onOpenChange={setCreateOpen}
-          services={services}
-          gateways={gateways}
-          onCreated={() => router.refresh()}
-        />
-      ) : null}
 
       <PaymentDetailDialog
         payment={detailPayment}
@@ -511,19 +415,8 @@ function PaymentsManager({
             setDetailPayment(null)
           }
         }}
-        onSimulate={(payment) => setSimulatePayment(payment)}
         onDelete={(payment) => removePayment(payment)}
         deleting={Boolean(detailPayment && deletingId === detailPayment.id)}
-      />
-
-      <SimulateResultDialog
-        payment={simulatePayment}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSimulatePayment(null)
-          }
-        }}
-        onCompleted={() => router.refresh()}
       />
     </>
   )

@@ -31,9 +31,9 @@ The local `.env.local` contains local development secrets and database settings;
 it is ignored by Git. For deployment, set both variables through the hosting
 environment.
 
-`AUTH_SECRET` is also used to derive the encryption key for per-service webhook
-signing secrets. Rotating it without rotating those service webhook secrets makes
-the existing encrypted secrets unreadable. See `PAYMENT_API.md`.
+`AUTH_SECRET` is also used to derive the encryption key for stored service
+credentials. Rotating it makes the existing encrypted credentials unreadable;
+re-issue them in Admin → Services. See `PAYMENT_API.md`.
 
 ## Create a manager
 

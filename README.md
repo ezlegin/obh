@@ -49,9 +49,7 @@ pnpm dev           # Turborepo dev task for all configured apps
 pnpm build         # Prisma generate + production build
 pnpm lint          # ESLint for every workspace package
 pnpm typecheck     # strict TypeScript checks
-pnpm test          # payment/API/SDK unit tests
-pnpm test:integration # local API + SDK integration test (requires local server)
-pnpm webhooks:process # process due webhook retries
+pnpm test          # unit tests (app + @obhco/pay)
 pnpm db:validate   # validate the Prisma schema
 pnpm db:generate   # generate the Prisma 7 client
 pnpm db:push       # push the schema directly to the database
@@ -122,49 +120,17 @@ implemented.
 No registration, password reset, MFA, or login rate limiting is implemented yet.
 See [`apps/web/AUTH.md`](apps/web/AUTH.md).
 
-## Payment platform and SDK
+## Payments and finance reporting
 
-The versioned API contract and security model are documented in
-[`apps/web/PAYMENT_API.md`](apps/web/PAYMENT_API.md). The server-side SDK is
-[`@obhco/payments`](packages/payments), version `0.1.0`, published on npm as
-[`@obhco/payments`](https://www.npmjs.com/package/@obhco/payments).
+OBH does not process payments or host gateways. Each connected service takes
+payments with its own bank-gateway terminal using
+[`@obhco/pay`](packages/pay) (Sadad, Zarinpal, Mellat, Digipay) and reports
+every payment to OBH, which handles accounting, per-service settlement
+accounts, installment schedules, reconciliation and reports. The report
+contract is in [`apps/web/PAYMENT_API.md`](apps/web/PAYMENT_API.md).
 
-Implemented in Step 5:
-
-- connected-service registration with exact return URL allowlists and a default
-  return URL
-- one-time TEST credential issuance and revocation, with only hashed secrets
-  stored
-- a server-side provider adapter boundary
-- an explicit local-only development adapter that supports TEST only
-- development provider and TEST provider-account setup
-- payment creation, provider session creation, lifecycle transitions, payment
-  events, verification attempts, and audit records
-- an admin TEST payment console that exercises success and failure paths
-- duplicate external-order prevention
-- unit tests for lifecycle transitions, credential hashing, and adapter behavior
-
-Implemented in Step 6:
-
-- `POST /api/v1/payments` and `GET /api/v1/payments/{reference}`
-- Bearer service authentication, revocation, last-used tracking, and service
-  isolation
-- idempotency keys and canonical request fingerprints
-- provider checkout URL generation and a local development checkout
-- server-side development verification producing completed/failed records
-- signed `payment.completed` / `payment.failed` webhooks with retries
-- encrypted per-service webhook signing secrets and rotation in admin
-- `@obhco/payments` with typed errors, timeouts, idempotency support, and a
-  server-only guard
-- local API/SDK integration tests covering cross-service isolation, idempotency,
-  signed webhooks, retry delivery, and revoked credentials
-
-Every payment created in this environment is TEST and uses the development
-adapter. No real payment provider has been contacted, no real money has moved,
-and the SDK has not been published or tested against a live provider. The
-development adapter is disabled in production builds unless explicitly enabled in
-an approved test environment; see
-[`DEVELOPMENT_PAYMENTS.md`](apps/web/DEVELOPMENT_PAYMENTS.md).
+The hosted payment API and its SDK, `@obhco/payments`, are retired
+(`/api/v1/payments` answers `410`).
 
 ## Accounting and expenses
 

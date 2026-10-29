@@ -1,5 +1,10 @@
 # @obhco/payments changelog
 
+## Deprecated
+
+The hosted OBH payment API was retired, so this package no longer has a
+backend to talk to. Use `@obhco/pay` inside your service instead.
+
 ## 0.2.0 — unreleased
 
 - Added `listGateways()` (`GET /api/v1/gateways`) so checkout pages can list
