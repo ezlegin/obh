@@ -539,6 +539,20 @@ export class Pay {
   }
 
   /**
+   * Verifies a still-pending payment again, now. Use it when the customer
+   * is back (result page, "check again") and the first verify did not come
+   * back with an answer. Only payments whose bank callback arrived are
+   * verified; anything else is returned unchanged.
+   */
+  async recheck(reference: string): Promise<PaymentRecord | null> {
+    const payment = await this.store.findByReference(reference)
+    if (!payment || payment.status !== "pending" || !payment.callbackReceivedAt) {
+      return payment
+    }
+    return (await this.verify(payment)).payment
+  }
+
+  /**
    * Housekeeping to run every few minutes (cron, queue, or a scheduled
    * route): expires abandoned sessions, retries verifies that hit a network
    * error, and re-sends reports OBH has not acknowledged.

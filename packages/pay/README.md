@@ -159,6 +159,10 @@ const { expired, reverified, reported } = await pay.reconcile()
 Without it, a payment whose callback was lost stays pending, and OBH shows the
 service as **stale** on its reports page.
 
+When the customer comes back and the payment is still pending (the bank's verify
+gave no answer the first time), call `await pay.recheck(reference)` to verify it
+again right away.
+
 ## What OBH receives
 
 For every state change the package sends one `payment.snapshot` (the full
