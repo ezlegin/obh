@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from "react"
 import { buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { LanguageSwitch } from "@/components/language-switch"
 import { Logo } from "@/components/logo"
 import { SiteContainer } from "@/components/site-container"
 import type { Dictionary } from "@/lib/i18n"
@@ -39,22 +38,14 @@ function SiteHeader({ locale, labels, navigation }: SiteHeaderProps) {
   const t = labels
 
   const navigationItems = [
-    {
-      label: navigation.ecosystem,
-      href: localizeHref(locale, "/#services"),
-    },
+    { label: navigation.services, href: localizeHref(locale, "/#services") },
+    { label: navigation.plans, href: localizeHref(locale, "/#plans") },
     {
       label: navigation.corporation,
       href: localizeHref(locale, "/about-us"),
     },
     { label: navigation.terms, href: localizeHref(locale, "/terms") },
   ]
-
-  const languageLabels = {
-    language: t.language,
-    english: t.english,
-    persian: t.persian,
-  }
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -138,11 +129,15 @@ function SiteHeader({ locale, labels, navigation }: SiteHeaderProps) {
             />
           </a>
 
-          <LanguageSwitch
-            locale={locale}
-            labels={languageLabels}
-            className="shrink-0"
-          />
+          <Link
+            href="/login"
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "sm" }),
+              "hidden md:inline-flex"
+            )}
+          >
+            {t.login}
+          </Link>
 
           <Link
             href={localizeHref(locale, "/contact-us")}
@@ -195,7 +190,6 @@ function SiteHeader({ locale, labels, navigation }: SiteHeaderProps) {
               <Logo className="h-[1.375rem]" />
             </Link>
             <div className="flex items-center gap-2">
-              <LanguageSwitch locale={locale} labels={languageLabels} />
               <button
                 type="button"
                 aria-label={t.closeMenu}
@@ -263,6 +257,16 @@ function SiteHeader({ locale, labels, navigation }: SiteHeaderProps) {
           </div>
 
           <div className="shrink-0 border-t border-border p-5">
+            <Link
+              href="/login"
+              onClick={() => setIsMenuOpen(false)}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "mb-3 w-full"
+              )}
+            >
+              {t.login}
+            </Link>
             <Link
               href={localizeHref(locale, "/contact-us")}
               onClick={() => setIsMenuOpen(false)}

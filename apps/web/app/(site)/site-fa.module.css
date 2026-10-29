@@ -1,6 +1,6 @@
 .root {
   font-family:
-    "Vazirmatn", "Vazir", "IRANSansX", "IRANSans", "Segoe UI", Tahoma,
+    var(--font-vazirmatn), "Vazirmatn", "Vazir", "IRANSansX", "IRANSans", "Segoe UI", Tahoma,
     "Noto Sans Arabic", Arial, sans-serif;
 }
 
@@ -10,4 +10,10 @@
 
 .root :is(h1, h2, h3) {
   line-height: 1.2;
+}
+
+.root :global(.eyebrow),
+.root :global(.font-mono) {
+  font-family: inherit;
+  text-transform: none;
 }

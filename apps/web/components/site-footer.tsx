@@ -20,6 +20,9 @@ function SiteFooter({ locale, dictionary }: SiteFooterProps) {
   const details = getContactDetails()
 
   const navigation = [
+    { label: t.links.services, href: localizeHref(locale, "/#services") },
+    { label: t.links.plans, href: localizeHref(locale, "/#plans") },
+    { label: t.links.checkout, href: localizeHref(locale, "/checkout") },
     { label: t.links.about, href: localizeHref(locale, "/about-us") },
     { label: t.links.contact, href: localizeHref(locale, "/contact-us") },
     { label: t.links.terms, href: localizeHref(locale, "/terms") },
