@@ -17,29 +17,32 @@ const vazirmatn = Vazirmatn({
 
 export const metadata: Metadata = {
   title: {
-    default: "OBH — طراحی و توسعه وب‌سایت",
-    template: "%s — OBH",
+    default: "OBH Corporation — Financial infrastructure",
+    template: "%s — OBH Corporation",
   },
   description:
-    "OBH یک استودیوی طراحی و برنامه‌نویسی وب‌سایت است: وب‌سایت شرکتی، فروشگاه اینترنتی و اپلیکیشن وب با سه پلن استارتر، پرو و اولترا.",
+    "OBH is an IT corporation building a centralized financial platform for payments, accounting, and ownership across its portfolio of digital services.",
   applicationName: "OBH",
   category: "technology",
   icons: {
     icon: [{ url: "/obh-logo.svg", type: "image/svg+xml" }],
   },
   openGraph: {
-    title: "OBH — طراحی و توسعه وب‌سایت",
+    title: "OBH Corporation — Financial infrastructure",
     description:
-      "طراحی و برنامه‌نویسی وب‌سایت شرکتی، فروشگاه اینترنتی و اپلیکیشن وب.",
-    siteName: "OBH",
-    locale: "fa_IR",
+      "A centralized financial layer for the OBH ecosystem: payments, accounting, and ownership.",
+    siteName: "OBH Corporation",
+    locale: "en",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "OBH — طراحی و توسعه وب‌سایت",
+    title: "OBH Corporation — Financial infrastructure",
     description:
-      "طراحی و برنامه‌نویسی وب‌سایت شرکتی، فروشگاه اینترنتی و اپلیکیشن وب.",
+      "A centralized financial layer for the OBH ecosystem: payments, accounting, and ownership.",
+  },
+  alternates: {
+    languages: { en: "/", fa: "/fa" },
   },
   robots: {
     index: true,

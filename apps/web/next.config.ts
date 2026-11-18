@@ -4,12 +4,6 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@workspace/ui"],
   devIndicators: false,
   poweredByHeader: false,
-  async redirects() {
-    return [
-      { source: "/fa", destination: "/", permanent: true },
-      { source: "/fa/:path*", destination: "/:path*", permanent: true },
-    ]
-  },
   async headers() {
     const headers = [
       { key: "X-Frame-Options", value: "DENY" },
