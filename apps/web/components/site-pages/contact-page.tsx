@@ -226,7 +226,7 @@ function ContactPage({ locale, dictionary }: ContactPageProps) {
               </h2>
             </div>
             <Link
-              href={localizeHref(locale, "/#services")}
+              href={localizeHref(locale, "/#ecosystem")}
               className={buttonVariants({ variant: "outline", size: "lg" })}
             >
               {t.closing.cta}

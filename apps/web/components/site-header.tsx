@@ -41,7 +41,7 @@ function SiteHeader({ locale, labels, navigation }: SiteHeaderProps) {
   const navigationItems = [
     {
       label: navigation.ecosystem,
-      href: localizeHref(locale, "/#services"),
+      href: localizeHref(locale, "/#ecosystem"),
     },
     {
       label: navigation.corporation,

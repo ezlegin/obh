@@ -17,29 +17,29 @@ const vazirmatn = Vazirmatn({
 
 export const metadata: Metadata = {
   title: {
-    default: "OBH Corporation — Financial infrastructure",
+    default: "OBH Corporation — Technology company",
     template: "%s — OBH Corporation",
   },
   description:
-    "OBH is an IT corporation building a centralized financial platform for payments, accounting, and ownership across its portfolio of digital services.",
+    "OBH Corporation is a technology company that designs, builds, and operates a group of digital services, with one team and a shared foundation behind them.",
   applicationName: "OBH",
   category: "technology",
   icons: {
     icon: [{ url: "/obh-logo.svg", type: "image/svg+xml" }],
   },
   openGraph: {
-    title: "OBH Corporation — Financial infrastructure",
+    title: "OBH Corporation — Technology company",
     description:
-      "A centralized financial layer for the OBH ecosystem: payments, accounting, and ownership.",
+      "The official website of OBH Corporation, a technology company building and running a group of digital services.",
     siteName: "OBH Corporation",
     locale: "en",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "OBH Corporation — Financial infrastructure",
+    title: "OBH Corporation — Technology company",
     description:
-      "A centralized financial layer for the OBH ecosystem: payments, accounting, and ownership.",
+      "The official website of OBH Corporation, a technology company building and running a group of digital services.",
   },
   alternates: {
     languages: { en: "/", fa: "/fa" },

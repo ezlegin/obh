@@ -1,8 +1,14 @@
-import { ArrowDownRight, ArrowRight } from "lucide-react"
+import {
+  ArrowDownRight,
+  ArrowRight,
+  Code2,
+  Landmark,
+  Megaphone,
+  PenTool,
+} from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
-import { Badge } from "@workspace/ui/components/badge"
 import { buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -13,17 +19,33 @@ import { SiteContainer } from "@/components/site-container"
 import type { Dictionary } from "@/lib/i18n"
 import type { Locale } from "@/lib/i18n/config"
 import { localizeHref } from "@/lib/i18n/links"
+import { services } from "@/lib/site"
 import { leadership, portraitSrc, team } from "@/lib/team"
 
-const homeTeam = [...leadership, ...team].slice(0, 5)
+const staff = [...leadership, ...team]
+const homeTeam = staff.slice(0, 5)
+const capabilityIcons = [Code2, PenTool, Megaphone, Landmark] as const
 
 type HomePageProps = {
   locale: Locale
   dictionary: Dictionary
 }
 
+function formatCount(locale: Locale, value: number) {
+  return new Intl.NumberFormat(locale === "fa" ? "fa-IR" : "en-US", {
+    minimumIntegerDigits: 2,
+  }).format(value)
+}
+
 function HomePage({ locale, dictionary }: HomePageProps) {
   const t = dictionary.home
+
+  const stats = [
+    { value: formatCount(locale, services.length), label: t.stats.services },
+    { value: formatCount(locale, staff.length), label: t.stats.team },
+    { value: formatCount(locale, 4), label: t.stats.disciplines },
+    { value: formatCount(locale, 2), label: t.stats.languages },
+  ]
 
   return (
     <>
@@ -58,7 +80,7 @@ function HomePage({ locale, dictionary }: HomePageProps) {
 
             <div className="animate-rise animate-delay-200 mt-10 flex flex-wrap items-center gap-3">
               <Link
-                href="#services"
+                href="#ecosystem"
                 className={cn(buttonVariants({ size: "lg" }), "pe-5")}
               >
                 {t.primaryCta}
@@ -78,21 +100,6 @@ function HomePage({ locale, dictionary }: HomePageProps) {
                 />
               </Link>
             </div>
-
-            <div className="animate-fade mt-14 flex max-w-lg flex-wrap gap-x-7 gap-y-3 border-t border-border pt-5">
-              {t.highlights.map((item) => (
-                <span
-                  key={item}
-                  className="flex items-center gap-2 font-mono text-[9px] tracking-[0.1em] text-muted-foreground/65 uppercase"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="size-1 rounded-full bg-white/30"
-                  />
-                  {item}
-                </span>
-              ))}
-            </div>
           </div>
 
           <div className="animate-rise-slow animate-delay-200 lg:w-full lg:max-w-[33rem] lg:justify-self-end">
@@ -101,19 +108,42 @@ function HomePage({ locale, dictionary }: HomePageProps) {
         </SiteContainer>
       </section>
 
+      <section aria-label={t.stats.label} className="border-b border-border">
+        <SiteContainer>
+          <dl className="grid grid-cols-2 lg:grid-cols-4">
+            {stats.map((stat, index) => (
+              <div
+                key={stat.label}
+                className={cn(
+                  "border-border py-8 sm:py-10",
+                  index % 2 === 1 && "border-s ps-6 sm:ps-8",
+                  index >= 2 && "border-t lg:border-t-0",
+                  index === 2 && "lg:border-s lg:ps-8"
+                )}
+              >
+                <dt className="eyebrow">{stat.label}</dt>
+                <dd className="mt-3 text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">
+                  {stat.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </SiteContainer>
+      </section>
+
       <section className="border-b border-border py-24 sm:py-32">
         <SiteContainer>
           <div className="grid gap-12 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20">
             <div>
-              <SectionLabel index="01">{t.premise.label}</SectionLabel>
+              <SectionLabel index="01">{t.about.label}</SectionLabel>
             </div>
             <div>
               <h2 className="max-w-4xl text-3xl leading-[1.12] font-medium tracking-[-0.045em] text-balance sm:text-4xl lg:text-5xl">
-                {t.premise.title}
+                {t.about.title}
               </h2>
 
               <div className="mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
-                {t.premise.body.map((paragraph) => (
+                {t.about.body.map((paragraph) => (
                   <p
                     key={paragraph}
                     className="text-sm leading-7 text-muted-foreground"
@@ -123,20 +153,23 @@ function HomePage({ locale, dictionary }: HomePageProps) {
                 ))}
               </div>
 
-              <div className="mt-10 flex flex-wrap gap-2">
-                {t.premise.badges.map((badge) => (
-                  <Badge key={badge} variant="outline">
-                    {badge}
-                  </Badge>
-                ))}
-              </div>
+              <Link
+                href={localizeHref(locale, "/about-us")}
+                className="mt-10 inline-flex items-center gap-1.5 text-sm text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+              >
+                {t.about.cta}
+                <ArrowRight
+                  aria-hidden="true"
+                  className="size-3.5 rtl:-scale-x-100"
+                />
+              </Link>
             </div>
           </div>
         </SiteContainer>
       </section>
 
       <section
-        id="services"
+        id="ecosystem"
         className="scroll-mt-24 border-b border-border py-24 sm:py-32"
       >
         <SiteContainer>
@@ -169,46 +202,49 @@ function HomePage({ locale, dictionary }: HomePageProps) {
           className="fine-grid absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,black,transparent_88%)] opacity-60"
         />
         <SiteContainer className="relative">
-          <div className="grid gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
-            <div className="lg:sticky lg:top-28 lg:self-start">
-              <SectionLabel index="03">{t.platform.label}</SectionLabel>
-              <h2 className="mt-6 max-w-xl text-4xl leading-[1.02] font-semibold tracking-[-0.05em] text-balance sm:text-5xl">
-                {t.platform.title}
+          <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+            <div>
+              <SectionLabel index="03">{t.capabilities.label}</SectionLabel>
+              <h2 className="mt-6 max-w-2xl text-4xl leading-[1.02] font-semibold tracking-[-0.05em] text-balance sm:text-5xl">
+                {t.capabilities.title}
               </h2>
-              <div className="mt-7">
-                <Badge variant="warning">
-                  <span
-                    aria-hidden="true"
-                    className="size-1 rounded-full bg-warning"
-                  />
-                  {t.platform.badge}
-                </Badge>
-              </div>
-              <p className="mt-6 max-w-md text-sm leading-7 text-muted-foreground">
-                {t.platform.description}
-              </p>
             </div>
+            <p className="max-w-sm text-sm leading-6 text-muted-foreground">
+              {t.capabilities.description}
+            </p>
+          </div>
 
-            <div className="border-y border-border">
-              {t.platform.pillars.map((pillar) => (
+          <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2">
+            {t.capabilities.items.map((item, index) => {
+              const Icon = capabilityIcons[index] ?? Code2
+
+              return (
                 <article
-                  key={pillar.number}
-                  className="grid grid-cols-[2rem_1fr] gap-4 border-b border-border py-8 last:border-b-0 sm:grid-cols-[3rem_1fr] sm:gap-5 sm:py-10"
+                  key={item.title}
+                  className="flex flex-col bg-background p-7 sm:p-9"
                 >
-                  <span className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground/70">
-                    {pillar.number}
+                  <span className="flex size-11 items-center justify-center rounded-xl border border-border bg-white/[0.03] text-foreground/80">
+                    <Icon aria-hidden="true" className="size-5" />
                   </span>
-                  <div>
-                    <h3 className="text-xl font-medium tracking-[-0.025em] sm:text-2xl">
-                      {pillar.title}
-                    </h3>
-                    <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
-                      {pillar.description}
-                    </p>
-                  </div>
+                  <h3 className="mt-8 text-xl font-medium tracking-[-0.025em] sm:text-2xl">
+                    {item.title}
+                  </h3>
+                  <p className="mt-3 max-w-md text-sm leading-7 text-muted-foreground">
+                    {item.description}
+                  </p>
+                  <ul className="mt-6 flex flex-wrap gap-2">
+                    {item.tags.map((tag) => (
+                      <li
+                        key={tag}
+                        className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground"
+                      >
+                        {tag}
+                      </li>
+                    ))}
+                  </ul>
                 </article>
-              ))}
-            </div>
+              )
+            })}
           </div>
         </SiteContainer>
       </section>
@@ -310,6 +346,9 @@ function HomePage({ locale, dictionary }: HomePageProps) {
                 <h2 className="mt-5 max-w-2xl text-3xl leading-[1.06] font-semibold tracking-[-0.045em] text-balance sm:text-4xl lg:text-5xl">
                   {t.closing.title}
                 </h2>
+                <p className="mt-5 max-w-xl text-sm leading-7 text-muted-foreground">
+                  {t.closing.description}
+                </p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <Link
@@ -323,7 +362,7 @@ function HomePage({ locale, dictionary }: HomePageProps) {
                   />
                 </Link>
                 <Link
-                  href={localizeHref(locale, "/about-us")}
+                  href={localizeHref(locale, "/team")}
                   className={buttonVariants({
                     variant: "outline",
                     size: "lg",

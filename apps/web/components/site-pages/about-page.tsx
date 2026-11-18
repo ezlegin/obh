@@ -203,7 +203,7 @@ function AboutPage({ locale, dictionary }: AboutPageProps) {
             </div>
             <div className="flex flex-wrap gap-3">
               <Link
-                href={localizeHref(locale, "/#services")}
+                href={localizeHref(locale, "/#ecosystem")}
                 className={buttonVariants({ size: "lg" })}
               >
                 {t.next.primaryCta}

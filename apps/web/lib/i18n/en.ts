@@ -28,8 +28,8 @@ export const en = {
   },
   footer: {
     tagline:
-      "An IT corporation building a shared financial foundation for its portfolio of digital services.",
-    motto: "Technology / Finance / Ownership",
+      "OBH Corporation is a technology company that builds and runs a group of digital services.",
+    motto: "Product / Design / Operations",
     navigate: "Navigate",
     ecosystem: "Ecosystem",
     contact: "Contact",
@@ -42,94 +42,97 @@ export const en = {
       terms: "Terms of use",
     },
     copyright: "© {year} OBH Corporation. All rights reserved.",
-    builtFor: "Built for the OBH ecosystem",
+    builtFor: "Official website of OBH Corporation",
   },
   orbit: {
-    systemMap: "System map",
-    servicesCore: "Services / Core",
-    payments: "Payments",
-    accounting: "Accounting",
-    ownership: "Ownership",
+    systemMap: "The OBH group",
+    servicesCore: "Services / OBH",
+    payments: "Engineering",
+    accounting: "Design",
+    ownership: "Operations",
   },
   home: {
     corporation: "OBH Corporation",
-    eyebrow: "Financial infrastructure",
-    titleLead: "The financial core",
-    titleTail: "behind every OBH service.",
+    eyebrow: "Technology company",
+    titleLead: "We build and run",
+    titleTail: "digital services.",
     description:
-      "One central layer for payments, accounting, and ownership — designed to bring every OBH service onto the same financial truth.",
-    primaryCta: "Explore the ecosystem",
-    secondaryCta: "About the corporation",
-    highlights: [
-      "Centralized payments",
-      "Unified accounting",
-      "Defined ownership",
-    ],
-    premise: {
-      label: "The premise",
-      title: "Independent services should not mean disconnected books.",
+      "OBH Corporation is a technology company that designs, builds, and operates a group of digital services, with one team and a shared foundation behind every one of them.",
+    primaryCta: "Explore our services",
+    secondaryCta: "About OBH",
+    stats: {
+      label: "OBH at a glance",
+      services: "Digital services",
+      team: "Team members",
+      disciplines: "Disciplines",
+      languages: "Languages",
+    },
+    about: {
+      label: "Who we are",
+      title: "One company behind a growing group of independent products.",
       body: [
-        "OBH is an IT corporation behind a portfolio of digital services. Each service has its own product focus. The group provides the shared structure that connects them.",
-        "Rather than letting every service build its own payment and accounting stack, OBH is building one financial layer for the whole ecosystem — with clear boundaries and a single source of truth.",
+        "OBH Corporation creates and runs digital services, each with its own name, audience, and domain. From product and engineering to design, marketing, and operations, the work is done by one in-house team.",
+        "Sharing that team and its standards lets every service move faster, stay consistent in quality, and rely on the same infrastructure for the things every business needs.",
       ],
-      badges: [
-        "Centralized payment layer",
-        "Shared financial record",
-        "Ownership history",
-      ],
+      cta: "Read more about OBH",
     },
     ecosystem: {
       label: "Ecosystem",
       titleLead: "Six services.",
-      titleTail: "One financial standard.",
+      titleTail: "One group.",
       description:
-        "Independent products, connected by a shared operational foundation. Visit any service at its official domain.",
+        "Independent products, each with its own identity, built and operated by OBH. Visit any service at its official domain.",
     },
-    platform: {
-      label: "Platform direction",
-      title: "A single financial layer, with clear boundaries.",
-      badge: "Internal to the group",
+    capabilities: {
+      label: "What we do",
+      title: "Everything a digital service needs, under one roof.",
       description:
-        "The OBH platform serves the services within the group. It is not a public payment service, and this website does not process payments or offer financial services.",
-      pillars: [
+        "The same team carries each service from the first idea to daily operation, so nothing is lost between handoffs.",
+      items: [
         {
-          number: "01",
-          title: "Payments, without repetition",
+          title: "Product and engineering",
           description:
-            "One shared payment package for every OBH service, with each payment reported back to a single financial record instead of rebuilding provider logic service by service.",
+            "Web applications, platforms, and APIs, designed, built, and deployed in-house, then maintained over their whole life.",
+          tags: ["Web apps", "APIs", "Infrastructure"],
         },
         {
-          number: "02",
-          title: "Accounting, without blurred lines",
+          title: "Design",
           description:
-            "Revenue, expenses, balances, and cash flow held in distinct records, with exact amounts and a clear audit trail behind every financial statement.",
+            "Interfaces, brand identities, and product experiences that give each service its own character and keep it easy to use.",
+          tags: ["UI and UX", "Brand", "Content"],
         },
         {
-          number: "03",
-          title: "Ownership, without ambiguity",
+          title: "Marketing and operations",
           description:
-            "Shareholder allocations and distribution history calculated from preserved ownership records, not overwritten summaries or informal agreements.",
+            "Launching services, growing their audiences, and running them day to day, from support to performance reporting.",
+          tags: ["Growth", "Support", "Operations"],
+        },
+        {
+          title: "Shared financial platform",
+          description:
+            "One platform for payments, accounting, and ownership records, so every OBH service works from the same financial record.",
+          tags: ["Payments", "Accounting", "Reporting"],
         },
       ],
     },
     principles: {
       label: "Principles",
-      title: "Quiet systems. Exact numbers.",
+      title: "Built with care. Run for the long term.",
       items: [
         {
-          title: "Precision",
+          title: "Craft",
           description:
-            "Financial records should be explainable to the last unit, never rounded away or presented without context.",
+            "We sweat the details of every product, from the interface people see to the systems they never notice.",
+        },
+        {
+          title: "Ownership",
+          description:
+            "Each service has a team that is accountable for it, from launch through every day it is in operation.",
         },
         {
           title: "Clarity",
           description:
-            "Actual balances, calculated balances, and pending amounts should always be visibly distinct.",
-        },
-        {
-          title: "Stewardship",
-          description:
-            "Access, changes, and distributions should leave a history that can be reviewed and trusted.",
+            "Clear decisions, clear records, and clear communication, inside the company and with everyone we work with.",
         },
       ],
     },
@@ -139,10 +142,12 @@ export const en = {
       cta: "Meet the team",
     },
     closing: {
-      label: "Start a conversation",
-      title: "A clearer financial foundation starts with a conversation.",
+      label: "Work with OBH",
+      title: "Let’s build something together.",
+      description:
+        "For partnerships, careers, or questions about any of our services, the OBH team is a message away.",
       primaryCta: "Contact OBH",
-      secondaryCta: "About the corporation",
+      secondaryCta: "Meet the team",
     },
   },
   about: {
