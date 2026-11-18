@@ -47,6 +47,7 @@ function SiteHeader({ locale, labels, navigation }: SiteHeaderProps) {
       label: navigation.corporation,
       href: localizeHref(locale, "/about-us"),
     },
+    { label: navigation.team, href: localizeHref(locale, "/team") },
     { label: navigation.terms, href: localizeHref(locale, "/terms") },
   ]
 

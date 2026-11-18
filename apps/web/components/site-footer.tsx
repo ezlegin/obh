@@ -21,6 +21,7 @@ function SiteFooter({ locale, dictionary }: SiteFooterProps) {
 
   const navigation = [
     { label: t.links.about, href: localizeHref(locale, "/about-us") },
+    { label: t.links.team, href: localizeHref(locale, "/team") },
     { label: t.links.contact, href: localizeHref(locale, "/contact-us") },
     { label: t.links.terms, href: localizeHref(locale, "/terms") },
   ]

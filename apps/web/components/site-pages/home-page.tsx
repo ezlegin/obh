@@ -1,4 +1,5 @@
 import { ArrowDownRight, ArrowRight } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 
 import { Badge } from "@workspace/ui/components/badge"
@@ -12,6 +13,9 @@ import { SiteContainer } from "@/components/site-container"
 import type { Dictionary } from "@/lib/i18n"
 import type { Locale } from "@/lib/i18n/config"
 import { localizeHref } from "@/lib/i18n/links"
+import { leadership, portraitSrc, team } from "@/lib/team"
+
+const homeTeam = [...leadership, ...team].slice(0, 5)
 
 type HomePageProps = {
   locale: Locale
@@ -239,6 +243,57 @@ function HomePage({ locale, dictionary }: HomePageProps) {
               ))}
             </div>
           </div>
+        </SiteContainer>
+      </section>
+
+      <section className="border-b border-border py-24 sm:py-32">
+        <SiteContainer>
+          <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+            <div>
+              <SectionLabel index="05">{t.team.label}</SectionLabel>
+              <h2 className="mt-6 max-w-xl text-4xl leading-[1.02] font-semibold tracking-[-0.05em] text-balance sm:text-5xl">
+                {t.team.title}
+              </h2>
+            </div>
+            <Link
+              href={localizeHref(locale, "/team")}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "self-start sm:self-auto"
+              )}
+            >
+              {t.team.cta}
+              <ArrowRight
+                aria-hidden="true"
+                className="size-4 rtl:-scale-x-100"
+              />
+            </Link>
+          </div>
+
+          <ul className="-mx-4 mt-14 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-5 sm:gap-6 sm:overflow-visible sm:px-0 sm:pb-0">
+            {homeTeam.map((member) => (
+              <li
+                key={member.slug}
+                className="group w-[42vw] shrink-0 snap-start sm:w-auto"
+              >
+                <div className="relative aspect-[4/5] overflow-hidden rounded-xl border border-border bg-card">
+                  <Image
+                    src={portraitSrc(member)}
+                    alt={member.name[locale]}
+                    fill
+                    sizes="(min-width: 640px) 15rem, 42vw"
+                    className="object-cover object-top grayscale-[35%] transition duration-500 group-hover:scale-[1.02] group-hover:grayscale-0"
+                  />
+                </div>
+                <h3 className="mt-4 text-base font-medium tracking-[-0.01em]">
+                  {member.name[locale]}
+                </h3>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {member.role[locale]}
+                </p>
+              </li>
+            ))}
+          </ul>
         </SiteContainer>
       </section>
 

@@ -25,6 +25,7 @@ export const fa: Dictionary = {
   nav: {
     ecosystem: "اکوسیستم",
     corporation: "شرکت",
+    team: "تیم",
     terms: "قوانین",
   },
   footer: {
@@ -38,6 +39,7 @@ export const fa: Dictionary = {
     contactCta: "تماس با OBH",
     links: {
       about: "درباره OBH",
+      team: "تیم",
       contact: "تماس",
       terms: "شرایط استفاده",
     },
@@ -124,6 +126,11 @@ export const fa: Dictionary = {
             "دسترسی، تغییرات و توزیع‌ها باید تاریخی به‌جا بگذارند که قابل بازبینی و اعتماد باشد.",
         },
       ],
+    },
+    team: {
+      label: "تیم",
+      title: "افرادی که OBH را می‌سازند.",
+      cta: "آشنایی با تیم",
     },
     closing: {
       label: "شروع گفت‌وگو",
@@ -228,6 +235,35 @@ export const fa: Dictionary = {
       title: "بیاموزید اکوسیستم چگونه به هم متصل است.",
       primaryCta: "کاوش در اکوسیستم",
       secondaryCta: "تماس با OBH",
+    },
+  },
+  team: {
+    meta: {
+      title: "تیم",
+      description:
+        "افرادی که پشت شرکت OBH هستند: مدیریت و تیمی که سرویس‌های گروه و پلتفرم مالی آن را می‌سازد.",
+    },
+    hero: {
+      label: "تیم / شرکت OBH",
+      titleLead: "افرادی",
+      titleTail: "که OBH را می‌سازند.",
+      description:
+        "تیمی متمرکز در حوزه‌های مهندسی، مالی، طراحی و عملیات که سرویس‌های اکوسیستم OBH و پلتفرم مالی پیوند‌دهنده آن‌ها را می‌سازد.",
+    },
+    leadership: {
+      label: "مدیریت",
+      title: "تعیین مسیر.",
+    },
+    members: {
+      label: "تیم",
+      title: "مهندسی، مالی، طراحی و عملیات.",
+      description:
+        "هر حوزه مسئول بخشی از پلتفرم است، با استانداردهای مشترک برای بازبینی و ثبت کارها.",
+    },
+    closing: {
+      label: "همکاری با ما",
+      title: "پرسش‌های شما از تیم با یک گفتگو آغاز می‌شود.",
+      cta: "تماس با OBH",
     },
   },
   contact: {

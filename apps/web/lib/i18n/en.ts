@@ -23,6 +23,7 @@ export const en = {
   nav: {
     ecosystem: "Ecosystem",
     corporation: "Corporation",
+    team: "Team",
     terms: "Terms",
   },
   footer: {
@@ -36,6 +37,7 @@ export const en = {
     contactCta: "Contact OBH",
     links: {
       about: "About OBH",
+      team: "Team",
       contact: "Contact",
       terms: "Terms of use",
     },
@@ -130,6 +132,11 @@ export const en = {
             "Access, changes, and distributions should leave a history that can be reviewed and trusted.",
         },
       ],
+    },
+    team: {
+      label: "Team",
+      title: "The people behind OBH.",
+      cta: "Meet the team",
     },
     closing: {
       label: "Start a conversation",
@@ -234,6 +241,35 @@ export const en = {
       title: "Learn how the ecosystem is connected.",
       primaryCta: "Explore the ecosystem",
       secondaryCta: "Contact OBH",
+    },
+  },
+  team: {
+    meta: {
+      title: "Team",
+      description:
+        "The people behind OBH Corporation: leadership and the team building the group's services and financial platform.",
+    },
+    hero: {
+      label: "Team / OBH Corporation",
+      titleLead: "The people",
+      titleTail: "behind OBH.",
+      description:
+        "A focused team across engineering, finance, design, and operations, building the services in the OBH ecosystem and the financial platform that connects them.",
+    },
+    leadership: {
+      label: "Leadership",
+      title: "Setting the direction.",
+    },
+    members: {
+      label: "The team",
+      title: "Engineering, finance, design, and operations.",
+      description:
+        "Each discipline owns its part of the platform, with shared standards for how work is reviewed and recorded.",
+    },
+    closing: {
+      label: "Work with us",
+      title: "Questions for the team start with a conversation.",
+      cta: "Contact OBH",
     },
   },
   contact: {

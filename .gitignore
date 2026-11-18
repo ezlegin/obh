@@ -53,3 +53,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 graphify-out
+# Earlier staff portrait versions, kept locally only
+apps/web/public/staff/previous/
