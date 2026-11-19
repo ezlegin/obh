@@ -7,6 +7,7 @@ import {
   CircleDollarSign,
   Clock,
   Download,
+  Landmark,
   PieChart,
   Receipt,
   Scale,
@@ -255,7 +256,7 @@ export default async function AdminReportsPage({
         <AccountingStat
           label="Net operating"
           value={formatIrrDecimal(report.summary.netOperating)}
-          hint="LIVE payments + manual income − paid expenses − settled fees."
+          hint="LIVE payments + manual income − paid expenses − settled fees, all net of VAT."
           icon={TrendingUp}
         />
         <AccountingStat
@@ -278,7 +279,13 @@ export default async function AdminReportsPage({
         />
       </div>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <AccountingStat
+          label="VAT collected"
+          value={formatIrrDecimal(report.summary.outputVat)}
+          hint={`${formatIrrDecimal(report.summary.inputVat)} creditable VAT on purchases. Both are excluded from net operating.`}
+          icon={Landmark}
+        />
         <AccountingStat
           label="Settled provider fees"
           value={formatIrrDecimal(report.summary.providerFees)}
@@ -386,10 +393,9 @@ export default async function AdminReportsPage({
         <div className="border-b border-border p-4">
           <p className="text-xs font-medium">Service reporting health</p>
           <p className="mt-1 text-[10px] text-muted-foreground">
-            Whether each active service is sending payments to OBH. A service
-            is silent after seven days without a report, and stale when
-            payments stay pending for over two hours (its reconcile job is not
-            running).
+            Whether each active service is sending payments to OBH. A service is
+            silent after seven days without a report, and stale when payments
+            stay pending for over two hours (its reconcile job is not running).
           </p>
         </div>
         <ReportTable

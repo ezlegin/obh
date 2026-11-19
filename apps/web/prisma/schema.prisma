@@ -121,6 +121,11 @@ enum PayoutStatus {
   CANCELLED
 }
 
+enum VatReturnStatus {
+  FILED
+  PAID
+}
+
 enum InstallmentPlanStatus {
   ACTIVE
   SETTLED
@@ -584,6 +589,9 @@ model Expense {
   serviceId          String?       @db.Uuid
   recurringExpenseId String?       @db.Uuid
   amount             Decimal       @db.Decimal(24, 2)
+  /// Creditable input VAT included in `amount`, as printed on the supplier's
+  /// official tax invoice. Zero when there is no such invoice.
+  vatAmount          Decimal       @default(0) @db.Decimal(24, 2)
   currency           String        @default("IRR") @db.VarChar(3)
   spentOn            DateTime      @db.Date
   description        String        @db.Text
@@ -665,6 +673,9 @@ model Income {
   accountId         String?  @db.Uuid
   serviceId         String?  @db.Uuid
   amount            Decimal  @db.Decimal(24, 2)
+  /// Output VAT collected from the customer and included in `amount`. It is
+  /// owed to the tax authority, so it is never revenue.
+  vatAmount         Decimal  @default(0) @db.Decimal(24, 2)
   currency          String   @default("IRR") @db.VarChar(3)
   receivedOn        DateTime @db.Date
   description       String   @db.Text
@@ -749,8 +760,12 @@ model ProfitPeriod {
   endsOn              DateTime           @db.Date
   currency            String             @default("IRR") @db.VarChar(3)
   status              ProfitPeriodStatus @default(DRAFT)
+  /// Revenue and expenses are stored net of VAT; the VAT removed from each is
+  /// kept beside them so a period stays explainable.
   totalRevenue        Decimal?           @db.Decimal(24, 2)
   totalExpenses       Decimal?           @db.Decimal(24, 2)
+  outputVat           Decimal?           @db.Decimal(24, 2)
+  inputVat            Decimal?           @db.Decimal(24, 2)
   providerFees        Decimal?           @db.Decimal(24, 2)
   retentionPercentage Decimal?           @default(0) @db.Decimal(7, 4)
   reserveAmount       Decimal?           @db.Decimal(24, 2)
@@ -815,6 +830,9 @@ model ServiceProfitPeriod {
   grossPayments       Decimal  @db.Decimal(24, 2)
   manualIncome        Decimal  @db.Decimal(24, 2)
   totalExpenses       Decimal  @db.Decimal(24, 2)
+  /// VAT removed from payments + income (output) and expenses (input).
+  outputVat           Decimal  @default(0) @db.Decimal(24, 2)
+  inputVat            Decimal  @default(0) @db.Decimal(24, 2)
   providerFees        Decimal  @db.Decimal(24, 2)
   netProfit           Decimal  @db.Decimal(24, 2)
   distributableAmount Decimal  @db.Decimal(24, 2)
@@ -890,4 +908,46 @@ model AuditLog {
   @@index([entityType, entityId, createdAt])
   @@index([actorId, createdAt])
   @@index([createdAt])
+}
+
+/// The corporation's VAT registration (one row, id "default"). Before
+/// `effectiveFrom` nothing is treated as VAT: gateway payments are plain
+/// revenue and VAT on purchases is an ordinary cost.
+model VatProfile {
+  id            String   @id @default("default") @db.VarChar(16)
+  /// Registration call ("فراخوان") stage the company was registered under.
+  stage         Int
+  /// First day the company must charge VAT (تاریخ مشمولیت).
+  effectiveFrom DateTime @db.Date
+  economicCode  String?  @db.VarChar(40)
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+}
+
+/// A filed quarterly VAT return. Figures are frozen at filing so later edits
+/// to income or expenses cannot silently change what was declared.
+model VatReturn {
+  id           String          @id @default(uuid(7)) @db.Uuid
+  /// Solar Hijri year and quarter (1 = Farvardin–Khordad).
+  year         Int
+  quarter      Int
+  startsOn     DateTime        @db.Date
+  endsOn       DateTime        @db.Date
+  dueOn        DateTime        @db.Date
+  taxableSales Decimal         @db.Decimal(24, 2)
+  outputVat    Decimal         @db.Decimal(24, 2)
+  purchases    Decimal         @db.Decimal(24, 2)
+  inputVat     Decimal         @db.Decimal(24, 2)
+  /// outputVat − inputVat. Negative is a credit carried to the next quarter.
+  netVat       Decimal         @db.Decimal(24, 2)
+  status       VatReturnStatus @default(FILED)
+  filedAt      DateTime        @db.Timestamptz(3)
+  paidAt       DateTime?       @db.Timestamptz(3)
+  reference    String?         @db.VarChar(191)
+  notes        String?         @db.Text
+  createdAt    DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime        @updatedAt @db.Timestamptz(3)
+
+  @@unique([year, quarter])
 }

@@ -20,6 +20,14 @@ const positiveAmountSchema = z
     "Amount must be greater than zero."
   )
 
+/** The VAT part of a gross amount; empty means none. */
+const vatAmountSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{1,18}(?:\.\d{1,2})?$/, "Enter a valid VAT amount.")
+  .optional()
+  .or(z.literal(""))
+
 const balanceAmountSchema = z
   .string()
   .trim()
@@ -30,6 +38,7 @@ export const createExpenseSchema = z.object({
   accountId: z.union([uuidSchema, z.literal("")]).optional(),
   serviceId: z.union([uuidSchema, z.literal("")]).optional(),
   amount: positiveAmountSchema,
+  vatAmount: vatAmountSchema,
   spentOn: dateOnlySchema,
   description: z.string().trim().min(2).max(500),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
@@ -89,6 +98,7 @@ export const createIncomeSchema = z.object({
   accountId: z.union([uuidSchema, z.literal("")]).optional(),
   serviceId: z.union([uuidSchema, z.literal("")]).optional(),
   amount: positiveAmountSchema,
+  vatAmount: vatAmountSchema,
   receivedOn: dateOnlySchema,
   description: z.string().trim().min(2).max(500),
   source: z.string().trim().max(160).optional().or(z.literal("")),

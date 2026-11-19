@@ -53,6 +53,8 @@ export async function GET(request: Request) {
       ["Paid expenses", csvNumber(report.summary.paidExpenses)],
       ["Pending expenses", csvNumber(report.summary.pendingExpenses)],
       ["Settled provider fees", csvNumber(report.summary.providerFees)],
+      ["Output VAT (collected)", csvNumber(report.summary.outputVat)],
+      ["Input VAT (creditable)", csvNumber(report.summary.inputVat)],
       ["Net operating", csvNumber(report.summary.netOperating)],
       ["Approved distributable", csvNumber(report.summary.distributable)],
       ["Payouts paid", csvNumber(report.summary.payoutsPaid)],

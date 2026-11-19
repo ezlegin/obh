@@ -6,6 +6,7 @@ import {
   CircleDollarSign,
   CreditCard,
   FileText,
+  Landmark,
   LayoutDashboard,
   PieChart,
   Receipt,
@@ -93,6 +94,12 @@ export const adminNavigation: AdminNavGroup[] = [
         href: "/admin/income",
         description: "Additional business income records.",
         icon: CircleDollarSign,
+      },
+      {
+        label: "VAT",
+        href: "/admin/vat",
+        description: "VAT registration, quarterly returns, and deadlines.",
+        icon: Landmark,
       },
       {
         label: "Payment sources",

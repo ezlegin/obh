@@ -314,6 +314,7 @@ function IncomeWorkspace({ data }: { data: IncomeWorkspace }) {
       </p>
 
       <CreateIncomeDialog
+        vatEffectiveFrom={data.vatEffectiveFrom}
         open={createOpen || Boolean(editingIncome)}
         onOpenChange={(open) => {
           if (!open) {

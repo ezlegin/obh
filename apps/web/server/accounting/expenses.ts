@@ -10,6 +10,7 @@ import { DomainError } from "@/server/errors"
 import { parseDateOnly } from "@/server/accounting/dates"
 import { deleteExpenseDocument } from "@/server/accounting/documents"
 import { resolveServiceId } from "@/server/services/resolve-service"
+import { resolveRecordVat } from "@/server/vat/record-vat"
 
 async function getActiveBusinessAccount(accountId: string) {
   const account = await getDb().financialAccount.findUnique({
@@ -62,6 +63,11 @@ export async function createExpense(
   )
   const resolvedServiceId = await resolveServiceId(values.serviceId)
   const amount = new Prisma.Decimal(values.amount)
+  const vatAmount = await resolveRecordVat({
+    amount,
+    vatAmount: values.vatAmount,
+    dateOnly: values.spentOn,
+  })
   const now = new Date()
 
   return db.$transaction(async (tx) => {
@@ -71,6 +77,7 @@ export async function createExpense(
         accountId: resolvedAccountId,
         serviceId: resolvedServiceId,
         amount,
+        vatAmount,
         currency: "IRR",
         spentOn: parseDateOnly(values.spentOn),
         description: values.description,
@@ -90,6 +97,7 @@ export async function createExpense(
         after: {
           category: category.name,
           amount: amount.toFixed(2),
+          vatAmount: vatAmount.toFixed(2),
           status: expense.status,
           spentOn: values.spentOn,
           accountId: resolvedAccountId,

@@ -8,6 +8,7 @@ import {
   type ConsistencyCheck,
 } from "@/server/reports/checks"
 import type { ReportRange } from "@/server/reports/range"
+import { computeVatTotals } from "@/server/vat/totals"
 
 export type FinancialReport = {
   range: { from: string; to: string }
@@ -17,6 +18,9 @@ export type FinancialReport = {
     paidExpenses: string
     pendingExpenses: string
     providerFees: string
+    /** VAT collected on sales and creditable VAT paid on purchases. */
+    outputVat: string
+    inputVat: string
     netOperating: string
     payoutsPaid: string
     distributable: string
@@ -340,6 +344,7 @@ export async function getFinancialReport(
     getReportingHealth(),
   ])
 
+  const vat = await computeVatTotals({ startsOn: range.from, endsOn: range.to })
   const zero = new Prisma.Decimal(0)
   const paymentRevenue = payments.reduce(
     (sum, payment) => sum.plus(payment.amount),
@@ -401,9 +406,12 @@ export async function getFinancialReport(
       paidExpenses: expenseTotal.toFixed(2),
       pendingExpenses: (pendingExpenses._sum.amount ?? zero).toFixed(2),
       providerFees: feeTotal.toFixed(2),
+      outputVat: vat.outputVat.toFixed(2),
+      inputVat: vat.inputVat.toFixed(2),
       netOperating: paymentRevenue
         .plus(manualIncome)
-        .minus(expenseTotal)
+        .minus(vat.outputVat)
+        .minus(expenseTotal.minus(vat.inputVat))
         .minus(feeTotal)
         .toFixed(2),
       payoutsPaid: payoutsTotal.toFixed(2),

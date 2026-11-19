@@ -6,6 +6,7 @@ import type { CreateIncomeInput } from "@/lib/validation/accounting"
 import { DomainError } from "@/server/errors"
 import { parseDateOnly } from "@/server/accounting/dates"
 import { resolveServiceId } from "@/server/services/resolve-service"
+import { resolveRecordVat } from "@/server/vat/record-vat"
 
 export async function createIncome(actorId: string, values: CreateIncomeInput) {
   const db = getDb()
@@ -34,6 +35,11 @@ export async function createIncome(actorId: string, values: CreateIncomeInput) {
   const resolvedServiceId = await resolveServiceId(values.serviceId)
 
   const amount = new Prisma.Decimal(values.amount)
+  const vatAmount = await resolveRecordVat({
+    amount,
+    vatAmount: values.vatAmount,
+    dateOnly: values.receivedOn,
+  })
 
   return db.$transaction(async (tx) => {
     const income = await tx.income.create({
@@ -41,6 +47,7 @@ export async function createIncome(actorId: string, values: CreateIncomeInput) {
         accountId: resolvedAccountId,
         serviceId: resolvedServiceId,
         amount,
+        vatAmount,
         currency: "IRR",
         receivedOn: parseDateOnly(values.receivedOn),
         description: values.description,
@@ -58,6 +65,7 @@ export async function createIncome(actorId: string, values: CreateIncomeInput) {
         entityId: income.id,
         after: {
           amount: amount.toFixed(2),
+          vatAmount: vatAmount.toFixed(2),
           source: income.source,
           receivedOn: values.receivedOn,
           accountId: resolvedAccountId,

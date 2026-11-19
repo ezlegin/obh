@@ -11,6 +11,7 @@ import {
 } from "@/server/accounting/dates"
 import { allocateWholeIrr } from "@/server/equity/profit-calculator"
 import { getEffectiveServiceOwnership } from "@/server/services/service-ownership"
+import { computeVatTotals } from "@/server/vat/totals"
 
 export async function calculateServiceProfitPeriod(
   actorId: string,
@@ -38,68 +39,84 @@ export async function calculateServiceProfitPeriod(
   const startsOn = parseDateOnly(range.startsOn)
   const endsOn = parseDateOnly(range.endsOn)
 
-  const [paymentRevenue, manualIncome, paidExpenses, providerFees, existing] =
-    await Promise.all([
-      db.payment.aggregate({
-        where: {
+  const [
+    paymentRevenue,
+    manualIncome,
+    paidExpenses,
+    providerFees,
+    existing,
+    vat,
+  ] = await Promise.all([
+    db.payment.aggregate({
+      where: {
+        serviceId: service.id,
+        status: "COMPLETED",
+        environment: "LIVE",
+        currency: "IRR",
+        completedAt: {
+          gte: range.startInstant,
+          lt: range.endInstant,
+        },
+      },
+      _sum: { amount: true },
+    }),
+    db.income.aggregate({
+      where: {
+        serviceId: service.id,
+        currency: "IRR",
+        receivedOn: { gte: startsOn, lte: endsOn },
+      },
+      _sum: { amount: true },
+    }),
+    db.expense.aggregate({
+      where: {
+        serviceId: service.id,
+        status: "PAID",
+        currency: "IRR",
+        spentOn: { gte: startsOn, lte: endsOn },
+      },
+      _sum: { amount: true },
+    }),
+    db.providerFee.aggregate({
+      where: {
+        status: "SETTLED",
+        currency: "IRR",
+        chargedAt: {
+          gte: range.startInstant,
+          lt: range.endInstant,
+        },
+        providerAccount: { environment: "LIVE" },
+        payment: { serviceId: service.id, environment: "LIVE" },
+      },
+      _sum: { amount: true },
+    }),
+    db.serviceProfitPeriod.findUnique({
+      where: {
+        serviceId_startsOn_endsOn: {
           serviceId: service.id,
-          status: "COMPLETED",
-          environment: "LIVE",
-          currency: "IRR",
-          completedAt: {
-            gte: range.startInstant,
-            lt: range.endInstant,
-          },
+          startsOn,
+          endsOn,
         },
-        _sum: { amount: true },
-      }),
-      db.income.aggregate({
-        where: {
-          serviceId: service.id,
-          currency: "IRR",
-          receivedOn: { gte: startsOn, lte: endsOn },
-        },
-        _sum: { amount: true },
-      }),
-      db.expense.aggregate({
-        where: {
-          serviceId: service.id,
-          status: "PAID",
-          currency: "IRR",
-          spentOn: { gte: startsOn, lte: endsOn },
-        },
-        _sum: { amount: true },
-      }),
-      db.providerFee.aggregate({
-        where: {
-          status: "SETTLED",
-          currency: "IRR",
-          chargedAt: {
-            gte: range.startInstant,
-            lt: range.endInstant,
-          },
-          providerAccount: { environment: "LIVE" },
-          payment: { serviceId: service.id, environment: "LIVE" },
-        },
-        _sum: { amount: true },
-      }),
-      db.serviceProfitPeriod.findUnique({
-        where: {
-          serviceId_startsOn_endsOn: {
-            serviceId: service.id,
-            startsOn,
-            endsOn,
-          },
-        },
-        include: { distributions: { select: { id: true } } },
-      }),
-    ])
+      },
+      include: { distributions: { select: { id: true } } },
+    }),
+    computeVatTotals({
+      startsOn: range.startsOn,
+      endsOn: range.endsOn,
+      serviceId: service.id,
+    }),
+  ])
 
   const grossPayments = paymentRevenue._sum.amount ?? new Prisma.Decimal(0)
   const income = manualIncome._sum.amount ?? new Prisma.Decimal(0)
   const expenses = paidExpenses._sum.amount ?? new Prisma.Decimal(0)
   const fees = providerFees._sum.amount ?? new Prisma.Decimal(0)
-  const netProfit = grossPayments.plus(income).minus(expenses).minus(fees)
+  // VAT is owed to (or reclaimed from) the tax authority, never profit.
+  const netProfit = grossPayments
+    .plus(income)
+    .minus(vat.outputVat)
+    .minus(expenses.minus(vat.inputVat))
+    .minus(fees)
   const distributableAmount = Prisma.Decimal.max(
     netProfit,
     new Prisma.Decimal(0)
@@ -154,6 +171,8 @@ export async function calculateServiceProfitPeriod(
       grossPayments,
       manualIncome: income,
       totalExpenses: expenses,
+      outputVat: vat.outputVat,
+      inputVat: vat.inputVat,
       providerFees: fees,
       netProfit,
       distributableAmount,
@@ -203,6 +222,8 @@ export async function calculateServiceProfitPeriod(
           grossPayments: grossPayments.toFixed(2),
           manualIncome: income.toFixed(2),
           expenses: expenses.toFixed(2),
+          outputVat: vat.outputVat.toFixed(2),
+          inputVat: vat.inputVat.toFixed(2),
           providerFees: fees.toFixed(2),
           netProfit: netProfit.toFixed(2),
           distributable: distributableAmount.toFixed(2),

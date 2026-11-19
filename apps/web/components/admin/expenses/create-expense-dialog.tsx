@@ -2,8 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ChevronDown, Loader2 } from "lucide-react"
-import { useEffect, useState, useTransition } from "react"
-import { useForm } from "react-hook-form"
+import { useCallback, useEffect, useState, useTransition } from "react"
+import { useForm, useWatch } from "react-hook-form"
 
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
@@ -13,6 +13,7 @@ import { Textarea } from "@workspace/ui/components/textarea"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { AmountInput } from "@/components/admin/amount-input"
+import { VatAmountField } from "@/components/admin/vat-amount-field"
 import { createExpenseAction } from "@/app/admin/expenses/actions"
 import { updateExpenseAction } from "@/app/admin/expenses/edit-actions"
 import type {
@@ -39,6 +40,10 @@ function getDefaultValues(
       accountId: expense.accountId ?? "",
       serviceId: expense.serviceId ?? "",
       amount: expense.amount.replace(/\.00$/, ""),
+      vatAmount:
+        expense.vatAmount === "0.00"
+          ? ""
+          : expense.vatAmount.replace(/\.00$/, ""),
       spentOn: expense.spentOn,
       description: expense.description,
       notes: expense.notes ?? "",
@@ -51,6 +56,7 @@ function getDefaultValues(
     accountId: firstAccount?.id ?? "",
     serviceId: "",
     amount: "",
+    vatAmount: "",
     spentOn: todayInputValue(),
     description: "",
     notes: "",
@@ -65,6 +71,7 @@ function CreateExpenseDialog({
   accounts,
   services,
   expense,
+  vatEffectiveFrom,
   onCreated,
 }: {
   open: boolean
@@ -73,6 +80,7 @@ function CreateExpenseDialog({
   accounts: AccountOption[]
   services: AdminServiceOption[]
   expense?: AdminExpense | null
+  vatEffectiveFrom: string | null
   onCreated: (expenseId: string) => void
 }) {
   const [serverError, setServerError] = useState<string | null>(null)
@@ -86,11 +94,20 @@ function CreateExpenseDialog({
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<CreateExpenseInput>({
     resolver: zodResolver(createExpenseSchema),
     defaultValues: getDefaultValues(null, firstCategory, firstAccount),
   })
+  const [watchedAmount, watchedDate, watchedVat] = useWatch({
+    control,
+    name: ["amount", "spentOn", "vatAmount"],
+  })
+  const setVatAmount = useCallback(
+    (value: string) => setValue("vatAmount", value, { shouldDirty: true }),
+    [setValue]
+  )
 
   useEffect(() => {
     if (open) {
@@ -167,7 +184,7 @@ function CreateExpenseDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="expense-amount">Amount (R)</Label>
+            <Label htmlFor="expense-amount">Total paid (R)</Label>
             <AmountInput
               id="expense-amount"
               control={control}
@@ -180,6 +197,19 @@ function CreateExpenseDialog({
             ) : null}
           </div>
         </div>
+
+        <VatAmountField
+          key={open ? (expense?.id ?? "new") : "closed"}
+          id="expense-vat"
+          amount={watchedAmount}
+          dateOnly={watchedDate}
+          vatAmount={watchedVat}
+          vatEffectiveFrom={vatEffectiveFrom}
+          initiallyIncluded={expense ? expense.vatAmount !== "0.00" : true}
+          onChange={setVatAmount}
+          error={errors.vatAmount?.message}
+          hint="Untick when there is no official tax invoice. Creditable VAT is reclaimed on the VAT return, so it is not counted as a cost."
+        />
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">

@@ -2,8 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ChevronDown, Loader2 } from "lucide-react"
-import { useEffect, useState, useTransition } from "react"
-import { useForm } from "react-hook-form"
+import { useCallback, useEffect, useState, useTransition } from "react"
+import { useForm, useWatch } from "react-hook-form"
 
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
@@ -13,6 +13,7 @@ import { Textarea } from "@workspace/ui/components/textarea"
 
 import { AdminDialog } from "@/components/admin/admin-dialog"
 import { AmountInput } from "@/components/admin/amount-input"
+import { VatAmountField } from "@/components/admin/vat-amount-field"
 import { createIncomeAction } from "@/app/admin/income/actions"
 import { updateIncomeAction } from "@/app/admin/income/edit-actions"
 import type {
@@ -34,6 +35,10 @@ function getIncomeDefaults(
       accountId: income.accountId ?? "",
       serviceId: income.serviceId ?? "",
       amount: income.amount.replace(/\.00$/, ""),
+      vatAmount:
+        income.vatAmount === "0.00"
+          ? ""
+          : income.vatAmount.replace(/\.00$/, ""),
       receivedOn: income.receivedOn,
       description: income.description,
       source: income.source ?? "",
@@ -46,6 +51,7 @@ function getIncomeDefaults(
     accountId: firstAccount?.id ?? "",
     serviceId: "",
     amount: "",
+    vatAmount: "",
     receivedOn: todayInputValue(),
     description: "",
     source: "",
@@ -60,6 +66,7 @@ function CreateIncomeDialog({
   accounts,
   services,
   income,
+  vatEffectiveFrom,
   onCreated,
 }: {
   open: boolean
@@ -67,6 +74,7 @@ function CreateIncomeDialog({
   accounts: Array<{ id: string; name: string }>
   services: AdminServiceOption[]
   income?: AdminIncome | null
+  vatEffectiveFrom: string | null
   onCreated: () => void
 }) {
   const [serverError, setServerError] = useState<string | null>(null)
@@ -80,11 +88,20 @@ function CreateIncomeDialog({
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<CreateIncomeInput>({
     resolver: zodResolver(createIncomeSchema),
     defaultValues: getIncomeDefaults(null, firstAccount),
   })
+  const [watchedAmount, watchedDate, watchedVat] = useWatch({
+    control,
+    name: ["amount", "receivedOn", "vatAmount"],
+  })
+  const setVatAmount = useCallback(
+    (value: string) => setValue("vatAmount", value, { shouldDirty: true }),
+    [setValue]
+  )
 
   useEffect(() => {
     if (open) {
@@ -144,7 +161,7 @@ function CreateIncomeDialog({
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="income-amount">Amount (R)</Label>
+            <Label htmlFor="income-amount">Total received (R)</Label>
             <AmountInput
               id="income-amount"
               control={control}
@@ -170,6 +187,19 @@ function CreateIncomeDialog({
             ) : null}
           </div>
         </div>
+
+        <VatAmountField
+          key={open ? (income?.id ?? "new") : "closed"}
+          id="income-vat"
+          amount={watchedAmount}
+          dateOnly={watchedDate}
+          vatAmount={watchedVat}
+          vatEffectiveFrom={vatEffectiveFrom}
+          initiallyIncluded={income ? income.vatAmount !== "0.00" : true}
+          onChange={setVatAmount}
+          error={errors.vatAmount?.message}
+          hint="The VAT inside this total is owed to the tax authority, so it is not counted as revenue."
+        />
 
         <div className="space-y-2">
           <Label htmlFor="income-service">Service (optional)</Label>

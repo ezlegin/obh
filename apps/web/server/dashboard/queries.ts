@@ -2,6 +2,8 @@ import "server-only"
 
 import { Prisma } from "@/lib/generated/prisma/client"
 import { getDb } from "@/lib/db/client"
+import { getVatDashboardAlert } from "@/server/vat/queries"
+import { computeVatTotals, getVatEffectiveFrom } from "@/server/vat/totals"
 import {
   addDays,
   formatDateOnly,
@@ -1003,18 +1005,38 @@ export async function getDashboardDataForAdmin(
   )
   const allCashBalance = totalBalance + installmentReceivable
 
+  // Revenue and expenses are shown net of VAT: collected VAT is owed to the
+  // tax authority and creditable VAT on purchases is reclaimed from it.
+  const vatEffectiveFrom = await getVatEffectiveFrom()
+  const [currentVat, prevVat] = await Promise.all([
+    computeVatTotals({
+      startsOn: window.currentFromStr,
+      endsOn: window.currentToStr,
+      effectiveFrom: vatEffectiveFrom,
+    }),
+    computeVatTotals({
+      startsOn: formatDateOnly(window.prevFromDate),
+      endsOn: formatDateOnly(window.prevToDate),
+      effectiveFrom: vatEffectiveFrom,
+    }),
+  ])
+
   const currentRevenue =
     toNumber(currentCompletedPayments._sum.amount) +
-    toNumber(currentIncome._sum.amount)
+    toNumber(currentIncome._sum.amount) -
+    toNumber(currentVat.outputVat)
   const prevRevenue =
     toNumber(prevCompletedPayments._sum.amount) +
-    toNumber(prevIncome._sum.amount)
+    toNumber(prevIncome._sum.amount) -
+    toNumber(prevVat.outputVat)
 
   const currentExpenses =
-    toNumber(currentPaidExpenses._sum.amount) +
+    toNumber(currentPaidExpenses._sum.amount) -
+    toNumber(currentVat.inputVat) +
     toNumber(currentSettledFees._sum.amount)
   const prevExpenses =
-    toNumber(prevPaidExpenses._sum.amount) +
+    toNumber(prevPaidExpenses._sum.amount) -
+    toNumber(prevVat.inputVat) +
     toNumber(prevSettledFees._sum.amount)
 
   const currentNetProfit = currentRevenue - currentExpenses
@@ -1105,6 +1127,11 @@ export async function getDashboardDataForAdmin(
       description: `${failedWebhookDeliveries} service webhook notification${failedWebhookDeliveries === 1 ? " has" : "s have"} failed or exhausted retries.`,
       severity: "warning",
     })
+  }
+
+  const vatAlert = await getVatDashboardAlert()
+  if (vatAlert) {
+    alerts.push(vatAlert)
   }
 
   if (alerts.length === 0) {

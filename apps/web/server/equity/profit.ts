@@ -16,6 +16,7 @@ import {
   calculateNetProfit,
   type OwnershipAllocation,
 } from "@/server/equity/profit-calculator"
+import { computeVatTotals } from "@/server/vat/totals"
 
 export async function calculateProfitPeriod(
   actorId: string,
@@ -61,6 +62,7 @@ export async function calculateProfitPeriod(
     providerFees,
     priorLossPeriod,
     ownershipRecords,
+    vat,
   ] = await Promise.all([
     db.payment.aggregate({
       where: {
@@ -119,12 +121,17 @@ export async function calculateProfitPeriod(
         shareholder: { select: { id: true, name: true } },
       },
     }),
+    computeVatTotals({ startsOn: range.startsOn, endsOn: range.endsOn }),
   ])
 
-  const revenue = (paymentRevenue._sum.amount ?? new Prisma.Decimal(0)).plus(
-    manualIncome._sum.amount ?? new Prisma.Decimal(0)
+  // VAT collected belongs to the tax authority and creditable VAT paid is
+  // reclaimed from it, so neither is revenue or cost.
+  const revenue = (paymentRevenue._sum.amount ?? new Prisma.Decimal(0))
+    .plus(manualIncome._sum.amount ?? new Prisma.Decimal(0))
+    .minus(vat.outputVat)
+  const expenses = (paidExpenses._sum.amount ?? new Prisma.Decimal(0)).minus(
+    vat.inputVat
   )
-  const expenses = paidExpenses._sum.amount ?? new Prisma.Decimal(0)
   const fees = providerFees._sum.amount ?? new Prisma.Decimal(0)
   const retentionPercentage = new Prisma.Decimal(values.retentionPercentage)
   const additionalReserve = values.reserveAmount
@@ -226,6 +233,8 @@ export async function calculateProfitPeriod(
     const data = {
       totalRevenue: revenue,
       totalExpenses: expenses,
+      outputVat: vat.outputVat,
+      inputVat: vat.inputVat,
       providerFees: fees,
       retentionPercentage,
       reserveAmount,
@@ -283,6 +292,8 @@ export async function calculateProfitPeriod(
           month: range.month,
           revenue: revenue.toFixed(2),
           expenses: expenses.toFixed(2),
+          outputVat: vat.outputVat.toFixed(2),
+          inputVat: vat.inputVat.toFixed(2),
           providerFees: fees.toFixed(2),
           retentionPercentage: retentionPercentage.toFixed(4),
           retainedEarnings: reserveAmount.toFixed(2),

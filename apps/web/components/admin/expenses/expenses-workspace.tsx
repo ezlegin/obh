@@ -936,6 +936,7 @@ function ExpensesWorkspace({ data }: { data: ExpenseWorkspace }) {
       ) : null}
 
       <CreateExpenseDialog
+        vatEffectiveFrom={data.vatEffectiveFrom}
         open={createExpenseOpen || Boolean(editingExpense)}
         onOpenChange={(open) => {
           if (!open) {

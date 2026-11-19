@@ -14,6 +14,7 @@ import { DomainError } from "@/server/errors"
 import { parseDateOnly } from "@/server/accounting/dates"
 import { calculateProviderBalance } from "@/server/reconciliation/service"
 import { resolveServiceId } from "@/server/services/resolve-service"
+import { resolveRecordVat } from "@/server/vat/record-vat"
 
 async function getActiveBusinessAccount(accountId: string) {
   const account = await getDb().financialAccount.findUnique({
@@ -67,6 +68,11 @@ export async function updateExpense(
     : null
   const serviceId = await resolveServiceId(values.serviceId)
   const amount = new Prisma.Decimal(values.amount)
+  const vatAmount = await resolveRecordVat({
+    amount,
+    vatAmount: values.vatAmount,
+    dateOnly: values.spentOn,
+  })
 
   return db.$transaction(async (tx) => {
     const updated = await tx.expense.update({
@@ -76,6 +82,7 @@ export async function updateExpense(
         accountId: account?.id ?? null,
         serviceId,
         amount,
+        vatAmount,
         spentOn: parseDateOnly(values.spentOn),
         description: values.description,
         notes: values.notes || null,
@@ -94,6 +101,7 @@ export async function updateExpense(
           accountId: expense.accountId,
           serviceId: expense.serviceId,
           amount: expense.amount.toFixed(2),
+          vatAmount: expense.vatAmount.toFixed(2),
           spentOn: expense.spentOn.toISOString().slice(0, 10),
           description: expense.description,
           notes: expense.notes,
@@ -104,6 +112,7 @@ export async function updateExpense(
           accountId: updated.accountId,
           serviceId: updated.serviceId,
           amount: updated.amount.toFixed(2),
+          vatAmount: updated.vatAmount.toFixed(2),
           spentOn: updated.spentOn.toISOString().slice(0, 10),
           description: updated.description,
           notes: updated.notes,
@@ -131,6 +140,11 @@ export async function updateIncome(actorId: string, values: UpdateIncomeInput) {
     : null
   const serviceId = await resolveServiceId(values.serviceId)
   const amount = new Prisma.Decimal(values.amount)
+  const vatAmount = await resolveRecordVat({
+    amount,
+    vatAmount: values.vatAmount,
+    dateOnly: values.receivedOn,
+  })
 
   return db.$transaction(async (tx) => {
     const updated = await tx.income.update({
@@ -139,6 +153,7 @@ export async function updateIncome(actorId: string, values: UpdateIncomeInput) {
         accountId: account?.id ?? null,
         serviceId,
         amount,
+        vatAmount,
         receivedOn: parseDateOnly(values.receivedOn),
         description: values.description,
         source: values.source || null,
@@ -157,6 +172,7 @@ export async function updateIncome(actorId: string, values: UpdateIncomeInput) {
           accountId: income.accountId,
           serviceId: income.serviceId,
           amount: income.amount.toFixed(2),
+          vatAmount: income.vatAmount.toFixed(2),
           receivedOn: income.receivedOn.toISOString().slice(0, 10),
           description: income.description,
           source: income.source,
@@ -167,6 +183,7 @@ export async function updateIncome(actorId: string, values: UpdateIncomeInput) {
           accountId: updated.accountId,
           serviceId: updated.serviceId,
           amount: updated.amount.toFixed(2),
+          vatAmount: updated.vatAmount.toFixed(2),
           receivedOn: updated.receivedOn.toISOString().slice(0, 10),
           description: updated.description,
           source: updated.source,

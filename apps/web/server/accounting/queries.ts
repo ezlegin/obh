@@ -2,6 +2,7 @@ import "server-only"
 
 import { Prisma } from "@/lib/generated/prisma/client"
 import { getDb } from "@/lib/db/client"
+import { getVatEffectiveFrom } from "@/server/vat/totals"
 import {
   formatDateOnly,
   startOfMonthDate,
@@ -50,6 +51,8 @@ export type AdminExpense = {
   serviceId: string | null
   serviceName: string | null
   amount: string
+  /** Creditable input VAT included in `amount`. */
+  vatAmount: string
   currency: string
   spentOn: string
   description: string
@@ -99,6 +102,8 @@ export type AdminRecurringExpense = {
 }
 
 export type ExpenseWorkspace = {
+  /** VAT registration date (YYYY-MM-DD), or null when VAT is not set up. */
+  vatEffectiveFrom: string | null
   accounts: AdminBusinessAccount[]
   categories: AdminExpenseCategory[]
   services: AdminServiceOption[]
@@ -120,6 +125,8 @@ export type AdminIncome = {
   serviceId: string | null
   serviceName: string | null
   amount: string
+  /** Output VAT included in `amount`. */
+  vatAmount: string
   currency: string
   receivedOn: string
   description: string
@@ -130,6 +137,8 @@ export type AdminIncome = {
 }
 
 export type IncomeWorkspace = {
+  /** VAT registration date (YYYY-MM-DD), or null when VAT is not set up. */
+  vatEffectiveFrom: string | null
   accounts: AdminBusinessAccount[]
   services: AdminServiceOption[]
   incomes: AdminIncome[]
@@ -358,6 +367,7 @@ export async function getExpenseWorkspace(): Promise<ExpenseWorkspace> {
   ])
 
   return {
+    vatEffectiveFrom: await getVatEffectiveFrom(),
     accounts,
     categories: categories.map((category) => ({
       id: category.id,
@@ -380,6 +390,7 @@ export async function getExpenseWorkspace(): Promise<ExpenseWorkspace> {
       serviceId: expense.serviceId,
       serviceName: expense.service?.name ?? null,
       amount: expense.amount.toFixed(2),
+      vatAmount: expense.vatAmount.toFixed(2),
       currency: expense.currency,
       spentOn: formatDateOnly(expense.spentOn),
       description: expense.description,
@@ -513,6 +524,7 @@ export async function getIncomeWorkspace(): Promise<IncomeWorkspace> {
   )
 
   return {
+    vatEffectiveFrom: await getVatEffectiveFrom(),
     accounts,
     services,
     incomes: incomes.map((income) => ({
@@ -522,6 +534,7 @@ export async function getIncomeWorkspace(): Promise<IncomeWorkspace> {
       serviceId: income.serviceId,
       serviceName: income.service?.name ?? null,
       amount: income.amount.toFixed(2),
+      vatAmount: income.vatAmount.toFixed(2),
       currency: income.currency,
       receivedOn: formatDateOnly(income.receivedOn),
       description: income.description,
