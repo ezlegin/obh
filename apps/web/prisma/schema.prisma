@@ -168,6 +168,11 @@ model ConnectedService {
   webhookSecretEncrypted String?   @db.Text
   webhookSecretCreatedAt DateTime? @db.Timestamptz(3)
   isActive               Boolean   @default(true)
+  /// 13-digit goods/service id (شناسه کالا/خدمت) its sales are invoiced under
+  /// in سامانه مودیان; also our commodity code at Kisan. Null: not invoiced yet.
+  taxStuffId             String?   @db.VarChar(13)
+  /// When `taxStuffId` was registered at Kisan.
+  taxStuffRegisteredAt   DateTime? @db.Timestamptz(3)
   createdAt              DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime  @updatedAt @db.Timestamptz(3)
 
@@ -379,6 +384,8 @@ model Payment {
   webhookDeliveries  WebhookDelivery[]
   idempotencyRecords PaymentIdempotencyRecord[]
   installmentPlan    InstallmentPlan?
+  taxInvoices        TaxInvoice[]
+  invoiceBuyer       InvoiceBuyer?
 
   @@unique([serviceId, externalOrderId])
   @@unique([serviceId, serviceReference])
@@ -908,6 +915,73 @@ model AuditLog {
   @@index([entityType, entityId, createdAt])
   @@index([actorId, createdAt])
   @@index([createdAt])
+}
+
+enum TaxInvoiceStatus {
+  /// Waiting to be sent to Kisan.
+  PENDING
+  /// Accepted by Kisan, waiting for سامانه مودیان.
+  SENT
+  /// In the tax workspace (درج در کارپوشه), with its tax number.
+  ISSUED
+  /// Refused by Kisan or the tax system (see `lastError`); waits for a manager to resend.
+  FAILED
+  /// Revoked (ابطال) or dropped, because a type-1 invoice replaced it.
+  CANCELLED
+}
+
+/// Buyer details a service sent for one of its payments, so the sale is
+/// invoiced as type 1 (with buyer) instead of type 2.
+model InvoiceBuyer {
+  paymentId    String   @id @db.Uuid
+  /// 1 person (حقیقی), 2 company (حقوقی).
+  buyerType    Int
+  name         String   @db.VarChar(160)
+  /// کد ملی (10 digits) or شناسه ملی (11 digits).
+  nationalId   String   @db.VarChar(11)
+  economicCode String?  @db.VarChar(14)
+  postalCode   String   @db.VarChar(10)
+  phone        String   @db.VarChar(16)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  // Removing a TEST payment removes its buyer details; LIVE payments are never deleted.
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+}
+
+/// One electronic invoice (صورتحساب الکترونیکی) for a LIVE sale, sent to
+/// سامانه مودیان through Kisan, the trusted company (`server/tax-invoices`).
+/// A payment has at most one invoice that is not CANCELLED.
+model TaxInvoice {
+  id             String           @id @default(uuid(7)) @db.Uuid
+  paymentId      String           @db.Uuid
+  /// Sent as the invoice number (شماره صورتحساب داخلی).
+  number         Int              @unique @default(autoincrement())
+  /// Our id for it at Kisan, kept for every retry.
+  uniqueId       String           @unique @db.Uuid
+  /// 1: with buyer details, 2: without.
+  invoiceType    Int
+  status         TaxInvoiceStatus @default(PENDING)
+  /// Kisan's own status code (3 accepted, 9 queued, 14 issued, 18 needs review…).
+  kisanStatus    Int?
+  trackingId     String?          @db.VarChar(64)
+  /// شماره منحصربه‌فرد مالیاتی (22 characters).
+  taxId          String?          @db.VarChar(32)
+  lastError      String?          @db.Text
+  sentAt         DateTime?        @db.Timestamptz(3)
+  checkedAt      DateTime?        @db.Timestamptz(3)
+  issuedAt       DateTime?        @db.Timestamptz(3)
+  cancelledAt    DateTime?        @db.Timestamptz(3)
+  /// The revocation (ابطال) sent to Kisan when a type-1 invoice replaced this one.
+  revokeUniqueId String?          @unique @db.Uuid
+  revokeTaxId    String?          @db.VarChar(32)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(3)
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId])
+  @@index([status, createdAt])
 }
 
 /// The corporation's VAT registration (one row, id "default"). Before

@@ -9,7 +9,7 @@ import { DomainError } from "@/server/errors"
 export type AdminApiLog = {
   id: string
   requestId: string
-  method: "POST" | "GET"
+  method: "POST" | "GET" | "PUT" | "DELETE"
   path: string
   statusCode: number
   durationMs: number | null
@@ -35,7 +35,7 @@ export type RecordAuthenticatedApiCallInput = {
   requestId: string
   request: Request
   auth: ServiceAuthContext
-  method: "POST" | "GET"
+  method: "POST" | "GET" | "PUT" | "DELETE"
   path: string
   statusCode: number
   durationMs: number
@@ -212,7 +212,11 @@ export async function getApiLogsForAdmin(): Promise<{
         ? (row.metadata as Record<string, unknown>)
         : {}
 
-    const method = asString(meta.method) === "GET" ? "GET" : "POST"
+    const loggedMethod = asString(meta.method)
+    const method =
+      loggedMethod === "GET" || loggedMethod === "PUT" || loggedMethod === "DELETE"
+        ? loggedMethod
+        : "POST"
     const paymentReference = asString(meta.paymentReference)
     if (paymentReference && method === "POST") {
       loggedPaymentRefs.add(paymentReference)

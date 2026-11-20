@@ -5,6 +5,7 @@ import {
   CalendarClock,
   CircleDollarSign,
   CreditCard,
+  FileCheck,
   FileText,
   Landmark,
   LayoutDashboard,
@@ -100,6 +101,12 @@ export const adminNavigation: AdminNavGroup[] = [
         href: "/admin/vat",
         description: "VAT registration, quarterly returns, and deadlines.",
         icon: Landmark,
+      },
+      {
+        label: "Tax invoices",
+        href: "/admin/tax-invoices",
+        description: "Electronic invoices sent to سامانه مودیان through Kisan.",
+        icon: FileCheck,
       },
       {
         label: "Payment sources",

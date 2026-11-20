@@ -5,3 +5,9 @@ SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 30 0 * * * root /opt/obh/backup.sh >> /var/log/obh.log 2>&1
+
+# Electronic invoices (Admin -> Tax invoices): every 30 minutes, inside the running web
+# container, create invoices for new LIVE sales, send them to Kisan and check sent ones.
+# Does nothing until KISAN_* and the VAT registration date are set. `timeout` stops a
+# stuck run; flock skips a run while the previous one is still going.
+8,38 * * * * root cd /opt/obh && flock -n /run/lock/obh-tax-invoices.lock timeout 600 docker compose exec -T web pnpm --silent --filter web tax-invoices >> /var/log/obh.log 2>&1

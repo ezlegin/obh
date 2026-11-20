@@ -98,6 +98,70 @@ Response:
 Errors use the usual envelope:
 `{ "error": { "code", "message", "requestId", "details?" } }`.
 
+## Electronic invoices (سامانه مودیان)
+
+OBH invoices every **LIVE** completed sale from the VAT registration date in
+سامانه مودیان through Kisan, the trusted company. A sale is a **type-2** invoice
+(no buyer) unless the service sends the buyer's details, which makes it
+**type 1** (an official invoice, «فاکتور رسمی»). A sale waits 2 hours for buyer
+details before its type-2 invoice; details that arrive after a type-2 invoice
+was issued revoke it and issue a type-1 one. Services need nothing for type 2.
+
+`{orderId}` is the `orderId` the service gives `@obhco/pay` (URL-encoded); the
+order's last completed attempt is used. `404 PAYMENT_NOT_FOUND` until it is
+reported as completed.
+
+### `PUT /api/v1/finance/orders/{orderId}/invoice`
+
+```json
+{
+  "buyerType": "company",
+  "name": "شرکت نمونه",
+  "nationalId": "10101234567",
+  "economicCode": null,
+  "postalCode": "1234567890",
+  "phone": "02112345678"
+}
+```
+
+* `buyerType`: `person` (`nationalId` is a valid 10-digit کد ملی) or
+  `company` (11-digit شناسه ملی). `economicCode` (11–14 digits) is optional.
+* Repeatable; the last details win until the type-1 invoice reaches Kisan.
+  After that a different body is `409 INVOICE_ISSUED`.
+* Buyer details are personal data and are never written to the API log.
+
+### `DELETE /api/v1/finance/orders/{orderId}/invoice`
+
+Withdraws the buyer details (the sale goes back to type 2) while the type-1
+invoice has not reached Kisan; otherwise `409 INVOICE_ISSUED`.
+
+### `GET /api/v1/finance/orders/{orderId}/invoice`
+
+All three answer with the order's state:
+
+```json
+{
+  "data": {
+    "orderId": "AF-8821",
+    "environment": "LIVE",
+    "hasBuyer": true,
+    "invoice": {
+      "number": 1042,
+      "type": 1,
+      "status": "ISSUED",
+      "taxId": "A49DW704F0A0000001A2B3",
+      "issuedAt": "2026-11-20T08:00:00.000Z",
+      "error": null
+    }
+  }
+}
+```
+
+* `invoice` is `null` until OBH creates it (TEST payments never get one).
+* `status`: `PENDING` (not sent yet) · `SENT` (at Kisan, waiting for the tax
+  system) · `ISSUED` (in the tax workspace; `taxId` is its شماره منحصربه‌فرد
+  مالیاتی) · `FAILED` (refused; `error` says why, and an OBH manager resends it).
+
 ## What appears in OBH
 
 * **Payments**: every reported attempt, with the service and gateway.
