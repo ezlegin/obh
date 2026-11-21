@@ -7,7 +7,7 @@
 #
 # Repository secrets:
 #   DEPLOY_SSH_KEY      private key of the server's obh-deploy user
-#   DEPLOY_KNOWN_HOSTS  `ssh-keyscan -t ed25519 91.107.179.58` output
+#   DEPLOY_KNOWN_HOSTS  `ssh-keyscan -t ed25519 89.58.40.203` output
 name: Deploy to production
 
 on:
@@ -63,4 +63,4 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          ssh -i ~/.ssh/deploy -o BatchMode=yes obh-deploy@91.107.179.58 "$TARGET"
+          ssh -i ~/.ssh/deploy -o BatchMode=yes obh-deploy@89.58.40.203 "$TARGET"

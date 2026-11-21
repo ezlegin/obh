@@ -25,7 +25,9 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # ARM only (linux/arm64), on the native ARM runner: the server is ARM
+    # since 2026-11-21.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -44,12 +46,14 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/arm64
           push: true
           build-args: |
             APP_VERSION=${{ github.sha }}
             APP_BUILT_AT=${{ env.BUILT_AT }}
+          # :latest only from master; a manual run on another branch pushes :<sha>.
           tags: |
-            ghcr.io/ezlegin/obh:latest
             ghcr.io/ezlegin/obh:${{ github.sha }}
+            ${{ github.ref == 'refs/heads/master' && 'ghcr.io/ezlegin/obh:latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
